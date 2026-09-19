@@ -1,6 +1,6 @@
 import { LIE, lieAt } from './terrain.js';
 import { pointAtDistance, greenCentre, clamp } from './hole.js';
-import { pathLength, distanceToPath } from './geometry.js';
+import { distanceToPath } from './geometry.js';
 
 /** Multipliers applied to a golfer's full range by the lie they play from. */
 const LIE_RANGE = {

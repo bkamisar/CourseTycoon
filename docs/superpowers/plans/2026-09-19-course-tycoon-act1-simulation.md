@@ -710,7 +710,8 @@ test('a point on the centreline is fairway', () => {
 });
 
 test('just outside the corridor is rough', () => {
-  assert.equal(lieAt(hole, { x: 26, y: 200 }), LIE.ROUGH);
+  // y=100 sits clear of the tree clump at (34, 200).
+  assert.equal(lieAt(hole, { x: 26, y: 100 }), LIE.ROUGH);
 });
 
 test('far offline is trees', () => {
@@ -1096,7 +1097,7 @@ Expected: FAIL — module not found.
 // src/sim/shot.js
 import { LIE, lieAt } from './terrain.js';
 import { pointAtDistance, greenCentre, clamp } from './hole.js';
-import { pathLength, distanceToPath } from './geometry.js';
+import { distanceToPath } from './geometry.js';
 
 /** Multipliers applied to a golfer's full range by the lie they play from. */
 const LIE_RANGE = {
@@ -1176,19 +1177,39 @@ export function distanceRemaining(hole, point) {
   return Math.max(0, Math.hypot(centre.x - point.x, centre.y - point.y));
 }
 
-/** How far along the corridor a point sits, in yards. */
+/**
+ * How far along the corridor a point sits, in yards.
+ *
+ * Computed by projecting onto each segment rather than by sampling the
+ * path at intervals. Sampling would be both approximate and ruinously
+ * slow: this runs on every shot, and the balance harness simulates
+ * thousands of days.
+ */
 function progressAlong(hole, point) {
-  const total = pathLength(hole.corridor);
-  // Walk the path and keep the closest station to the point.
+  const path = hole.corridor;
   let best = 0;
   let bestDist = Infinity;
-  for (let d = 0; d <= total; d += 5) {
-    const p = pointAtDistance(hole.corridor, d);
-    const dist = Math.hypot(p.x - point.x, p.y - point.y);
+  let cumulative = 0;
+
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSq = dx * dx + dy * dy;
+    const segment = Math.sqrt(lengthSq);
+
+    let t = lengthSq === 0
+      ? 0
+      : ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq;
+    t = Math.max(0, Math.min(1, t));
+
+    const dist = Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
     if (dist < bestDist) {
       bestDist = dist;
-      best = d;
+      best = cumulative + t * segment;
     }
+    cumulative += segment;
   }
   return best;
 }
