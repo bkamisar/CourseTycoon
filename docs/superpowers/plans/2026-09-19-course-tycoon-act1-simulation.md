@@ -2859,14 +2859,23 @@ export function runDay(state, seed) {
   next.day += 1;
   if (gate.passed) next.act = 2;
 
-  return { state: next, report, timeline: buildTimeline(schedule, rawEvents) };
+  return {
+    state: next,
+    report,
+    timeline: buildTimeline(schedule, rawEvents, averageHoleMinutes),
+  };
 }
 
 /**
  * Flattens per-hole events onto the day's clock. The renderer plays this
  * back; the simulation has already finished before the first frame draws.
+ *
+ * A group reaches hole h having both waited AND played every hole before
+ * it, so the offset must accumulate both. Counting only the waits would
+ * stamp every event on the closing holes near the tee time and play the
+ * whole day back as one bunched-up mess.
  */
-function buildTimeline(schedule, rawEvents) {
+function buildTimeline(schedule, rawEvents, holeMinutes) {
   const timeline = [];
 
   for (const round of schedule.rounds) {
@@ -2876,13 +2885,22 @@ function buildTimeline(schedule, rawEvents) {
   for (const bundle of rawEvents) {
     const round = schedule.rounds[bundle.groupIndex];
     if (!round) continue;
-    // Start of the hole for this group: tee time plus everything before it.
+
     let minute = round.teeTime;
-    for (let h = 0; h < bundle.holeIndex; h++) minute += round.waitByHole[h] ?? 0;
+    for (let h = 0; h < bundle.holeIndex; h++) {
+      minute += (round.waitByHole[h] ?? 0) + (holeMinutes[h] ?? 0);
+    }
     minute += round.waitByHole[bundle.holeIndex] ?? 0;
+
+    // Spread this hole's events across the time the hole actually took.
+    const duration = holeMinutes[bundle.holeIndex] ?? 12;
     const span = Math.max(1, bundle.events.length);
     bundle.events.forEach((e, i) => {
-      timeline.push({ ...e, minute: minute + (i / span) * 12, groupIndex: bundle.groupIndex });
+      timeline.push({
+        ...e,
+        minute: minute + (i / span) * duration,
+        groupIndex: bundle.groupIndex,
+      });
     });
   }
 
@@ -3300,6 +3318,20 @@ A passive operator who never builds or adjusts anything should be *struggling bu
 | Mean round time | 135–175 min | Above 200 means holes are too slow to be fun; below 110 means pace never bites |
 | Mean satisfaction | 45–70 | Pinned at 100 or 0 means a term dominates |
 | Mean final turf | 30–80 | At 0 or 100 means the groundskeeper decision is fake |
+
+### Findings already in hand from Task 14
+
+A seven-day run of `newGame(1)` produced these, before any tuning. Start here rather than rediscovering them. The first is a **model gap**, not a constant, and should be fixed before the numbers are tuned around it.
+
+**1. Demand ignores satisfaction entirely — fix this first.** `demandGroups` reads course rating, prestige and price, but never satisfaction. In the observed week guests rated the resort 11–17 out of 100 and turned up in *growing* numbers every day. The player's worst mistakes never reach their wallet, which removes the feedback loop the whole game rests on. Add a satisfaction term: recent average satisfaction should pull demand down hard when it is poor. Until this exists, no amount of constant-tuning makes the economy behave.
+
+**2. Prestige rises on a resort everyone hates.** `nextPrestige` targets `rating * 0.55 + satisfaction * 0.45`, so a well-designed course that plays miserably still climbs — observed 12 → 27 across the week at satisfaction 11. Rating measures the *drawing*, satisfaction measures the *experience*; the experience should weigh at least as heavily.
+
+**3. The gate is trivially reachable.** $50,000 banked by **day 4** with no player action whatsoever, against a target of a passive operator almost never graduating. Profit ran $5.7k–$7.5k per day against costs of only $390. Either costs are far too low, revenue too high, or the money threshold too soft — likely all three.
+
+**4. The opening course cannot process its own tee sheet.** Pinehollow starts with three holes at ~16 minutes each, so it can pass at most ~41 groups through a day, yet the 10-minute interval sells 66 slots and demand delivered 34–44. Rounds took 194–241 minutes on a *three-hole* course. This is the tee interval question below, made sharper: it is not merely tight, it oversells throughput from day one.
+
+**5. Turf decays steadily** from 70 to 40 across the week with one groundskeeper against three holes. That is arguably correct — it makes hiring a real decision — but confirm the recovery curve lets an attentive player actually climb back.
 
 - [ ] **Step 4: Tune the constants, not the tests**
 

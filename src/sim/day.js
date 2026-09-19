@@ -17,8 +17,15 @@ const RANGE_WARMUP = -4;
 const PRACTICE_GREEN_WARMUP = -5;
 const WARMUP_HOLES = 2;
 
-/** The turn: which hole index a halfway house sits before, on a nine. */
-const TURN_HOLE_INDEX = 5;
+/**
+ * The turn: which hole a halfway house sits before. Derived from how many
+ * holes are actually open, not fixed, so that a player who builds one on a
+ * short course still gets something for their money. A fixed index 5 left
+ * it inert on the three-hole starting resort - another fake decision.
+ */
+function turnHoleIndex(holeCount) {
+  return Math.floor(holeCount / 2);
+}
 
 /** Each marshal shaves this fraction off hole times, capped in total. */
 const MARSHAL_EFFECT = 0.04;
@@ -75,7 +82,7 @@ export function runDay(state, seed) {
         carts,
         handicapAdjust: warming && hasRange ? RANGE_WARMUP : 0,
         puttAdjust: warming && hasPracticeGreen ? PRACTICE_GREEN_WARMUP : 0,
-        refuel: hasHalfwayHouse && holeIndex === TURN_HOLE_INDEX,
+        refuel: hasHalfwayHouse && holeIndex === turnHoleIndex(holes.length),
       });
       minutes.push(played.minutes);
       scores.push(played.scores);
