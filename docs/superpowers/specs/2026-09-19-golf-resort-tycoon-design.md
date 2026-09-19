@@ -77,8 +77,16 @@ needs beds, beds need golf, and distant golf needs transport.
 
 ### Act IV — The horizon
 
-A second property, sharing brand prestige. Not planned in detail. The data model
-holds `properties` as an array so this is never ruled out.
+A second property, sharing brand prestige. **Deliberately not planned in
+detail**, and it should stay that way until Act III has been played. What
+belongs in a fourth act depends on how managing multiple courses actually feels
+— if Act III proves tedious, then a second property is that same tedium doubled
+and something else (tournaments, a career mode) is the better fourth act.
+Planning it now would mean designing for a world we have not seen and then
+feeling committed to a plan we should abandon.
+
+The commitment here is narrower: Act IV is not *ruled out*. The data model holds
+`properties` as an array so the shape will not fight us later.
 
 **Gates read as graduation, not grind.** A gate fires when the player has
 demonstrated competence — profitable, well-rated, nine holes standing — not when
@@ -409,6 +417,19 @@ and how many days the Act I gate actually takes to reach. This is how the
 starting values in §8.3 get replaced with good ones. When the player says "money
 feels too easy," the answer takes ten seconds instead of an afternoon of
 replaying.
+
+**Who tunes what.** The balance tool tunes for *soundness* and runs before the
+game is ever played by a human: money exploding until cost stops mattering,
+bankruptcy being unavoidable regardless of play, the Act I gate arriving in four
+days or four hundred, a tee interval so generous that groups never queue and
+pace of play never bites. These are failures a script can catch, and spending a
+play session discovering them is waste.
+
+Playtesting tunes for *feel*, which no script can judge: whether raising the
+green fee is an interesting decision or an obvious one, whether reaching the
+gate lands as an achievement or a chore. The starting values in §8.3 and the
+gate thresholds in §3 are therefore expected to move twice — once from the tool,
+once from play.
 
 ---
 
