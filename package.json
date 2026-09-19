@@ -1,0 +1,11 @@
+{
+  "name": "course-tycoon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "An 8-bit golf resort management game",
+  "scripts": {
+    "test": "node --test",
+    "balance": "node tools/balance.js"
+  }
+}
