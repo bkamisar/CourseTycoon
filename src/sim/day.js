@@ -12,6 +12,18 @@ import { openHoles } from './state.js';
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
 
+/** Warm-up benefit, in effective handicap strokes, on the first two holes. */
+const RANGE_WARMUP = -4;
+const PRACTICE_GREEN_WARMUP = -5;
+const WARMUP_HOLES = 2;
+
+/** The turn: which hole index a halfway house sits before, on a nine. */
+const TURN_HOLE_INDEX = 5;
+
+/** Each marshal shaves this fraction off hole times, capped in total. */
+const MARSHAL_EFFECT = 0.04;
+const MARSHAL_CAP = 0.12;
+
 /**
  * Runs one full day and returns the next state, the evening report, and a
  * timeline of timestamped events for the renderer to play back.
@@ -26,6 +38,9 @@ export function runDay(state, seed) {
   const { greenFee, teeInterval } = next.resort.pricing;
   const amenityTypes = next.resort.amenities.map((a) => a.type);
   const carts = amenityTypes.includes('cartBarn');
+  const hasRange = amenityTypes.includes('drivingRange');
+  const hasPracticeGreen = amenityTypes.includes('practiceGreen');
+  const hasHalfwayHouse = amenityTypes.includes('halfwayHouse');
 
   const rating = holes.length ? courseRating(holes, next.turfQuality) : 0;
 
@@ -54,12 +69,18 @@ export function runDay(state, seed) {
   for (const group of groups) {
     const minutes = [];
     const scores = [];
-    for (const hole of holes) {
-      const played = playHole(rng, hole, group, { carts });
+    holes.forEach((hole, holeIndex) => {
+      const warming = holeIndex < WARMUP_HOLES;
+      const played = playHole(rng, hole, group, {
+        carts,
+        handicapAdjust: warming && hasRange ? RANGE_WARMUP : 0,
+        puttAdjust: warming && hasPracticeGreen ? PRACTICE_GREEN_WARMUP : 0,
+        refuel: hasHalfwayHouse && holeIndex === TURN_HOLE_INDEX,
+      });
       minutes.push(played.minutes);
       scores.push(played.scores);
-      rawEvents.push({ groupIndex: group.id, holeIndex: minutes.length - 1, events: played.events });
-    }
+      rawEvents.push({ groupIndex: group.id, holeIndex, events: played.events });
+    });
     perGroupHoleMinutes.push(minutes);
     perGroupScores.push(scores);
   }
@@ -71,11 +92,17 @@ export function runDay(state, seed) {
       : 0
   );
 
+  // Marshals move slow groups along. Capped, deliberately: staffing must not
+  // be a way to buy your way out of a badly designed course.
+  const marshals = next.resort.staff.filter((m) => m.role === 'marshal').length;
+  const marshalFactor = 1 - Math.min(MARSHAL_CAP, marshals * MARSHAL_EFFECT);
+  const pacedHoleMinutes = averageHoleMinutes.map((m) => m * marshalFactor);
+
   const schedule = groupCount
     ? scheduleRounds({
         groupCount,
         teeInterval,
-        holeMinutes: averageHoleMinutes,
+        holeMinutes: pacedHoleMinutes,
         dayStart: DAY_START,
         dayEnd: DAY_END,
       })
@@ -179,7 +206,7 @@ export function runDay(state, seed) {
   return {
     state: next,
     report,
-    timeline: buildTimeline(schedule, rawEvents, averageHoleMinutes),
+    timeline: buildTimeline(schedule, rawEvents, pacedHoleMinutes),
   };
 }
 

@@ -16,28 +16,49 @@ const TIRED_PENALTY = 0.12;  // extra minutes per stroke at zero energy
 
 const MAX_STROKES = 12;      // pick up and move on
 
+/** Energy a refuel stop restores golfers to, and what the stop costs. */
+const REFUEL_TO = 82;
+const REFUEL_MINUTES = 3.5;
+
 /**
  * Plays one group through one hole. Mutates each guest's energy — they get
  * tireder as the round goes on — and returns scores, elapsed minutes and
  * the events a renderer will replay.
  */
-export function playHole(rng, hole, group, { carts }) {
+export function playHole(
+  rng,
+  hole,
+  group,
+  { carts, handicapAdjust = 0, puttAdjust = 0, refuel = false }
+) {
   const stats = holeStats(hole);
   const greenDifficulty = GREEN_DIFFICULTY[hole.greenPreset];
   const scores = [];
   const events = [];
-  let penaltyMinutes = 0;
   let totalStrokes = 0;
+
+  if (refuel) {
+    for (const guest of group.guests) {
+      guest.energy = Math.max(guest.energy, REFUEL_TO);
+    }
+    events.push({ type: 'refuel', holeId: hole.id });
+  }
+
+  let penaltyMinutes = refuel ? REFUEL_MINUTES : 0;
 
   for (const guest of group.guests) {
     let position = { ...hole.teePos };
     let lie = LIE.TEE;
     let strokes = 0;
 
+    // Warm-up and coaching lower the effective handicap, never below scratch.
+    const swingHandicap = clamp(guest.handicap + handicapAdjust, 0, 36);
+    const puttHandicap = clamp(guest.handicap + puttAdjust, 0, 36);
+
     while (strokes < MAX_STROKES) {
       if (lie === LIE.GREEN) break;
 
-      const shot = resolveShot(rng, hole, position, lie, guest.handicap);
+      const shot = resolveShot(rng, hole, position, lie, swingHandicap);
       strokes++;
       events.push({
         type: 'shot',
@@ -71,7 +92,7 @@ export function playHole(rng, hole, group, { carts }) {
     // Hole out.
     const feetToPin = distanceRemaining(hole, position) * 3;
     const putts = lie === LIE.GREEN
-      ? puttsToHole(rng, feetToPin, guest.handicap, greenDifficulty)
+      ? puttsToHole(rng, feetToPin, puttHandicap, greenDifficulty)
       : 2;
     strokes += putts;
     strokes = Math.min(strokes, MAX_STROKES + 2);
