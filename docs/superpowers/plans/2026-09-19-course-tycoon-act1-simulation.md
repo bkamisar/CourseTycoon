@@ -64,7 +64,7 @@ Expected: `v18.0.0` or higher. Node's built-in test runner does not exist before
   "type": "module",
   "description": "An 8-bit golf resort management game",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test",
     "balance": "node tools/balance.js"
   }
 }
