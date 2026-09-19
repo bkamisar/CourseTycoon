@@ -1582,8 +1582,12 @@ test('no bottleneck is reported when nothing queues', () => {
 });
 
 test('groups finishing after the day ends are reported', () => {
+  // With an 8 minute interval and 16 minute holes the course saturates, so
+  // each group finishes exactly 16 minutes after the one ahead: group g
+  // finishes at 420 + 16 * (9 + g). Overrunning 1080 needs g >= 33, so 30
+  // groups all finish comfortably inside the day and 40 is the honest test.
   const r = scheduleRounds({
-    groupCount: 30, teeInterval: 8, holeMinutes: flat(16), dayStart: 420, dayEnd: 1080,
+    groupCount: 40, teeInterval: 8, holeMinutes: flat(16), dayStart: 420, dayEnd: 1080,
   });
   assert.ok(r.overrunGroups > 0);
 });
@@ -3305,6 +3309,13 @@ If a measure is out of range, change the constant that drives it and re-run. The
 - **Money impossible** → lower the same, or raise the `reputationPull` floor in `demandGroups`.
 - **Rounds too slow** → lower `PRE_SHOT` or raise `WALK_YARDS_PER_MIN` in `src/sim/round.js`.
 - **Pace never bites** → lower the default `teeInterval` in `src/sim/state.js`.
+
+**Known question to settle here.** Task 9's sanity sweep showed queueing vanishes exactly when the tee interval reaches the average hole time, and holes currently average about 16 minutes against a default `teeInterval` of 10. So the starting resort is already heavily backed up: roughly 231-minute rounds against a 144-minute clean one. Decide deliberately which of these is wanted, rather than letting it stand by accident:
+
+- **Keep it jammed.** Realistic — public courses back up exactly this way — and day one complaints teach the player what pace of play means before they have built anything. Risk: the player starts in a hole they did not dig and may read it as the game being broken.
+- **Start near the crossover** (interval 15–16). The player begins healthy and creates their own congestion by building hazards, which makes the mechanic feel earned. Risk: pace never bites for a cautious player.
+
+The balance run will show which produces a better opening few days. Whichever is chosen, `teeInterval` should stay a player-facing dial, because moving it is the clearest lever they have against a course they have made too slow.
 - **Gate too easy or unreachable** → adjust `GATE_THRESHOLDS` in `src/sim/acts.js`.
 - **Turf pinned** → adjust the `wear` and `care` coefficients in `src/sim/day.js`.
 
