@@ -87,13 +87,18 @@ export function playHole(rng, hole, group, { carts }) {
 
   const walkFactor = carts ? CART_WALK_FACTOR : 1;
   const walkMinutes = (stats.length / WALK_YARDS_PER_MIN) * walkFactor;
-  const puttMinutes = scores.reduce((s, x) => s + x.putts, 0) * PER_PUTT;
+  // Putts are already inside totalStrokes, so the pre-shot routine applies
+  // only to full shots. Charging a putt both costs double-counts it, which
+  // added roughly four phantom minutes per hole for a four-ball.
+  const totalPutts = scores.reduce((s, x) => s + x.putts, 0);
+  const fullShots = totalStrokes - totalPutts;
+  const puttMinutes = totalPutts * PER_PUTT;
   const averageEnergy =
     group.guests.reduce((s, g) => s + g.energy, 0) / group.guests.length;
   const tiredMinutes = totalStrokes * TIRED_PENALTY * (1 - averageEnergy / 100);
 
   const minutes =
-    walkMinutes + totalStrokes * PRE_SHOT + puttMinutes + penaltyMinutes + tiredMinutes;
+    walkMinutes + fullShots * PRE_SHOT + puttMinutes + penaltyMinutes + tiredMinutes;
 
   return { scores, minutes, events, totalStrokes };
 }

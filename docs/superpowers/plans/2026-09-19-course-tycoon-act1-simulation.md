@@ -1450,13 +1450,18 @@ export function playHole(rng, hole, group, { carts }) {
 
   const walkFactor = carts ? CART_WALK_FACTOR : 1;
   const walkMinutes = (stats.length / WALK_YARDS_PER_MIN) * walkFactor;
-  const puttMinutes = scores.reduce((s, x) => s + x.putts, 0) * PER_PUTT;
+  // Putts are already inside totalStrokes, so the pre-shot routine applies
+  // only to full shots. Charging a putt both costs double-counts it, which
+  // added roughly four phantom minutes per hole for a four-ball.
+  const totalPutts = scores.reduce((s, x) => s + x.putts, 0);
+  const fullShots = totalStrokes - totalPutts;
+  const puttMinutes = totalPutts * PER_PUTT;
   const averageEnergy =
     group.guests.reduce((s, g) => s + g.energy, 0) / group.guests.length;
   const tiredMinutes = totalStrokes * TIRED_PENALTY * (1 - averageEnergy / 100);
 
   const minutes =
-    walkMinutes + totalStrokes * PRE_SHOT + puttMinutes + penaltyMinutes + tiredMinutes;
+    walkMinutes + fullShots * PRE_SHOT + puttMinutes + penaltyMinutes + tiredMinutes;
 
   return { scores, minutes, events, totalStrokes };
 }
@@ -1495,6 +1500,8 @@ Run: `node --test tests/round.test.js`
 Expected: PASS, 10 passing.
 
 If the "believable time" test fails, adjust `PRE_SHOT` and `WALK_YARDS_PER_MIN` rather than loosening the assertion — a par 4 that takes 40 minutes means the pace-of-play mechanic will not work.
+
+**Sanity check before moving on.** Print `expectedMinutes` for all six templates and take the **average**, then multiply by nine. Do not sum the six and compare that to a nine-hole figure — six holes is not a round, and that mistake once hid a 40-minute-per-round error. Expect par 3s around 9–13 minutes, par 4s 13–18, par 5s 18–21, and a nine-hole round of **135–150 minutes**. Anything much above that and the pace mechanic will strangle demand before the player has done anything wrong.
 
 - [ ] **Step 5: Commit**
 
