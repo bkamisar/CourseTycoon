@@ -37,7 +37,7 @@ export function perceivedValue({ courseRating, prestige, amenities }) {
  * cannot sell more rounds than daylight allows.
  */
 export function demandGroups({
-  courseRating, prestige, amenities, greenFee, teeInterval,
+  courseRating, prestige, amenities, greenFee, teeInterval, recentSatisfaction = 50,
 }) {
   const value = perceivedValue({ courseRating, prestige, amenities });
   // 1.0 when priced at value; falls away above it, gains slowly below it.
@@ -47,9 +47,14 @@ export function demandGroups({
     : Math.max(0, 1 - (ratio - 1) * 1.15);
 
   const reputationPull = 0.35 + (prestige / 100) * 0.9;
+
+  // Word of mouth. A resort people leave unhappy empties out, and this is
+  // the only route by which a bad course reaches the player's wallet.
+  const wordOfMouth = clamp((recentSatisfaction / 55) ** 1.5, 0.05, 1.25);
+
   const capacity = maxGroupsForDay(teeInterval);
 
-  return clamp(Math.round(capacity * appetite * reputationPull), 0, capacity);
+  return clamp(Math.round(capacity * appetite * reputationPull * wordOfMouth), 0, capacity);
 }
 
 export function dailyRevenue({ groupsPlayed, greenFee, amenities, averageSatisfaction }) {

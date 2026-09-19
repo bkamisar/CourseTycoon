@@ -51,6 +51,13 @@ export function runDay(state, seed) {
 
   const rating = holes.length ? courseRating(holes, next.turfQuality) : 0;
 
+  // Word of mouth from the last few days. No history yet (day one) is
+  // neutral, so the resort isn't punished or rewarded before it has played.
+  const recentHistory = next.satisfactionHistory.slice(-3);
+  const recentSatisfaction = recentHistory.length
+    ? recentHistory.reduce((s, v) => s + v, 0) / recentHistory.length
+    : 50;
+
   // Nobody comes to a resort with no golf.
   const groupCount = holes.length
     ? demandGroups({
@@ -59,6 +66,7 @@ export function runDay(state, seed) {
         amenities: next.resort.amenities,
         greenFee,
         teeInterval,
+        recentSatisfaction,
       })
     : 0;
 

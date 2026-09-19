@@ -37,7 +37,7 @@ export function courseRating(holes, turfQuality) {
  * be able to buy their way out of a bad course with one good day.
  */
 export function nextPrestige(current, rating, averageSatisfaction) {
-  const target = rating * 0.55 + averageSatisfaction * 0.45;
+  const target = rating * 0.45 + averageSatisfaction * 0.55;
   const RATE = 0.08;
   return clamp(current + (target - current) * RATE, 0, 100);
 }
