@@ -137,3 +137,21 @@ test('a slow hole on the back nine is named, not undefined', () => {
   assert.ok(complaints.some((c) => c.includes('14th')), complaints.join(' | '));
   assert.ok(!complaints.some((c) => c.includes('undefined')), complaints.join(' | '));
 });
+
+test('a short course is never told about a hole it does not have', () => {
+  // The restroom complaint used to hard-code "past the 6th", which on the
+  // three-hole starting resort described a hole that does not exist.
+  const complaints = buildComplaints({
+    waitTotalsByHole: new Array(3).fill(0),
+    groupsPlayed: 12,
+    turfQuality: 85,
+    amenityTypes: ['clubhouse'],
+    averageSatisfaction: 65,
+    nearActGate: false,
+  });
+  const joined = complaints.join(' | ');
+  assert.ok(/restroom/i.test(joined), joined);
+  for (const n of [4, 5, 6, 7, 8, 9]) {
+    assert.ok(!joined.includes(ordinal(n)), `named a nonexistent hole: ${joined}`);
+  }
+});

@@ -82,7 +82,16 @@ export function buildComplaints({
 
   // Missing amenities.
   if (!amenityTypes.includes('restrooms')) {
-    complaints.push('There is no restroom anywhere past the 6th.');
+    // Name a hole the course actually has. Hard-coding "past the 6th"
+    // told players about a hole that does not exist on a three-hole
+    // resort, which reads as the game being broken rather than the
+    // course being short of facilities.
+    const holeCount = waitTotalsByHole.length;
+    complaints.push(
+      holeCount >= 4
+        ? `There is no restroom anywhere past the ${ordinal(Math.ceil(holeCount / 2))}.`
+        : 'There is nowhere out there to use a restroom.'
+    );
   }
   if (!amenityTypes.includes('snackShack') && !amenityTypes.includes('halfwayHouse')) {
     complaints.push('Nowhere to get a drink at the turn.');

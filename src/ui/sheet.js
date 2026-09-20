@@ -202,6 +202,10 @@ export function mountSheetHost(root) {
   let dragDelta = 0;
 
   function onPointerDown(evt) {
+    // The close button sits inside the header. Capturing the pointer here
+    // would mean the pointerup lands on the panel rather than the button,
+    // so its click never fires and the X silently does nothing.
+    if (evt.target.closest && evt.target.closest('.sheet-close')) return;
     dragStartY = evt.clientY;
     dragDelta = 0;
     panel.classList.add('sheet-panel--dragging');
