@@ -73,13 +73,36 @@ test('handicapAdjust never pushes a handicap below zero', () => {
   assert.ok(r.scores.every((s) => s.strokes >= 1));
 });
 
-test('a driving range measurably improves satisfaction across a day', () => {
+test('a driving range improves satisfaction when the tee sheet has room', () => {
+  // Only when there is room. See the next test for why that matters.
   const without = newGame(21);
+  without.resort.pricing.teeInterval = 30;
   const withRange = newGame(21);
+  withRange.resort.pricing.teeInterval = 30;
   withRange.resort.amenities.push({ type: 'drivingRange' });
   const a = runDay(without, 5).report.averageSatisfaction;
   const b = runDay(withRange, 5).report.averageSatisfaction;
   assert.ok(b > a, `no range ${a} vs range ${b}`);
+});
+
+test('an amenity that draws a crowd onto a full tee sheet makes things worse', () => {
+  // An improvement raises what a round here is worth, which draws more
+  // golfers, which queues them on a course that was already at capacity.
+  // Measured: at the default interval the driving range adds a group,
+  // stretches the round from 61 to 67 minutes, and drops satisfaction.
+  // That is a real trade, not a bug - an amenity only pays if there is
+  // room to absorb the crowd it attracts - and it is pinned here so it
+  // cannot quietly disappear in a future tuning pass.
+  const without = newGame(21);
+  const withRange = newGame(21);
+  withRange.resort.amenities.push({ type: 'drivingRange' });
+  const a = runDay(without, 5).report;
+  const b = runDay(withRange, 5).report;
+  assert.ok(b.groupsPlayed >= a.groupsPlayed, 'the amenity should draw at least as many');
+  assert.ok(
+    b.averageRoundMinutes > a.averageRoundMinutes,
+    `a fuller tee sheet should play slower: ${a.averageRoundMinutes} vs ${b.averageRoundMinutes}`
+  );
 });
 
 test('marshals shorten the average round', () => {

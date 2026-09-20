@@ -102,8 +102,17 @@ function landingProximity(along, length) {
 }
 
 function difficultyOf(hole, length, bunkers, ponds, trees) {
-  // Narrow corridors punish dispersion most, so width dominates.
-  const widthPenalty = clamp((46 - hole.corridorWidth) * 1.6, -10, 40);
+  // Narrow corridors punish dispersion - but only in proportion to the club
+  // being swung. Thirty yards is tight for a driver and generous for a
+  // wedge, so the same corridor is a different hole at 150 yards and at 500.
+  //
+  // Treating width as an absolute made a 155 yard par 3 (44.6) score harder
+  // than a 526 yard par 5 (43.8), because the short holes happen to have the
+  // narrowest corridors. That squashed every template into an eight point
+  // band, and a band that narrow cannot express the difference between what
+  // a beginner wants and what a scratch player wants.
+  const clubFactor = clamp(length / 390, 0.35, 1.35);
+  const widthPenalty = clamp((46 - hole.corridorWidth) * 1.6 * clubFactor, -10, 45);
 
   // A hazard threatens in two dimensions, and the second one used to be
   // missing. Sideways: a pond 80 yards offline is scenery. Along the hole:
@@ -129,7 +138,7 @@ function difficultyOf(hole, length, bunkers, ponds, trees) {
 
   const treePressure = trees.reduce((sum, f) => sum + hazardScore(f, 4), 0);
 
-  const lengthPressure = clamp((length - 330) / 12, -8, 20);
+  const lengthPressure = clamp((length - 330) / 10, -10, 26);
   const greenPressure = (GREEN_DIFFICULTY[hole.greenPreset] - 1) * 30;
 
   return clamp(
