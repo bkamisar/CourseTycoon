@@ -11,7 +11,7 @@ import { createSurface, topChromeOverlapPx, bottomChromeOverlapPx } from './rend
 import { PALETTE } from './render/palette.js';
 import { drawResort } from './render/resortView.js';
 import { computeTokens, computeEffects, drawTokens, drawEffects } from './render/tokens.js';
-import { newGame, openHoles } from './sim/state.js';
+import { openHoles } from './sim/state.js';
 import { runDay } from './sim/day.js';
 import { holeStats } from './sim/hole.js';
 import { createClock, PLAYBACK_SPEEDS } from './play/clock.js';
@@ -23,26 +23,30 @@ import { mountHoleEditor, openTemplatePicker } from './ui/editor.js';
 import { openBuildSheet, openStaffSheet, openPricingSheet } from './ui/panels.js';
 import { openGlossarySheet } from './ui/glossary.js';
 import { mountReport } from './ui/report.js';
+import { mountStartScreen, startNewGame, applySaveCode } from './ui/start.js';
 import { createSaveAdapter } from './save/adapter.js';
 import { createLocalBackend } from './save/local.js';
+import { encode } from './save/code.js';
 import { createChiptune, mountMuteToggle } from './audio/chiptune.js';
 
 document.body.style.backgroundColor = PALETTE.OUTLINE;
 
 // ---------------------------------------------------------------------
-// Boot: continue a save if one exists, otherwise start fresh. The seed for
-// a brand new game comes from wall-clock time -- fine here, since this is
-// outside the simulation and the seed is then stored in state, exactly as
-// the rest of the sim expects: every draw from here on is deterministic.
+// Boot: whatever save exists (or doesn't) is read up front so the start
+// screen can offer Continue with real numbers on it, but it is NOT what
+// the game plays on. `state` stays unset until the player actually picks
+// Continue, New Game or a save code on that screen -- see "Start screen"
+// below. The seed for a brand new game comes from wall-clock time --
+// fine here, since this is outside the simulation and the seed is then
+// stored in state, exactly as the rest of the sim expects: every draw
+// from here on is deterministic.
 // ---------------------------------------------------------------------
 
 const adapter = createSaveAdapter();
 adapter.registerBackend(createLocalBackend());
 
-let state = adapter.load();
-if (!state) {
-  state = newGame(Date.now() & 0x7fffffff);
-}
+let existingSave = adapter.load();
+let state = null;
 
 // ---------------------------------------------------------------------
 // DOM shell
@@ -52,7 +56,7 @@ const canvas = document.getElementById('game-canvas');
 const uiRoot = document.getElementById('ui-root');
 const surface = createSurface(canvas, { width: 180, height: 320 });
 
-const router = createScreenRouter('overview');
+const router = createScreenRouter('start');
 
 // The HUD bar and the amenity strip stack in normal document flow inside
 // one shared fixed-at-top wrapper, rather than each hand-placing itself
@@ -94,6 +98,9 @@ const chiptune = createChiptune();
 
 const reportRoot = document.createElement('div');
 document.body.appendChild(reportRoot);
+
+const startRoot = document.createElement('div');
+document.body.appendChild(startRoot);
 
 injectToolbarStyles();
 
@@ -303,14 +310,65 @@ function updatePlaybackToolbar() {
 // ---------------------------------------------------------------------
 
 function syncScreenChrome() {
+  const onStart = router.current === 'start';
   overviewToolbar.hidden = router.current !== 'overview';
   playbackToolbar.hidden = router.current !== 'playback';
   reportRoot.hidden = router.current !== 'report';
+  startRoot.hidden = !onStart;
+  // The HUD bar and amenity strip have nothing real to show before a game
+  // state exists at all -- hide them rather than let them sit empty behind
+  // the start screen.
+  topChrome.style.display = onStart ? 'none' : '';
   overviewMute.update();
   playbackMute.update();
 }
 router.subscribe(syncScreenChrome);
 syncScreenChrome();
+
+// ---------------------------------------------------------------------
+// Start screen: Continue (only when a save exists), New Game (wiping any
+// existing save, with a confirmation naming what is lost), and loading a
+// save code (the other half of the copy-a-save-code feature -- see the
+// "Copy Save Code" card `mountStartScreen` renders whenever `existingSave`
+// is set). This is the only place `state` is ever first assigned.
+// ---------------------------------------------------------------------
+
+function enterOverviewFromStart(nextState) {
+  state = nextState;
+  router.go('overview');
+  drawOverview();
+  chiptune.playMusic('build');
+}
+
+function renderStartScreen() {
+  mountStartScreen(startRoot, {
+    save: existingSave,
+    saveCode: existingSave ? encode(existingSave) : null,
+    sheets,
+    topInset: embedded ? EMBEDDED_TOP_INSET : 0,
+    onContinue() {
+      enterOverviewFromStart(existingSave);
+    },
+    onNewGame() {
+      const fresh = startNewGame(Date.now() & 0x7fffffff);
+      const saved = adapter.save(fresh);
+      if (!saved) {
+        // Same rule as onReportContinue below: never silently lose a save.
+        console.warn('Course Tycoon: could not save the new game (every save backend failed).');
+      }
+      existingSave = fresh;
+      enterOverviewFromStart(fresh);
+    },
+    onLoadCode(text) {
+      const result = applySaveCode(text, adapter);
+      if (result.ok) {
+        existingSave = result.state;
+        enterOverviewFromStart(result.state);
+      }
+      return result;
+    },
+  });
+}
 
 // ---------------------------------------------------------------------
 // Opening the day: runDay is the only place a day's outcome is decided.
@@ -410,6 +468,10 @@ function frame(now) {
   lastFrameTime = now;
 
   switch (router.current) {
+    case 'start':
+      // Full-screen DOM overlay; nothing to draw on the canvas underneath,
+      // and no `state` exists yet for anything here to read.
+      break;
     case 'overview':
       drawOverview();
       break;
@@ -437,8 +499,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-drawOverview();
-chiptune.playMusic('build');
+renderStartScreen();
 requestAnimationFrame(frame);
 
 window.addEventListener('resize', () => {
