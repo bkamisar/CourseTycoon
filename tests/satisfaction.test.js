@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { guestSatisfaction, buildComplaints } from '../src/sim/satisfaction.js';
+import { guestSatisfaction, buildComplaints, ordinal } from '../src/sim/satisfaction.js';
 
 const baseline = {
   handicap: 15,
@@ -108,4 +108,32 @@ test('nearing the act gate foreshadows lodging', () => {
     nearActGate: true,
   });
   assert.ok(complaints.some((c) => /sleep|stay|motel|room/i.test(c)), complaints.join(' | '));
+});
+
+test('hole ordinals read correctly past the front nine', () => {
+  // A hard-coded table of nine produced "The undefined takes forever."
+  assert.equal(ordinal(1), '1st');
+  assert.equal(ordinal(2), '2nd');
+  assert.equal(ordinal(3), '3rd');
+  assert.equal(ordinal(9), '9th');
+  assert.equal(ordinal(11), '11th');
+  assert.equal(ordinal(12), '12th');
+  assert.equal(ordinal(13), '13th');
+  assert.equal(ordinal(18), '18th');
+  assert.equal(ordinal(21), '21st');
+});
+
+test('a slow hole on the back nine is named, not undefined', () => {
+  const waits = new Array(18).fill(0);
+  waits[13] = 400; // the 14th
+  const complaints = buildComplaints({
+    waitTotalsByHole: waits,
+    groupsPlayed: 20,
+    turfQuality: 85,
+    amenityTypes: ['clubhouse', 'restrooms', 'snackShack'],
+    averageSatisfaction: 70,
+    nearActGate: false,
+  });
+  assert.ok(complaints.some((c) => c.includes('14th')), complaints.join(' | '));
+  assert.ok(!complaints.some((c) => c.includes('undefined')), complaints.join(' | '));
 });

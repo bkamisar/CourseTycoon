@@ -1,6 +1,20 @@
 import { clamp } from './hole.js';
 
-const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th'];
+/**
+ * Ordinal for a hole number. Computed rather than looked up in a table of
+ * nine, so complaints still read correctly if a course ever runs past the
+ * front nine - a hard-coded list produced "The undefined takes forever."
+ */
+export function ordinal(n) {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
 
 /**
  * A golfer's verdict on their round, 0–100.
@@ -54,9 +68,9 @@ export function buildComplaints({
   const worst = waitTotalsByHole.indexOf(Math.max(...waitTotalsByHole));
   const worstPerGroup = waitTotalsByHole[worst] / groups;
   if (worstPerGroup > 6) {
-    complaints.push(`The ${ORDINALS[worst]} takes forever. We stood on that tee for ages.`);
+    complaints.push(`The ${ordinal(worst + 1)} takes forever. We stood on that tee for ages.`);
   } else if (worstPerGroup > 3) {
-    complaints.push(`Bit of a backup on the ${ORDINALS[worst]}.`);
+    complaints.push(`Bit of a backup on the ${ordinal(worst + 1)}.`);
   }
 
   // Condition.
