@@ -12,7 +12,7 @@
  * in the browser (see the Task 5 report).
  */
 
-export const SCREEN_NAMES = Object.freeze(['overview', 'editor', 'playback', 'report']);
+export const SCREEN_NAMES = Object.freeze(['start', 'overview', 'editor', 'playback', 'report']);
 
 function assertScreen(name) {
   if (!SCREEN_NAMES.includes(name)) {

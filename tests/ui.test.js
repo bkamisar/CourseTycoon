@@ -7,8 +7,8 @@ import { newGame } from '../src/sim/state.js';
 
 // --- Screens --------------------------------------------------------------
 
-test('there are exactly the four documented screens', () => {
-  assert.deepEqual(SCREEN_NAMES, ['overview', 'editor', 'playback', 'report']);
+test('there are exactly the five documented screens', () => {
+  assert.deepEqual(SCREEN_NAMES, ['start', 'overview', 'editor', 'playback', 'report']);
 });
 
 test('a router starts on overview by default', () => {
