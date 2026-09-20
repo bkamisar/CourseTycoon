@@ -236,6 +236,7 @@ export const SPRITES = {
   golferWalk1,
   golferWalk2,
   flag,
+  tee,
   tree,
   ball,
   cart,

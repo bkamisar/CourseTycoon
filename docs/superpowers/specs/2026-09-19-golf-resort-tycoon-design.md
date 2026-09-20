@@ -531,6 +531,36 @@ a game that makes noise unprompted on a phone is a game that gets closed.
 
 ---
 
+## 15a. The variety layer — agreed principles, not yet designed
+
+The game as built has no opposition. The world is static, so every decision
+either works or does not against a fixed target, and a player who finds a good
+configuration can run it on autopilot. Confirmed in the first real playthrough:
+*"I hit my stride in act one and it was a way to sort of put on autopilot."*
+
+Four features answer this and are deliberately being designed **together**,
+because they reinforce each other and would be four unrelated taxes apart:
+random events with choices, player types, amenity levels with degradation, and
+weather.
+
+Three principles are already agreed and should survive into that design:
+
+**Every choice states its cost explicitly.** No hidden tradeoffs and no
+guessing. A choice whose consequence is unknown is a coin flip, not a decision.
+
+**A recurring character delivers events.** A named, familiar voice makes
+interruptions read as a continuing story rather than dice rolls.
+
+**Player types create opposed constituencies.** Rookies and professionals want
+opposite things, so no course configuration satisfies everyone. This is the
+anti-autopilot mechanic and it is nearly free: difficulty is already a dial in
+the simulation, it simply has no opposed audiences pulling on it yet. It also
+gives prestige a qualitative meaning — the crowd changes as you rise, and the
+new crowd wants what the old resort cannot provide.
+
+Weather additionally supplies the run-to-run variance the balance pass could not
+manufacture, and is the likeliest fix for bankruptcy sitting at 0% (§8.3).
+
 ## 16. Deferred decisions
 
 Recorded so they are not silently forgotten, and deliberately excluded from Act

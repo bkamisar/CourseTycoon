@@ -35,7 +35,19 @@ const CELL_GAP = 4;
 const LABEL_FONT = '7px monospace';
 const LABEL_PAD_X = 2;
 const LABEL_HEIGHT = 9;
+const LABEL_MARGIN = 1;
 
+/**
+ * A small top-left corner badge, deliberately NOT centred over the plot.
+ * Both the flag (drawn at the green, top-centre) and the tee sprite
+ * (drawn at the corridor start, bottom-centre) sit on that centreline —
+ * an earlier version of this label sat centred at the bottom and drew
+ * its chip directly on top of the tee sprite, dimming it into an
+ * unreadable smudge sitting in the middle of the text. The corner is
+ * always rough/trees background on every template (the corridor never
+ * reaches the plot's edges), so a badge there never collides with
+ * anything the hole itself draws.
+ */
 function drawHoleLabel(ctx, hole, rect) {
   const stats = holeStats(hole);
   const text = `P${stats.par} · D${Math.round(stats.difficulty)}`;
@@ -44,20 +56,19 @@ function drawHoleLabel(ctx, hole, rect) {
   ctx.font = LABEL_FONT;
   ctx.textBaseline = 'middle';
   const textWidth = ctx.measureText(text).width;
-  const labelWidth = Math.min(rect.width, textWidth + LABEL_PAD_X * 2);
-  const labelX = rect.x + Math.round((rect.width - labelWidth) / 2);
-  const labelY = rect.y + rect.height - LABEL_HEIGHT;
+  const labelWidth = Math.min(rect.width - LABEL_MARGIN * 2, textWidth + LABEL_PAD_X * 2);
+  const labelX = rect.x + LABEL_MARGIN;
+  const labelY = rect.y + LABEL_MARGIN;
 
-  // A solid chip behind the text, not just the text itself — the hole art
+  // A solid (not translucent) chip behind the text — the hole art
   // underneath ranges from dark tree green to pale sand, and white text
-  // alone would vanish against the lighter parts of it.
+  // alone would vanish against the lighter parts of it; a translucent
+  // chip would too, over the darkest parts.
   ctx.fillStyle = PALETTE.OUTLINE;
-  ctx.globalAlpha = 0.78;
   ctx.fillRect(labelX, labelY, labelWidth, LABEL_HEIGHT);
-  ctx.globalAlpha = 1;
 
   ctx.fillStyle = PALETTE.WHITE;
-  ctx.fillText(text, labelX + Math.round((labelWidth - textWidth) / 2), labelY + LABEL_HEIGHT / 2 + 0.5);
+  ctx.fillText(text, labelX + LABEL_PAD_X, labelY + LABEL_HEIGHT / 2 + 0.5);
   ctx.restore();
 }
 
