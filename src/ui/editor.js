@@ -167,22 +167,41 @@ function injectStyles() {
       font-size: 11px;
     }
 
-    .editor-readout {
+    /*
+     * The readout and the toolbar are docked together at the bottom, as one
+     * fixed block, rather than the readout floating at a hand-picked "top:
+     * 34px" the way it used to. That old value assumed the canvas always
+     * left a tall gap below the HUD bar to float in — true only when the
+     * full 375x812 viewport is actually available. A real phone's browser
+     * chrome (address bar, home-indicator bar) eats into that height, and
+     * because this page disables scrolling, that chrome never auto-hides
+     * the way it would on an ordinary page — so the gap the bar depended on
+     * shrinks or vanishes, and the bar ends up sitting on top of the green
+     * it is supposed to describe instead of above it. Docking it to the
+     * bottom, and having render() below inset the hole's drawing rect by
+     * this dock's real measured height, means the hole is guaranteed clear
+     * of it no matter how much of the viewport the browser chrome takes.
+     */
+    .editor-dock {
       position: fixed;
-      top: 34px;
       left: 0;
       right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 8;
+    }
+    .editor-readout {
       display: flex;
       flex-wrap: wrap;
       gap: 4px 12px;
       padding: 6px 10px;
       background: ${PALETTE.UI_DARK};
-      border-bottom: 1px solid ${PALETTE.OUTLINE};
+      border-top: 1px solid ${PALETTE.OUTLINE};
       font-family: monospace;
       font-size: 11px;
       color: ${PALETTE.WHITE};
       pointer-events: none;
-      z-index: 8;
     }
     .editor-readout-row {
       display: flex;
@@ -198,17 +217,12 @@ function injectStyles() {
     }
 
     .editor-toolbar {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       padding: 8px;
       background: ${PALETTE.UI_DARK};
       border-top: 1px solid ${PALETTE.OUTLINE};
-      z-index: 8;
       pointer-events: auto;
     }
     .editor-btn {
@@ -300,14 +314,30 @@ export function openTemplatePicker(sheetHost, { state, holeId, onBuilt }) {
 export function mountHoleEditor({ canvas, surface, container, hole, carts = false, onDone }) {
   injectStyles();
 
+  const dockEl = document.createElement('div');
+  dockEl.className = 'editor-dock';
   const readoutEl = document.createElement('div');
   readoutEl.className = 'editor-readout';
   const toolbarEl = document.createElement('div');
   toolbarEl.className = 'editor-toolbar';
-  container.append(readoutEl, toolbarEl);
+  dockEl.append(readoutEl, toolbarEl);
+  container.append(dockEl);
+
+  const hudEl = container.querySelector('.hud-bar');
 
   let minutesCache = minutesFor(hole, { carts });
   let currentRect = { x: 0, y: 0, width: surface.width, height: surface.height };
+  // Real measured pixel heights of the fixed chrome around the canvas
+  // (HUD bar above, the readout+toolbar dock below), re-measured whenever
+  // either changes size. `render()` insets the hole's drawing rect by
+  // these so the hole is never drawn underneath them, on any viewport.
+  let hudChromePx = 0;
+  let dockChromePx = 0;
+
+  function remeasureChrome() {
+    hudChromePx = hudEl ? hudEl.getBoundingClientRect().height : 0;
+    dockChromePx = dockEl.getBoundingClientRect().height;
+  }
 
   function updateReadout() {
     const r = deriveReadout(hole, { carts, minutesOverride: minutesCache });
@@ -330,6 +360,7 @@ export function mountHoleEditor({ canvas, surface, container, hole, carts = fals
       row.append(l, v);
       readoutEl.appendChild(row);
     }
+    remeasureChrome();
   }
 
   function recomputeMinutes() {
@@ -461,22 +492,39 @@ export function mountHoleEditor({ canvas, surface, container, hole, carts = fals
       makeButton(`Green: ${hole.greenPreset}`, cycleGreenPreset),
       Object.assign(makeButton('Done', () => onDone?.()), { className: 'editor-btn editor-btn--done' })
     );
+    remeasureChrome();
   }
 
   renderToolbar();
   updateReadout();
 
   function render(ctx, rect) {
-    currentRect = rect;
-    drawHole(ctx, hole, rect);
+    // Inset the drawing rect by the real, measured height of the fixed
+    // chrome around the canvas (the HUD above, the readout+toolbar dock
+    // below) so the hole is always drawn clear of both — see the comment
+    // on `.editor-dock` above for why a hand-picked pixel offset isn't
+    // safe to assume here.
+    const scale = Math.max(1, surface.scale);
+    const topInset = hudChromePx / scale;
+    const bottomInset = dockChromePx / scale;
+    const height = Math.max(10, rect.height - topInset - bottomInset);
+    const insetRect = { x: rect.x, y: rect.y + topInset, width: rect.width, height };
+    currentRect = insetRect;
+    // drawHole only paints inside insetRect, which is smaller than the full
+    // canvas rect whenever the chrome above/below is non-zero — so the
+    // margin left outside it must be cleared explicitly, or it keeps
+    // showing whatever the previous frame (the overview map, most likely)
+    // last drew there.
+    ctx.fillStyle = PALETTE.OUTLINE;
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    drawHole(ctx, hole, insetRect);
   }
 
   function destroy() {
     canvas.removeEventListener('pointerdown', onPointerDown);
     canvas.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onPointerUp);
-    readoutEl.remove();
-    toolbarEl.remove();
+    dockEl.remove();
   }
 
   return { render, destroy, updateReadout };
