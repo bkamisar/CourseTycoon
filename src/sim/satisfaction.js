@@ -1,4 +1,5 @@
 import { clamp } from './hole.js';
+import { SEGMENTS, difficultyFit } from './segments.js';
 
 /**
  * Ordinal for a hole number. Computed rather than looked up in a table of
@@ -22,6 +23,16 @@ export function ordinal(n) {
  * The dominant term is waiting, deliberately: a slow round is the thing
  * golfers resent most, and it is the consequence the player must feel when
  * they build a punishing course.
+ *
+ * `segment` (default `locals`, so every caller that predates segments keeps
+ * its old behaviour) weighs the wait, price, scenery, turf and amenity
+ * terms by that segment's own priorities, and adds a difficulty-fit term
+ * from the exact same bell curve `segments.segmentAppeal` uses to score the
+ * course's appeal — imported rather than re-derived, so the crowd that
+ * turns up and the crowd that leaves happy can never disagree about what a
+ * course's difficulty means. `courseDifficulty` is optional: omit it (as
+ * every caller does until Task 5 wires it through) and the fit term is
+ * simply left out rather than guessed at.
  */
 export function guestSatisfaction({
   handicap,
@@ -32,18 +43,30 @@ export function guestSatisfaction({
   scenery,
   turfQuality,
   amenityBonus,
+  segment = 'locals',
+  courseDifficulty,
 }) {
+  const seg = SEGMENTS[segment] ?? SEGMENTS.locals;
+
   // Over nine holes a golfer expects roughly half their handicap.
   const expectedOverPar = handicap / 2;
   const scoreDelta = clamp((expectedOverPar - strokesOverPar) * 1.6, -22, 14);
 
-  const waitPenalty = waitMinutes * 0.55;
-  const priceDelta = clamp((perceivedValue - greenFee) * 0.22, -20, 12);
-  const sceneryBonus = (scenery - 50) * 0.16;
-  const turfBonus = (turfQuality - 60) * 0.22;
+  const waitPenalty = waitMinutes * 0.55 * seg.waitWeight;
+  const priceDelta = clamp((perceivedValue - greenFee) * 0.22 * seg.priceSensitivity, -20, 12);
+  const sceneryBonus = (scenery - 50) * 0.16 * seg.sceneryWeight;
+  const turfBonus = (turfQuality - 60) * 0.22 * seg.turfWeight;
+  const amenityBonusWeighted = amenityBonus * seg.amenityWeight;
+
+  // 1 at the segment's ideal difficulty, falling away either side — the
+  // same shape that decides whether this segment even turns up.
+  const difficultyBonus = courseDifficulty === undefined
+    ? 0
+    : (difficultyFit(courseDifficulty, seg) - 0.5) * 30;
 
   return clamp(
-    55 + scoreDelta - waitPenalty + priceDelta + sceneryBonus + turfBonus + amenityBonus,
+    55 + scoreDelta - waitPenalty + priceDelta + sceneryBonus + turfBonus +
+      amenityBonusWeighted + difficultyBonus,
     0,
     100
   );

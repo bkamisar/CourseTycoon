@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { guestSatisfaction, buildComplaints, ordinal } from '../src/sim/satisfaction.js';
+import { SEGMENTS } from '../src/sim/segments.js';
 
 const baseline = {
   handicap: 15,
@@ -48,6 +49,55 @@ test('scenery and turf both matter', () => {
   const bleak = guestSatisfaction({ ...baseline, scenery: 10, turfQuality: 20 });
   const lovely = guestSatisfaction({ ...baseline, scenery: 95, turfQuality: 95 });
   assert.ok(lovely > bleak);
+});
+
+test('the same hard, pristine, expensive round satisfies serious golfers and not locals', () => {
+  const round = {
+    ...baseline,
+    strokesOverPar: 15,
+    greenFee: 110,
+    perceivedValue: 90,
+    turfQuality: 96,
+    scenery: 55,
+    courseDifficulty: 72, // the serious golfers' ideal, per segments.js
+  };
+  const local = guestSatisfaction({ ...round, segment: 'locals' });
+  const serious = guestSatisfaction({ ...round, segment: 'serious' });
+  assert.ok(serious > local + 15, `local ${local} serious ${serious}`);
+});
+
+test('waiting hurts locals more than destination guests', () => {
+  const quick = { ...baseline, waitMinutes: 0 };
+  const slow = { ...baseline, waitMinutes: 45 };
+  const localDrop =
+    guestSatisfaction({ ...quick, segment: 'locals' }) - guestSatisfaction({ ...slow, segment: 'locals' });
+  const destinationDrop =
+    guestSatisfaction({ ...quick, segment: 'destination' }) - guestSatisfaction({ ...slow, segment: 'destination' });
+  assert.ok(localDrop > destinationDrop, `local drop ${localDrop} destination drop ${destinationDrop}`);
+});
+
+test('turf matters far more to serious golfers than to locals', () => {
+  const shaggy = { ...baseline, turfQuality: 20 };
+  const pristine = { ...baseline, turfQuality: 95 };
+  const localGain =
+    guestSatisfaction({ ...pristine, segment: 'locals' }) - guestSatisfaction({ ...shaggy, segment: 'locals' });
+  const seriousGain =
+    guestSatisfaction({ ...pristine, segment: 'serious' }) - guestSatisfaction({ ...shaggy, segment: 'serious' });
+  assert.ok(seriousGain > localGain * 2, `local gain ${localGain} serious gain ${seriousGain}`);
+});
+
+test('difficulty satisfaction peaks at each segment\'s own ideal', () => {
+  for (const key of Object.keys(SEGMENTS)) {
+    const atIdeal = guestSatisfaction({ ...baseline, segment: key, courseDifficulty: SEGMENTS[key].idealDifficulty });
+    const farFromIdeal = guestSatisfaction({ ...baseline, segment: key, courseDifficulty: SEGMENTS[key].idealDifficulty + 90 });
+    assert.ok(atIdeal > farFromIdeal, `${key}: at ideal ${atIdeal}, far ${farFromIdeal}`);
+  }
+});
+
+test('omitting courseDifficulty behaves exactly like the pre-segments call', () => {
+  const withDifficulty = guestSatisfaction({ ...baseline, segment: 'locals' });
+  const withoutSegmentOrDifficulty = guestSatisfaction({ ...baseline });
+  assert.equal(withDifficulty, withoutSegmentOrDifficulty);
 });
 
 test('a slow hole produces a complaint naming that hole', () => {
