@@ -14,6 +14,7 @@
 import { PALETTE } from '../render/palette.js';
 import { AMENITIES, WAGES, perceivedValue } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
+import { marshalPaceFactor } from '../sim/day.js';
 import { openHoles } from '../sim/state.js';
 import { courseRating } from '../sim/ratings.js';
 import { expectedMinutes } from '../sim/round.js';
@@ -458,8 +459,15 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
       // is open, so it is computed once, here, at sheet-open time, and the
       // slider's `input` handler below only ever does the cheap comparison
       // against this cached array.
+      // Marshals shorten hole times before the tee sheet is scheduled, so the
+      // forecast has to apply the same factor the day will. Without it, hiring
+      // a marshal never moved this line even though the day genuinely ran
+      // faster - the sheet contradicting the simulation.
       const carts = state.resort.amenities.some((a) => a.type === 'cartBarn');
-      const holeMinutesByIndex = openHoles(state).map((h) => expectedMinutes(h, { carts }));
+      const marshals = state.resort.staff.filter((m) => m.role === 'marshal').length;
+      const paceFactor = marshalPaceFactor(marshals);
+      const holeMinutesByIndex = openHoles(state)
+        .map((h) => expectedMinutes(h, { carts }) * paceFactor);
 
       function updateIntervalConsequence() {
         const interval = current.resort.pricing.teeInterval;

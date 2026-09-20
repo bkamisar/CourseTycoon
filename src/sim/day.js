@@ -32,6 +32,19 @@ const MARSHAL_EFFECT = 0.04;
 const MARSHAL_CAP = 0.12;
 
 /**
+ * How much marshals shorten hole times, as a multiplier.
+ *
+ * Exported because the pricing sheet needs to forecast the same pace the
+ * day will actually run at. It previously predicted from raw hole times
+ * and ignored marshals entirely, so hiring one never moved the forecast
+ * even though the day itself ran faster - the interface contradicting
+ * the simulation.
+ */
+export function marshalPaceFactor(marshals) {
+  return 1 - Math.min(MARSHAL_CAP, marshals * MARSHAL_EFFECT);
+}
+
+/**
  * Runs one full day and returns the next state, the evening report, and a
  * timeline of timestamped events for the renderer to play back.
  *
@@ -111,7 +124,7 @@ export function runDay(state, seed) {
   // Marshals move slow groups along. Capped, deliberately: staffing must not
   // be a way to buy your way out of a badly designed course.
   const marshals = next.resort.staff.filter((m) => m.role === 'marshal').length;
-  const marshalFactor = 1 - Math.min(MARSHAL_CAP, marshals * MARSHAL_EFFECT);
+  const marshalFactor = marshalPaceFactor(marshals);
   const pacedHoleMinutes = averageHoleMinutes.map((m) => m * marshalFactor);
 
   const schedule = groupCount

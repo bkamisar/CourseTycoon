@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
-import { runDay } from '../src/sim/day.js';
+import { runDay, marshalPaceFactor } from '../src/sim/day.js';
 
 test('runDay returns a next state, a report and a timeline', () => {
   const { state, report, timeline } = runDay(newGame(1), 1);
@@ -102,4 +102,16 @@ test('ten consecutive days run without error and keep state coherent', () => {
   assert.equal(state.history.length, 10);
   assert.ok(state.prestige >= 0 && state.prestige <= 100);
   assert.ok(Number.isFinite(state.money));
+});
+
+test('marshals shorten hole times on a capped curve', () => {
+  // The pricing sheet forecasts pace from this same function, so that the
+  // prediction and the day agree. It used to ignore marshals entirely.
+  assert.equal(marshalPaceFactor(0), 1);
+  assert.ok(marshalPaceFactor(1) < marshalPaceFactor(0));
+  assert.ok(marshalPaceFactor(3) < marshalPaceFactor(1));
+  // Capped: a fourth marshal buys nothing, deliberately, so staffing cannot
+  // undo a badly designed course.
+  assert.equal(marshalPaceFactor(4), marshalPaceFactor(3));
+  assert.equal(marshalPaceFactor(50), marshalPaceFactor(3));
 });
