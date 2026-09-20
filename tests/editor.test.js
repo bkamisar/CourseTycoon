@@ -4,6 +4,7 @@ import { makeHole, holeStats } from '../src/sim/hole.js';
 import { expectedMinutes } from '../src/sim/round.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { newGame } from '../src/sim/state.js';
+import { BUILD_COSTS } from '../src/sim/economy.js';
 import {
   liveStats,
   minutesFor,
@@ -11,6 +12,9 @@ import {
   templateOptions,
   buildHole,
   HOLE_BUILD_COST,
+  featureCost,
+  refundFor,
+  greenCycleCost,
 } from '../src/ui/editor.js';
 
 // --- The point of this task: the editor never computes its own numbers ----
@@ -128,4 +132,54 @@ test('buildHole refuses an unknown template', () => {
   const state = newGame(1);
   const emptyId = state.resort.courses[0].holes.find((h) => !h.open).id;
   assert.throws(() => buildHole(state, emptyId, 'nope'), /unknown template/i);
+});
+
+// --- Hazard and green-upgrade charge/refund arithmetic ---------------------
+
+test('featureCost reads straight off BUILD_COSTS for each hazard type', () => {
+  assert.equal(featureCost('bunker'), BUILD_COSTS.bunker);
+  assert.equal(featureCost('pond'), BUILD_COSTS.pond);
+  assert.equal(featureCost('trees'), BUILD_COSTS.trees);
+});
+
+test('refundFor is half the cost, rounded down', () => {
+  assert.equal(refundFor(800), 400);
+  assert.equal(refundFor(2500), 1250);
+  assert.equal(refundFor(300), 150);
+  assert.equal(refundFor(801), 400); // rounds down, not to nearest
+  assert.equal(refundFor(1), 0);
+});
+
+test('a refund is always strictly less than the original cost (never a profit)', () => {
+  for (const cost of [BUILD_COSTS.bunker, BUILD_COSTS.pond, BUILD_COSTS.trees, BUILD_COSTS.greenUpgrade]) {
+    assert.ok(refundFor(cost) < cost, `refund of ${cost} should be less than ${cost}`);
+  }
+});
+
+test('greenCycleCost charges the upgrade price when moving to a harder preset', () => {
+  // small (1.15) -> tiered (1.3) is strictly harder.
+  assert.equal(greenCycleCost('small', 'tiered'), BUILD_COSTS.greenUpgrade);
+});
+
+test('greenCycleCost is free when moving to an easier or equally hard preset', () => {
+  // tiered (1.3) -> elevated (1.1) is easier.
+  assert.equal(greenCycleCost('tiered', 'elevated'), 0);
+  // island (1.25) -> small (1.15) is easier too.
+  assert.equal(greenCycleCost('island', 'small'), 0);
+});
+
+test('cycling every green preset in a full loop cannot generate money', () => {
+  // Forward through the whole cycle, then confirm nothing downgrades ever
+  // refunds: total cost of a full loop is the sum of the "harder" hops
+  // only, and there is no way to recoup any of it by continuing to cycle.
+  const order = ['small', 'large', 'tiered', 'elevated', 'island'];
+  let totalCost = 0;
+  for (let i = 0; i < order.length; i++) {
+    const from = order[i];
+    const to = order[(i + 1) % order.length];
+    const cost = greenCycleCost(from, to);
+    assert.ok(cost === 0 || cost === BUILD_COSTS.greenUpgrade);
+    totalCost += cost;
+  }
+  assert.ok(totalCost > 0, 'at least one hop in a full loop must be an upgrade');
 });

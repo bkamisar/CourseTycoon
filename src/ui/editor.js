@@ -36,6 +36,37 @@ const CORRIDOR_WIDTH_STEP = 2;
 /** Default sizes for a freshly added feature, in yards. */
 const NEW_FEATURE_SIZE = { bunker: 9, pond: 20, trees: 18 };
 
+/** Toolbar label for each hazard type. */
+const FEATURE_LABEL = { bunker: 'Bunker', pond: 'Pond', trees: 'Trees' };
+
+// ---------------------------------------------------------------------
+// Pure charge/refund arithmetic — test-first, see tests/editor.test.js.
+// Hazards and the green preset cost money to add or upgrade; removing a
+// feature refunds half of what it cost, rounded down. That refund is the
+// whole reason tap-to-remove needs no confirmation dialog: a misclick
+// costs you half, never everything.
+// ---------------------------------------------------------------------
+
+/** What adding one hazard of `type` (bunker/pond/trees) costs. */
+export function featureCost(type) {
+  return BUILD_COSTS[type];
+}
+
+/** What removing a hazard that cost `cost` to add refunds — half, rounded down. */
+export function refundFor(cost) {
+  return Math.floor(cost / 2);
+}
+
+/**
+ * What cycling the green preset from `fromPreset` to `toPreset` costs.
+ * Only charges when the new preset is strictly harder than the old one —
+ * cycling down to an easier preset is free, never refunded, so there is no
+ * way to profit by cycling forward and back.
+ */
+export function greenCycleCost(fromPreset, toPreset) {
+  return GREEN_DIFFICULTY[toPreset] > GREEN_DIFFICULTY[fromPreset] ? BUILD_COSTS.greenUpgrade : 0;
+}
+
 // ---------------------------------------------------------------------
 // Pure stat wiring — test-first, see tests/editor.test.js.
 // ---------------------------------------------------------------------
@@ -226,15 +257,34 @@ function injectStyles() {
       pointer-events: auto;
     }
     .editor-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
       min-height: 44px;
       min-width: 44px;
-      padding: 0 10px;
+      padding: 4px 10px;
       background: ${PALETTE.PATH};
       color: ${PALETTE.WHITE};
       border: 1px solid ${PALETTE.OUTLINE};
       border-radius: 6px;
       font-family: monospace;
       font-size: 12px;
+      line-height: 1.2;
+    }
+    .editor-btn:disabled {
+      background: ${PALETTE.UI_LIGHT};
+      color: ${PALETTE.OUTLINE};
+      opacity: 0.6;
+    }
+    .editor-btn-sub {
+      font-size: 9px;
+      font-weight: normal;
+      color: ${PALETTE.ACCENT};
+    }
+    .editor-btn:disabled .editor-btn-sub {
+      color: ${PALETTE.OUTLINE};
     }
     .editor-btn--done {
       background: ${PALETTE.FAIRWAY};
@@ -306,12 +356,15 @@ export function openTemplatePicker(sheetHost, { state, holeId, onBuilt }) {
  * Mounts the interactive editor for one already-built hole. `hole` is
  * mutated directly (a classic direct-manipulation editor), so the caller's
  * own state reference stays in sync without a round trip through this
- * module. Returns `{ render(ctx, rect), destroy() }`; the caller is
- * responsible for calling `render` every frame while the editor screen is
- * active (drawHole itself is cheap — it is only expectedMinutes that must
- * be throttled).
+ * module. `state` is the same live game state the caller holds — spending
+ * on a hazard or a green upgrade debits `state.money` directly, the same
+ * direct-mutation contract `hole` already has, so the caller's money is
+ * never out of sync either. Returns `{ render(ctx, rect), destroy() }`;
+ * the caller is responsible for calling `render` every frame while the
+ * editor screen is active (drawHole itself is cheap — it is only
+ * expectedMinutes that must be throttled).
  */
-export function mountHoleEditor({ canvas, surface, container, hole, carts = false, onDone }) {
+export function mountHoleEditor({ canvas, surface, container, state, hole, carts = false, onDone }) {
   injectStyles();
 
   const dockEl = document.createElement('div');
@@ -327,6 +380,10 @@ export function mountHoleEditor({ canvas, surface, container, hole, carts = fals
 
   let minutesCache = minutesFor(hole, { carts });
   let currentRect = { x: 0, y: 0, width: surface.width, height: surface.height };
+  // Money spent (minus refunds) on this hole so far this editing session —
+  // plain bookkeeping on BUILD_COSTS figures already read from the sim, not
+  // a game outcome, so it is tracked here rather than inside deriveReadout.
+  let sessionSpend = 0;
   // Real measured pixel heights of the fixed chrome around the canvas
   // (HUD bar above, the readout+toolbar dock below), re-measured whenever
   // either changes size. `render()` insets the hole's drawing rect by
@@ -349,6 +406,7 @@ export function mountHoleEditor({ canvas, surface, container, hole, carts = fals
       ['Scenery', Math.round(r.scenery)],
       ['Min', r.minutes.toFixed(1)],
       ['Upkeep', `$${Math.round(r.upkeep)}`],
+      ['Spent', `$${sessionSpend.toLocaleString()}`],
     ];
     for (const [label, value] of rows) {
       const row = document.createElement('div');
@@ -434,9 +492,17 @@ export function mountHoleEditor({ canvas, surface, container, hole, carts = fals
   function onPointerUp() {
     if (!dragging) return;
     if (!dragMoved && dragging.feature) {
-      // A tap on an existing feature removes it.
+      // A tap on an existing feature removes it and refunds half its cost,
+      // rounded down — this, not a confirmation dialog, is what makes a
+      // misclick safe: it costs half, never everything.
       const idx = hole.features.indexOf(dragging.feature);
-      if (idx !== -1) hole.features.splice(idx, 1);
+      if (idx !== -1) {
+        const [removed] = hole.features.splice(idx, 1);
+        const refund = refundFor(featureCost(removed.type));
+        state.money += refund;
+        sessionSpend -= refund;
+        renderToolbar();
+      }
     }
     dragging = null;
     dragStart = null;
@@ -450,6 +516,10 @@ export function mountHoleEditor({ canvas, surface, container, hole, carts = fals
 
   // --- Toolbar: add features, widen/narrow, cycle green, done. ------
   function addFeature(type) {
+    const cost = featureCost(type);
+    if (state.money < cost) return; // belt and suspenders — the button is disabled too
+    state.money -= cost;
+    sessionSpend += cost;
     const len = pathLength(hole.corridor);
     const mid = pointAtDistance(hole.corridor, len / 2);
     hole.features.push({
@@ -459,6 +529,7 @@ export function mountHoleEditor({ canvas, surface, container, hole, carts = fals
       size: NEW_FEATURE_SIZE[type],
     });
     recomputeMinutes();
+    renderToolbar(); // affordability of the remaining features may have changed
   }
 
   function adjustCorridorWidth(delta) {
@@ -466,30 +537,70 @@ export function mountHoleEditor({ canvas, surface, container, hole, carts = fals
     recomputeMinutes();
   }
 
-  function cycleGreenPreset() {
+  function nextGreenPreset() {
     const i = GREEN_PRESETS.indexOf(hole.greenPreset);
-    hole.greenPreset = GREEN_PRESETS[(i + 1) % GREEN_PRESETS.length];
+    return GREEN_PRESETS[(i + 1) % GREEN_PRESETS.length];
+  }
+
+  function cycleGreenPreset() {
+    const next = nextGreenPreset();
+    const cost = greenCycleCost(hole.greenPreset, next);
+    if (cost > 0 && state.money < cost) return; // belt and suspenders
+    state.money -= cost;
+    sessionSpend += cost;
+    hole.greenPreset = next;
     recomputeMinutes();
     renderToolbar();
   }
 
-  function makeButton(label, onClick) {
+  /** `sub`, when given, is a small second line — a price or a shortfall. */
+  function makeButton(label, onClick, { disabled = false, sub } = {}) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'editor-btn';
-    btn.textContent = label;
+    btn.disabled = disabled;
+    const top = document.createElement('span');
+    top.textContent = label;
+    btn.appendChild(top);
+    if (sub) {
+      const bottom = document.createElement('span');
+      bottom.className = 'editor-btn-sub';
+      bottom.textContent = sub;
+      btn.appendChild(bottom);
+    }
     btn.addEventListener('click', onClick);
     return btn;
   }
 
+  /** Sublabel for an add-hazard button: its price, or the shortfall if the
+   * player cannot afford it — matching how the template picker shows it. */
+  function costSub(cost) {
+    return state.money >= cost
+      ? `$${cost.toLocaleString()}`
+      : `$${(cost - state.money).toLocaleString()} short`;
+  }
+
   function renderToolbar() {
+    const hazardButtons = ['bunker', 'pond', 'trees'].map((type) => {
+      const cost = featureCost(type);
+      return makeButton(`+${FEATURE_LABEL[type]}`, () => addFeature(type), {
+        disabled: state.money < cost,
+        sub: costSub(cost),
+      });
+    });
+
+    const nextPreset = nextGreenPreset();
+    const greenCost = greenCycleCost(hole.greenPreset, nextPreset);
+    const greenButton = makeButton(`Green: ${hole.greenPreset}`, cycleGreenPreset, {
+      disabled: greenCost > 0 && state.money < greenCost,
+      sub: greenCost > 0 ? costSub(greenCost) : undefined,
+    });
+
     toolbarEl.replaceChildren(
-      makeButton('+Bunker', () => addFeature('bunker')),
-      makeButton('+Pond', () => addFeature('pond')),
-      makeButton('+Trees', () => addFeature('trees')),
+      ...hazardButtons,
       makeButton('Width −', () => adjustCorridorWidth(-CORRIDOR_WIDTH_STEP)),
       makeButton('Width +', () => adjustCorridorWidth(CORRIDOR_WIDTH_STEP)),
-      makeButton(`Green: ${hole.greenPreset}`, cycleGreenPreset),
+      greenButton,
       Object.assign(makeButton('Done', () => onDone?.()), { className: 'editor-btn editor-btn--done' })
     );
     remeasureChrome();

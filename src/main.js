@@ -94,6 +94,7 @@ function openEditorFor(holeId) {
     canvas,
     surface,
     container: uiRoot,
+    state,
     hole,
     carts: state.resort.amenities.some((a) => a.type === 'cartBarn'),
     onDone: () => {
