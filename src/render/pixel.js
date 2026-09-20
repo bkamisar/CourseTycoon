@@ -59,3 +59,31 @@ export function createSurface(canvas, { width, height }) {
 
   return surface;
 }
+
+/**
+ * How many INTERNAL canvas px of `canvas`'s own top edge sit underneath
+ * `topEl`'s fixed-position box — real overlap, not just `topEl`'s own
+ * height. The canvas is centred in the viewport; on a tall viewport it
+ * can sit well clear of a fixed top bar, with headroom to spare, and on a
+ * short one it can start only a few px down. Insetting drawing by the
+ * bar's full height regardless of which case applies either fails to
+ * clear a bar that actually reaches the canvas, or carves out a dead gap
+ * above content that was never actually covered — both real bugs an
+ * earlier pass here shipped by measuring the bar alone instead of the
+ * overlap. `topEl`/`bottomEl` may be null (nothing to inset for).
+ */
+export function topChromeOverlapPx(canvas, topEl, scale) {
+  if (!topEl) return 0;
+  const canvasTop = canvas.getBoundingClientRect().top;
+  const chromeBottom = topEl.getBoundingClientRect().bottom;
+  return Math.max(0, chromeBottom - canvasTop) / Math.max(1, scale);
+}
+
+/** The bottom-edge counterpart to `topChromeOverlapPx`, for a fixed
+ * toolbar docked to the bottom of the viewport instead of the top. */
+export function bottomChromeOverlapPx(canvas, bottomEl, scale) {
+  if (!bottomEl) return 0;
+  const canvasBottom = canvas.getBoundingClientRect().bottom;
+  const chromeTop = bottomEl.getBoundingClientRect().top;
+  return Math.max(0, canvasBottom - chromeTop) / Math.max(1, scale);
+}

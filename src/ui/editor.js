@@ -20,6 +20,7 @@
  */
 import { PALETTE } from '../render/palette.js';
 import { drawHole, computeHoleTransform } from '../render/holeView.js';
+import { topChromeOverlapPx, bottomChromeOverlapPx } from '../render/pixel.js';
 import { makeHole, holeStats, clamp, GREEN_DIFFICULTY } from '../sim/hole.js';
 import { expectedMinutes } from '../sim/round.js';
 import { TEMPLATE_NAMES, TEMPLATES } from '../sim/templates.js';
@@ -450,17 +451,21 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
   // (a gesture the player is already using to place hazards) avoids
   // inventing a second tap meaning that would collide with the first.
   let selectedFeature = null;
-  // Real measured pixel heights of the fixed chrome around the canvas
-  // (HUD/amenity stack above, the readout+toolbar dock below), re-measured
-  // whenever either changes size. `render()` insets the hole's drawing
-  // rect by these so the hole is never drawn underneath them, on any
-  // viewport.
+  // How many INTERNAL canvas px of real overlap the fixed chrome around
+  // the canvas actually has (HUD/amenity stack above, the readout+toolbar
+  // dock below) — re-measured whenever either changes size. `render()`
+  // insets the hole's drawing rect by these so the hole is never drawn
+  // underneath them. This is genuine overlap (`topChromeOverlapPx` /
+  // `bottomChromeOverlapPx`), not just those elements' own height: on a
+  // tall viewport the canvas can be centred well clear of the HUD, and
+  // insetting by its full height regardless would carve a dead gap above
+  // the hole instead of actually clearing anything.
   let hudChromePx = 0;
   let dockChromePx = 0;
 
   function remeasureChrome() {
-    hudChromePx = topChromeEl ? topChromeEl.getBoundingClientRect().height : 0;
-    dockChromePx = dockEl.getBoundingClientRect().height;
+    hudChromePx = topChromeOverlapPx(canvas, topChromeEl, surface.scale);
+    dockChromePx = bottomChromeOverlapPx(canvas, dockEl, surface.scale);
   }
 
   function updateReadout() {
@@ -741,16 +746,14 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
   updateReadout();
 
   function render(ctx, rect) {
-    // Inset the drawing rect by the real, measured height of the fixed
+    // Inset the drawing rect by the real, measured overlap of the fixed
     // chrome around the canvas (the HUD above, the readout+toolbar dock
     // below) so the hole is always drawn clear of both — see the comment
     // on `.editor-dock` above for why a hand-picked pixel offset isn't
-    // safe to assume here.
-    const scale = Math.max(1, surface.scale);
-    const topInset = hudChromePx / scale;
-    const bottomInset = dockChromePx / scale;
-    const height = Math.max(10, rect.height - topInset - bottomInset);
-    const insetRect = { x: rect.x, y: rect.y + topInset, width: rect.width, height };
+    // safe to assume here. hudChromePx/dockChromePx are already internal
+    // canvas px (remeasureChrome does the scale division), not CSS px.
+    const height = Math.max(10, rect.height - hudChromePx - dockChromePx);
+    const insetRect = { x: rect.x, y: rect.y + hudChromePx, width: rect.width, height };
     currentRect = insetRect;
     // drawHole only paints inside insetRect, which is smaller than the full
     // canvas rect whenever the chrome above/below is non-zero — so the

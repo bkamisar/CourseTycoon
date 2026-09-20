@@ -7,7 +7,7 @@
  * draws a screen or computes a number for one, but only this file decides
  * which screen is showing and when to move to the next.
  */
-import { createSurface } from './render/pixel.js';
+import { createSurface, topChromeOverlapPx, bottomChromeOverlapPx } from './render/pixel.js';
 import { PALETTE } from './render/palette.js';
 import { drawResort } from './render/resortView.js';
 import { computeTokens, computeEffects, drawTokens, drawEffects } from './render/tokens.js';
@@ -89,11 +89,37 @@ let dayResult = null; // { state, report, timeline } | null
 let clock = null;
 let lastFrameTime = null;
 
+/**
+ * The rect `drawResort` should draw into, inset by how much of the canvas
+ * the fixed DOM chrome above (`topChrome`: the HUD bar and the amenity
+ * strip stacked) and below (`bottomToolbarEl`, whichever toolbar is
+ * showing) actually overlaps — real overlap (`topChromeOverlapPx` /
+ * `bottomChromeOverlapPx`), not just those elements' own height. Skipping
+ * this entirely on the overview screen was a bug the amenity strip
+ * exposed: on a short viewport (the 390x664 case a real phone's browser
+ * chrome forces) the combined HUD+amenity bar covers enough of the
+ * canvas to hide each hole's par/difficulty label, which sits right at
+ * the top of its plot.
+ */
+function insetRectForChrome(bottomToolbarEl) {
+  const scale = surface.scale;
+  const topPx = topChromeOverlapPx(canvas, topChrome, scale);
+  const bottomPx = bottomChromeOverlapPx(canvas, bottomToolbarEl, scale);
+  const height = Math.max(10, surface.height - topPx - bottomPx);
+  return { x: 0, y: topPx, width: surface.width, height };
+}
+
 // --- Overview -----------------------------------------------------------
 
 function drawOverview() {
   const { ctx, width, height } = surface;
-  regions = drawResort(ctx, state, { x: 0, y: 0, width, height });
+  // The margin outside the inset rect sits behind opaque fixed chrome and
+  // is never actually seen, but it is cleared anyway rather than left
+  // showing whatever the previous frame drew there -- see the identical
+  // comment on render() in src/ui/editor.js for why that matters.
+  ctx.fillStyle = PALETTE.OUTLINE;
+  ctx.fillRect(0, 0, width, height);
+  regions = drawResort(ctx, state, insetRectForChrome(overviewToolbar));
   hud.update(state);
   amenityBar.update(state);
 }
@@ -316,7 +342,9 @@ function playAudioForWindow(fromMinute, toMinute) {
 
 function drawPlayback() {
   const { ctx, width, height } = surface;
-  regions = drawResort(ctx, dayResult.state, { x: 0, y: 0, width, height });
+  ctx.fillStyle = PALETTE.OUTLINE;
+  ctx.fillRect(0, 0, width, height);
+  regions = drawResort(ctx, dayResult.state, insetRectForChrome(playbackToolbar));
   const holes = openHoles(dayResult.state);
   const minute = clock.minute;
   drawTokens(ctx, computeTokens(dayResult.timeline, holes, regions, minute));
