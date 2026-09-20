@@ -60,10 +60,27 @@ const router = createScreenRouter('overview');
 // pass got caught by (see the comment on .editor-dock in src/ui/editor.js).
 // Stacking them in flow means the amenity strip always sits directly under
 // the HUD no matter how the HUD's own height changes.
+//
+// When the game runs inside a host that draws its own bar over the top of
+// the frame - the artifact viewer does - anything pinned to top:0 ends up
+// underneath it. We cannot see or measure that bar from in here, so the
+// page leaves room for one whenever it is embedded rather than top-level.
+// A standalone page (GitHub Pages, a local server) is unaffected.
+const EMBEDDED_TOP_INSET = 44;
+let embedded = false;
+try {
+  embedded = window.self !== window.top;
+} catch {
+  // A cross-origin frame throws on that comparison, which is itself the
+  // answer: if we cannot see the top window, we are inside something.
+  embedded = true;
+}
+
 const topChrome = document.createElement('div');
 topChrome.className = 'top-chrome';
 topChrome.style.cssText =
-  'position:fixed;top:0;left:0;right:0;z-index:10;display:flex;flex-direction:column;pointer-events:none;';
+  `position:fixed;top:${embedded ? EMBEDDED_TOP_INSET : 0}px;left:0;right:0;z-index:10;` +
+  'display:flex;flex-direction:column;pointer-events:none;';
 uiRoot.appendChild(topChrome);
 
 const hud = mountHud(topChrome);

@@ -1,3 +1,4 @@
+import { drawPixelText, pixelTextWidth, GLYPH_HEIGHT } from './sprites.js';
 /**
  * Draws the resort overview: the nine-plot map the player spends most of
  * their time on. A built hole is drawn as a small version of its actual
@@ -53,22 +54,28 @@ function drawHoleLabel(ctx, hole, rect) {
   const text = `P${stats.par} · D${Math.round(stats.difficulty)}`;
 
   ctx.save();
-  ctx.font = LABEL_FONT;
-  ctx.textBaseline = 'middle';
-  const textWidth = ctx.measureText(text).width;
+  // Drawn as bitmap glyphs rather than fillText: canvas text anti-aliases,
+  // and this canvas is magnified by a whole number afterwards, so the grey
+  // fringe around each letter is magnified too and reads as blur.
+  const textWidth = pixelTextWidth(text);
   const labelWidth = Math.min(rect.width - LABEL_MARGIN * 2, textWidth + LABEL_PAD_X * 2);
-  const labelX = rect.x + LABEL_MARGIN;
-  const labelY = rect.y + LABEL_MARGIN;
+  const labelX = Math.round(rect.x + LABEL_MARGIN);
+  const labelY = Math.round(rect.y + LABEL_MARGIN);
 
   // A solid (not translucent) chip behind the text — the hole art
   // underneath ranges from dark tree green to pale sand, and white text
   // alone would vanish against the lighter parts of it; a translucent
   // chip would too, over the darkest parts.
   ctx.fillStyle = PALETTE.OUTLINE;
-  ctx.fillRect(labelX, labelY, labelWidth, LABEL_HEIGHT);
+  ctx.fillRect(labelX, labelY, Math.round(labelWidth), LABEL_HEIGHT);
 
-  ctx.fillStyle = PALETTE.WHITE;
-  ctx.fillText(text, labelX + LABEL_PAD_X, labelY + LABEL_HEIGHT / 2 + 0.5);
+  drawPixelText(
+    ctx,
+    text,
+    labelX + LABEL_PAD_X,
+    labelY + Math.round((LABEL_HEIGHT - GLYPH_HEIGHT) / 2),
+    PALETTE.WHITE
+  );
   ctx.restore();
 }
 

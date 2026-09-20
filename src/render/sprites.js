@@ -277,3 +277,58 @@ export function drawSprite(ctx, sprite, x, y, { flip = false } = {}) {
     }
   }
 }
+
+/**
+ * A 3x5 bitmap alphabet, enough for the hole labels.
+ *
+ * Canvas fillText anti-aliases, and this game draws at 180x320 and then
+ * magnifies by a whole number, so the grey fringe around every glyph is
+ * magnified with it and reads as blur. Drawing letters as pixels the same
+ * way the sprites do makes them exactly as sharp as everything else.
+ */
+const GLYPHS = {
+  '0': ['###', '# #', '# #', '# #', '###'],
+  '1': [' # ', '## ', ' # ', ' # ', '###'],
+  '2': ['###', '  #', '###', '#  ', '###'],
+  '3': ['###', '  #', '###', '  #', '###'],
+  '4': ['# #', '# #', '###', '  #', '  #'],
+  '5': ['###', '#  ', '###', '  #', '###'],
+  '6': ['###', '#  ', '###', '# #', '###'],
+  '7': ['###', '  #', '  #', '  #', '  #'],
+  '8': ['###', '# #', '###', '# #', '###'],
+  '9': ['###', '# #', '###', '  #', '###'],
+  P: ['###', '# #', '###', '#  ', '#  '],
+  D: ['## ', '# #', '# #', '# #', '## '],
+  '.': ['   ', '   ', '   ', '   ', ' # '],
+  '\u00b7': ['   ', '   ', ' # ', '   ', '   '],
+  ' ': ['   ', '   ', '   ', '   ', '   '],
+};
+
+export const GLYPH_WIDTH = 3;
+export const GLYPH_HEIGHT = 5;
+const GLYPH_GAP = 1;
+
+/** Width in pixels that `drawPixelText` will occupy for this string. */
+export function pixelTextWidth(text) {
+  if (text.length === 0) return 0;
+  return text.length * GLYPH_WIDTH + (text.length - 1) * GLYPH_GAP;
+}
+
+/** Draws `text` as hard pixels with its top-left at (x, y). */
+export function drawPixelText(ctx, text, x, y, colour) {
+  const left = Math.round(x);
+  const top = Math.round(y);
+  ctx.fillStyle = colour;
+  let cursor = left;
+  for (const ch of text.toUpperCase()) {
+    const glyph = GLYPHS[ch];
+    if (glyph) {
+      for (let row = 0; row < glyph.length; row++) {
+        for (let col = 0; col < glyph[row].length; col++) {
+          if (glyph[row][col] !== ' ') ctx.fillRect(cursor + col, top + row, 1, 1);
+        }
+      }
+    }
+    cursor += GLYPH_WIDTH + GLYPH_GAP;
+  }
+}
