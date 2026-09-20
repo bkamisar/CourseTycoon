@@ -70,8 +70,22 @@ Guests begin complaining they could not get a tee time.
 
 ### Act III — The Resort
 
-Far land, a second course, zones and shuttles. The full capacity chain: golf
-needs beds, beds need golf, and distant golf needs transport.
+Two steps, in this order, because they escalate properly.
+
+**First the back nine.** Act I's course is the *front* nine. When beds outrun tee
+times, the cheapest fix is more golf on land you already own, sharing the
+clubhouse you already run. This also makes the turn real — a halfway house at
+the 9th is the genuine article rather than the contrivance it is on a
+standalone nine.
+
+**Then the far course.** Only once eighteen holes still cannot meet demand does
+the player go beyond the near zone, which brings travel time and shuttles with
+it. The full capacity chain: golf needs beds, beds need golf, and distant golf
+needs transport.
+
+Ordering matters. Expanding what you have before building where you are not is
+both the cheaper move and the one a real operator makes, and it means the
+shuttle arrives as a solution to a problem the player has actually felt.
 
 **Gate:** both courses profitable with the shuttle keeping up.
 
