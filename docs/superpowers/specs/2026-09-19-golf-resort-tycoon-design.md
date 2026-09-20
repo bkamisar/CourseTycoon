@@ -531,35 +531,157 @@ a game that makes noise unprompted on a phone is a game that gets closed.
 
 ---
 
-## 15a. The variety layer — agreed principles, not yet designed
+## 15a. The variety layer
 
-The game as built has no opposition. The world is static, so every decision
-either works or does not against a fixed target, and a player who finds a good
-configuration can run it on autopilot. Confirmed in the first real playthrough:
-*"I hit my stride in act one and it was a way to sort of put on autopilot."*
+The game as built has execution but no strategy. Every golfer plays the same
+maximally aggressive line, every configuration has a correct answer, and the
+world pushes back at nothing. Confirmed in the first real playthrough: *"I hit
+my stride in act one and it was a way to sort of put on autopilot."*
 
-Four features answer this and are deliberately being designed **together**,
-because they reinforce each other and would be four unrelated taxes apart:
-random events with choices, player types, amenity levels with degradation, and
-weather.
+This section designs the answer. Its features are deliberately designed
+**together**, because apart they are four unrelated taxes and together they
+compound.
 
-Three principles are already agreed and should survive into that design:
+### 15a.1 Three principles
 
-**Every choice states its cost explicitly.** No hidden tradeoffs and no
-guessing. A choice whose consequence is unknown is a coin flip, not a decision.
+**Every choice states its cost explicitly.** A choice whose consequence is
+unknown is a coin flip, not a decision.
 
 **A recurring character delivers events.** A named, familiar voice makes
 interruptions read as a continuing story rather than dice rolls.
 
-**Player types create opposed constituencies.** Rookies and professionals want
-opposite things, so no course configuration satisfies everyone. This is the
-anti-autopilot mechanic and it is nearly free: difficulty is already a dial in
-the simulation, it simply has no opposed audiences pulling on it yet. It also
-gives prestige a qualitative meaning — the crowd changes as you rise, and the
-new crowd wants what the old resort cannot provide.
+**No configuration pleases everyone.** This is the anti-autopilot mechanic and
+everything below serves it.
 
-Weather additionally supplies the run-to-run variance the balance pass could not
-manufacture, and is the likeliest fix for bankruptcy sitting at 0% (§8.3).
+### 15a.2 Who you are trying to please
+
+Three customer segments, with genuinely opposed wants.
+
+**Locals and regulars.** Volume. Play often, pay little. Want fast rounds,
+honest prices and forgiving holes they can score on. First to leave when prices
+rise or the course turns punishing. The baseline that keeps the lights on in
+Act I.
+
+**Serious golfers.** Few, well-off, travelled a long way to be tested. Want
+difficulty, variety and pristine conditioning — the only segment that actually
+notices the turf number. Pay a premium for a course that beats them up; bored
+by an easy one.
+
+**Destination guests.** Largest spenders, mostly an Act II phenomenon once beds
+exist. Here for the experience rather than the test: scenery, amenities,
+comfort, memorability. Forgive a hard course if it is beautiful; never forgive
+threadbare facilities.
+
+**Where they collide.** *Difficulty* is the sharpest axis and the central
+tension of the game — serious golfers want more, locals want less, and no
+setting satisfies both. It runs straight through the hole editor, which is
+where the player already spends their time. *Price* splits locals from everyone
+else. *Scenery and amenities* delight destination guests and raise the upkeep
+that locals resent paying for in green fees.
+
+*Pace* is the one axis where locals and serious golfers agree — both hate
+waiting. That is deliberate; not every axis needs to be a trap. But see
+§15a.5, which gives even this lever a cost.
+
+### 15a.3 Positioning is emergent, and narrated
+
+The player never declares a market. The segments respond to the course that
+actually exists: build cheap, short and forgiving and a locals' track emerges;
+build long, brutal and beautiful and the serious golfers arrive while beginners
+quietly stop booking.
+
+This makes every design decision carry strategic weight without a separate
+strategy screen, and it makes act transitions land harder — an Act I locals'
+course gets a lodge, destination guests arrive, and they are unimpressed by the
+very thing the regulars loved.
+
+**The risk is opacity.** An emergent system the player cannot read feels
+arbitrary rather than earned. The answer is narration events (§15a.4): the
+world tells the player what it thinks of them, in a voice, rather than through
+a statistics panel.
+
+### 15a.4 Events, of two kinds
+
+**Narration events** tell the player about themselves, and exist to make the
+emergent simulation legible. A golf magazine reviews the course. A regular
+mentions the place has got expensive. A stranger with a plus handicap says he
+drove two hours to play here. No decision, or a trivial one.
+
+**Decision events** are tradeoffs with explicit costs and no obviously right
+answer. The city wants to host its tournament: prestige and a fee, against
+three days closed and a chewed-up course. A journalist wants an interview, and
+the answers shape which segment hears about the resort. The main mower dies:
+pay a premium to fix it today, or wait a week and let the crew resent it.
+
+**Cadence is tiered.** Narration most days — cheap, keeps the world inhabited,
+costs no attention. Decisions roughly once per in-game week, rare enough that
+the player leans in when one arrives. Both figures are tunable once they can be
+felt.
+
+**A decision event must never be dismissable with a default.** An event that
+can be waved away becomes a notification rather than a choice, and the player
+starts clicking through without reading.
+
+### 15a.5 Staff morale
+
+Not a constituency to please for its own sake — the **hidden multiplier**.
+Ground-down crews let turf decay faster and bunkers go unraked, and the serious
+golfers notice first. Morale falls with workload (holes per groundskeeper,
+rounds pushed through a day), poor pay, and things left broken.
+
+Three levers raise it by spending: **staffing levels**, **pay above the going
+rate**, and **equipment and prompt repairs**.
+
+The fourth is the one the system is built around. **Slack.** Run the course
+flat out every day and the crew burns out regardless of headcount or wages; a
+wider tee interval, a lighter day, or closing for maintenance lets them
+recover. It matters because it is **not money — it is revenue deliberately not
+earned.** A system fixed entirely by spending is a cost to budget for, not a
+decision.
+
+It also gives the pace lever a price. Locals and serious golfers both want fast
+rounds, pushing the player toward tight intervals — and that pressure is now
+paid for by the people maintaining the place.
+
+**Morale must be visible.** An invisible multiplier silently degrading turf
+would read as the game cheating.
+
+### 15a.6 Weather
+
+**Forecast two to three days ahead.** This is what makes weather a mechanic
+rather than a tax: the player schedules around it, runs maintenance on the
+quiet day, decides whether the outing still goes. Unforecastable weather is
+noise that punishes at random.
+
+Touches **play** (wind scatters shots and lengthens rounds, rain slows
+everything), **demand** (fewer golfers turn out in bad weather), and **turf**
+(rain helps, heat and heavy play hurt).
+
+Weather is also the fix for the balance result §8.3 could not tune out.
+Bankruptcy sits at 0% because, with no shocks, every seed plays out nearly
+identically. A bad run of weather is the variance the economy has never had.
+
+### 15a.7 Amenity tiers and condition
+
+Each amenity gains **levels**. A tier-1 clubhouse serves locals perfectly well
+and quietly fails destination guests — it works until it doesn't, and *who is
+showing up* determines when that is.
+
+Everything also carries **condition** that degrades with use. Repairs cost
+money, and a demoralised crew repairs slower, which is where morale,
+degradation and the segments all meet.
+
+### 15a.8 Build order
+
+Shipped in playable slices rather than one long disappearance.
+
+1. **Segments and narration events.** The smallest slice that fixes autopilot
+   on its own: three crowds with opposed wants, arriving based on the course,
+   telling the player about themselves in their own voices.
+2. **Decision events.**
+3. **Staff morale, including slack.**
+4. **Weather.**
+5. **Amenity tiers and condition.**
 
 ## 16. Deferred decisions
 
