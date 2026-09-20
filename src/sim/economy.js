@@ -1,5 +1,6 @@
 import { maxGroupsForDay } from './schedule.js';
 import { clamp } from './hole.js';
+import { crowdMix, SEGMENT_KEYS } from './segments.js';
 
 /** Daily wage by role. */
 export const WAGES = {
@@ -65,30 +66,84 @@ export function perceivedValue({
 }
 
 /**
- * How many groups turn up. Appetite is driven by price against perceived
- * value; the tee sheet then caps it, so a wildly popular course still
- * cannot sell more rounds than daylight allows.
+ * Splits a whole number of `total` units across `weights` (a plain object
+ * of non-negative numbers) in proportion to each weight's share, using
+ * largest-remainder rounding so the parts always sum to exactly `total`
+ * and none of them can go negative — a naive "round each share, dump the
+ * remainder on the last key" approach can drive that last key negative
+ * when the earlier ones round up.
+ */
+function allocateByWeight(total, weights) {
+  const keys = Object.keys(weights);
+  const result = {};
+  const sum = keys.reduce((s, k) => s + weights[k], 0);
+  if (total <= 0 || sum <= 0) {
+    for (const k of keys) result[k] = 0;
+    return result;
+  }
+  const parts = keys.map((k) => {
+    const exact = (total * weights[k]) / sum;
+    return { key: k, floor: Math.floor(exact), remainder: exact - Math.floor(exact) };
+  });
+  let allocated = parts.reduce((s, p) => s + p.floor, 0);
+  for (const p of parts) result[p.key] = p.floor;
+  parts.sort((a, b) => b.remainder - a.remainder);
+  for (let i = 0; allocated < total; i++, allocated++) {
+    result[parts[i % parts.length].key] += 1;
+  }
+  return result;
+}
+
+/**
+ * How many groups turn up, and who they are.
+ *
+ * Total demand is the sum of each segment's own demand: every segment's
+ * appeal for this exact course (see segments.js) drives its own slice of
+ * the crowd, rather than one blended "appetite" number standing in for
+ * three audiences who want different things. The tee sheet then caps the
+ * total, so a wildly popular course still cannot sell more rounds than
+ * daylight allows. Word of mouth and reputation are properties of the
+ * whole resort, not of any one segment, so they scale the crowd uniformly
+ * once appeal has decided its composition.
  */
 export function demandGroups({
   courseRating, prestige, amenities, greenFee, teeInterval,
   recentSatisfaction = 50, holesOpen = FULL_COURSE_HOLES,
+  courseDifficulty = 50, scenery = 50, turfQuality = 50, amenityScore,
+  hasRooms = false,
 }) {
   const value = perceivedValue({ courseRating, prestige, amenities, holesOpen });
-  // 1.0 when priced at value; falls away above it, gains slowly below it.
-  const ratio = greenFee / Math.max(1, value);
-  const appetite = ratio <= 1
-    ? 1 + (1 - ratio) * 0.35
-    : Math.max(0, 1 - (ratio - 1) * 1.8);
+  // 1.0 when priced at value; segmentAppeal's own priceFit is what makes
+  // this hurt each segment differently above that point.
+  const valueRatio = greenFee / Math.max(1, value);
+  const resolvedAmenityScore = amenityScore ?? clamp(amenities.length / 6, 0, 1);
+
+  const { appeal, share } = crowdMix({
+    courseDifficulty, scenery, turfQuality, amenityScore: resolvedAmenityScore,
+    valueRatio, hasRooms,
+  });
 
   const reputationPull = 0.35 + (prestige / 100) * 0.9;
 
   // Word of mouth. A resort people leave unhappy empties out, and this is
   // the only route by which a bad course reaches the player's wallet.
   const wordOfMouth = clamp((recentSatisfaction / 55) ** 1.5, 0.05, 1.25);
+  const pull = reputationPull * wordOfMouth;
 
   const capacity = maxGroupsForDay(teeInterval);
 
-  return clamp(Math.round(capacity * appetite * reputationPull * wordOfMouth), 0, capacity);
+  const rawBySegment = {};
+  let rawTotal = 0;
+  for (const key of SEGMENT_KEYS) {
+    const raw = capacity * appeal[key] * pull;
+    rawBySegment[key] = raw;
+    rawTotal += raw;
+  }
+
+  const total = clamp(Math.round(rawTotal), 0, capacity);
+  const bySegment = allocateByWeight(total, rawBySegment);
+
+  return { total, bySegment, share };
 }
 
 export function dailyRevenue({ groupsPlayed, greenFee, amenities, averageSatisfaction }) {

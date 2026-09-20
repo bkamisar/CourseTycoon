@@ -72,6 +72,12 @@ export function runDay(state, seed) {
     : 50;
 
   // Nobody comes to a resort with no golf.
+  //
+  // demandGroups now also returns a per-segment breakdown (see
+  // economy.js); wiring that breakdown into the crowd this day actually
+  // generates, and into the report, is Task 5's job. This call site is
+  // touched here only so the return shape's change does not leave the
+  // build red between the two commits.
   const groupCount = holes.length
     ? demandGroups({
         courseRating: rating,
@@ -81,7 +87,7 @@ export function runDay(state, seed) {
         teeInterval,
         recentSatisfaction,
         holesOpen: holes.length,
-      })
+      }).total
     : 0;
 
   resetGuestIds();

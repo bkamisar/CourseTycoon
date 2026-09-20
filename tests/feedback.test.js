@@ -11,8 +11,8 @@ const conditions = {
 };
 
 test('word of mouth sharply cuts demand when recent satisfaction is poor', () => {
-  const unhappy = demandGroups({ ...conditions, recentSatisfaction: 15 });
-  const happy = demandGroups({ ...conditions, recentSatisfaction: 85 });
+  const unhappy = demandGroups({ ...conditions, recentSatisfaction: 15 }).total;
+  const happy = demandGroups({ ...conditions, recentSatisfaction: 85 }).total;
   assert.ok(
     unhappy < happy * 0.5,
     `expected a resort with recentSatisfaction 15 to draw well under half the groups of one at 85, got ${unhappy} vs ${happy}`
@@ -22,7 +22,7 @@ test('word of mouth sharply cuts demand when recent satisfaction is poor', () =>
 test('demandGroups with no recentSatisfaction behaves like the old, unaffected call', () => {
   const withDefault = demandGroups(conditions);
   const withNeutral = demandGroups({ ...conditions, recentSatisfaction: 50 });
-  assert.equal(withDefault, withNeutral, 'omitting recentSatisfaction should be identical to passing the neutral default');
+  assert.deepEqual(withDefault, withNeutral, 'omitting recentSatisfaction should be identical to passing the neutral default');
 });
 
 test('a poor-satisfaction resort does not grow its group count over ten days', () => {
