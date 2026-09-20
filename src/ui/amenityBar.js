@@ -31,11 +31,11 @@ function injectStyles() {
       display: flex;
       align-items: center;
       gap: 6px;
-      min-height: 32px;
+      min-height: 44px;
       padding: 6px 10px;
+      box-sizing: border-box;
       background: ${PALETTE.UI_DARK};
       border-bottom: 2px solid ${PALETTE.OUTLINE};
-      box-sizing: border-box;
       overflow-x: auto;
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
