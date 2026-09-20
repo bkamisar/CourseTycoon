@@ -168,7 +168,17 @@ function openEditorFor(holeId) {
     state,
     hole,
     carts: state.resort.amenities.some((a) => a.type === 'cartBarn'),
+    sheetHost: sheets,
     onDone: () => {
+      stopEditorLoop();
+      router.go('overview');
+    },
+    // Rebuilding replaces `hole` with a different object (see
+    // mountHoleEditor's doc comment), so this editor session can't just
+    // keep going — the same "confirm, then drop back to the overview" exit
+    // `onDone` already uses, on the new state rather than the old one.
+    onRebuild: (next) => {
+      state = next;
       stopEditorLoop();
       router.go('overview');
     },

@@ -56,9 +56,14 @@ const MAX_SIZE_FACTOR = 2;
 // ---------------------------------------------------------------------
 // Pure charge/refund arithmetic — test-first, see tests/editor.test.js.
 // Hazards and the green preset cost money to add or upgrade; removing a
-// feature refunds half of what it cost, rounded down. That refund is the
-// whole reason tap-to-remove needs no confirmation dialog: a misclick
-// costs you half, never everything.
+// feature refunds the FULL amount paid for it. What makes a pond a
+// commitment is its $45/day upkeep forever (see UPKEEP_PER_POND in
+// src/sim/hole.js), not its purchase price — the build price is a capital
+// gate, not a punishment, so a full refund is what lets the player
+// actually experiment with the course instead of eating a loss every time
+// they change their mind. That refund is also the whole reason
+// tap-to-remove needs no confirmation dialog: a misclick costs nothing,
+// not even half.
 // ---------------------------------------------------------------------
 
 /** What adding one hazard of `type` (bunker/pond/trees) costs. */
@@ -66,9 +71,14 @@ export function featureCost(type) {
   return BUILD_COSTS[type];
 }
 
-/** What removing a hazard that cost `cost` to add refunds — half, rounded down. */
+/**
+ * What removing a hazard that cost `cost` to add refunds — all of it. A
+ * thin pass-through rather than a bare `cost` at every call site: the name
+ * documents the policy (full refund) at the one place it's decided, so a
+ * future change to that policy has exactly one line to edit.
+ */
 export function refundFor(cost) {
-  return Math.floor(cost / 2);
+  return cost;
 }
 
 /**
@@ -112,15 +122,26 @@ export function sizedFeatureCost(type, size) {
  * `toSize` yards. Positive means money leaves the player: growing a
  * hazard costs the full area-scaled difference, the same rate buying it
  * at that size outright would. Negative means money comes back: shrinking
- * refunds half of the area-scaled difference, rounded down — the same
- * half-back rule `refundFor` already applies to removing a hazard
- * outright, so resizing up and back down can never turn a profit either.
+ * refunds that same difference in full — the same full-refund policy
+ * `refundFor` applies to removing a hazard outright, applied here too so
+ * the two stay consistent. It is exactly `sizedFeatureCost(toSize) -
+ * sizedFeatureCost(fromSize)`, nothing more: because it's a plain
+ * difference, any chain of resizes telescopes — grow then shrink back (in
+ * any order, any number of steps) always nets to exactly what a single
+ * resize between the endpoints would have cost, so no sequence of
+ * add/resize/remove can ever turn a profit, only break even at best.
  */
 export function resizeFeatureCost(type, fromSize, toSize) {
-  const fromCost = sizedFeatureCost(type, fromSize);
-  const toCost = sizedFeatureCost(type, toSize);
-  if (toCost >= fromCost) return toCost - fromCost;
-  return -Math.floor((fromCost - toCost) / 2);
+  return sizedFeatureCost(type, toSize) - sizedFeatureCost(type, fromSize);
+}
+
+/** What removing a hazard already on the hole refunds — the full price it
+ * would cost to build fresh at its CURRENT size, not the price it was
+ * originally added at. A hazard grown after purchase is worth more, and
+ * must refund more, or growing-then-removing would quietly destroy value
+ * the player paid for. */
+export function removalRefund(feature) {
+  return refundFor(sizedFeatureCost(feature.type, feature.size));
 }
 
 // ---------------------------------------------------------------------
@@ -195,6 +216,106 @@ export function buildHole(state, holeId, templateName) {
 
   const next = structuredClone(state);
   next.money -= HOLE_BUILD_COST;
+  next.resort.courses[0].holes[idx] = { ...makeHole(templateName, holeId), open: true };
+  return next;
+}
+
+// ---------------------------------------------------------------------
+// Rebuilding an already-built hole with a different template.
+//
+// Pivoting between segments (§15a of the design doc) is the strategic
+// decision the game is now built around — locals want a forgiving course,
+// serious golfers want a hard one, and no course satisfies both. A player
+// who built one and wants the other must be able to change it, without
+// hand-editing nine holes one hazard at a time. But it has to stay a real
+// choice, not a free do-over: too cheap and there is no reason to ever
+// think before building; too punishing and pivoting never pays for
+// itself, and the game's central tension goes back to being a wall.
+// ---------------------------------------------------------------------
+
+/** What every hazard currently on `hole` would cost to build fresh at its
+ * current (possibly resized) size — the fair salvage value of everything
+ * a rebuild is about to bulldoze. */
+export function investedInHazards(hole) {
+  return hole.features.reduce((sum, f) => sum + sizedFeatureCost(f.type, f.size), 0);
+}
+
+/**
+ * What replacing an already-built hole with a fresh template costs: the
+ * full `HOLE_BUILD_COST`, since the whole hole is being regraded, minus
+ * the full salvage value of the hazards being destroyed.
+ *
+ * The salvage is deliberately uncapped, and can exceed the regrade so the
+ * figure comes back negative — a rebuild that pays out. That is not free
+ * money: the player bought those hazards, and removing them one by one
+ * already refunds the same amount. Capping it meant rebuilding a
+ * hazard-heavy hole directly cost $2,400 while stripping it first and
+ * then rebuilding left the player $3,000 better off for the identical
+ * result. A player who does the obvious thing should not be quietly
+ * punished for it, so both routes now settle at the same number.
+ *
+ * Over a full cycle - buy hazards, rebuild, get them back - the player is
+ * out exactly one `HOLE_BUILD_COST`, which is what a regrade should cost.
+ */
+export function rebuildCost(hole) {
+  return HOLE_BUILD_COST - investedInHazards(hole);
+}
+
+/** Each of the six templates, priced at what rebuilding THIS hole (see
+ * `rebuildCost`) into that template would cost — the same figure for
+ * every option, since the price depends on what is being torn out, not
+ * on what replaces it. */
+/**
+ * A rebuild's price as words. Salvage can exceed the regrade, making the
+ * figure negative — a rebuild that pays out. "$-5,365" on a button is
+ * nonsense, so a negative price is phrased as money coming back.
+ */
+export function rebuildPriceLabel(cost) {
+  return cost > 0
+    ? `$${cost.toLocaleString()}`
+    : `$${Math.abs(cost).toLocaleString()} back`;
+}
+
+/** The same figure inside a sentence: "for $9,635" / "and get $5,365 back". */
+export function rebuildPricePhrase(cost) {
+  return cost > 0
+    ? `for $${cost.toLocaleString()}`
+    : `and get $${Math.abs(cost).toLocaleString()} back`;
+}
+
+export function rebuildOptions(hole) {
+  const cost = rebuildCost(hole);
+  return TEMPLATE_NAMES.map((name) => {
+    const preview = makeHole(name, 0);
+    const stats = holeStats(preview);
+    return { name, label: TEMPLATES[name].name, par: stats.par, length: stats.length, cost };
+  });
+}
+
+/**
+ * Replaces an already-built hole with a fresh template. Returns a new
+ * state (does not mutate the one passed in); throws — rather than
+ * quietly no-op'ing — on insufficient funds, an unknown template, or an
+ * unbuilt plot, so a UI bug bypassing its own checks can never produce a
+ * free or broken rebuild. Refusing an unbuilt plot is deliberate: an
+ * empty plot has no hazards to salvage and no reason to pay the rebuild
+ * price when `buildHole`'s plain build price already applies.
+ */
+export function rebuildHole(state, holeId, templateName) {
+  if (!TEMPLATE_NAMES.includes(templateName)) {
+    throw new Error(`unknown template: ${templateName}`);
+  }
+  const holes = state.resort.courses[0].holes;
+  const idx = holes.findIndex((h) => h.id === holeId);
+  if (idx === -1) throw new Error(`no such hole slot: ${holeId}`);
+  if (!holes[idx].open) throw new Error(`hole ${holeId} has not been built yet`);
+  const cost = rebuildCost(holes[idx]);
+  if (state.money < cost) {
+    throw new Error(`insufficient funds: $${cost - state.money} short`);
+  }
+
+  const next = structuredClone(state);
+  next.money -= cost;
   next.resort.courses[0].holes[idx] = { ...makeHole(templateName, holeId), open: true };
   return next;
 }
@@ -348,6 +469,42 @@ function injectStyles() {
       font-weight: bold;
       margin-left: auto;
     }
+
+    /* Rebuild confirmation — same standard as the start screen's wipe
+     * confirmation (see src/ui/start.js): name what's lost, in words,
+     * before a single danger-coloured button commits to it. */
+    .rebuild-confirm-body {
+      font-size: 14px;
+      line-height: 1.6;
+      color: ${PALETTE.WHITE};
+      margin: 0 0 16px;
+    }
+    .rebuild-confirm-body strong { color: ${PALETTE.ACCENT}; }
+    .rebuild-confirm-btn {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 48px;
+      padding: 8px 12px;
+      background: ${PALETTE.PATH};
+      color: ${PALETTE.WHITE};
+      border: 1px solid ${PALETTE.OUTLINE};
+      border-radius: 8px;
+      font-family: monospace;
+      font-weight: bold;
+      font-size: 15px;
+    }
+    .rebuild-confirm-btn--danger {
+      background: ${PALETTE.SAND};
+      color: ${PALETTE.OUTLINE};
+    }
+    .rebuild-confirm-btn + .rebuild-confirm-btn { margin-top: 10px; }
+    .rebuild-note {
+      color: ${PALETTE.UI_LIGHT};
+      font-size: 12px;
+      margin: 4px 0 14px;
+      line-height: 1.4;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -374,7 +531,7 @@ export function openTemplatePicker(sheetHost, { state, holeId, onBuilt }) {
         title.textContent = opt.label;
         const stats = document.createElement('div');
         stats.className = 'template-card-stats';
-        stats.textContent = `Par ${opt.par} · ${Math.round(opt.length)} yd · $${opt.cost.toLocaleString()}`;
+        stats.textContent = `Par ${opt.par} · ${Math.round(opt.length)} yd · ${rebuildPriceLabel(opt.cost)}`;
         info.append(title, stats);
 
         const buildBtn = document.createElement('button');
@@ -382,7 +539,7 @@ export function openTemplatePicker(sheetHost, { state, holeId, onBuilt }) {
         buildBtn.className = 'template-card-build';
         buildBtn.textContent = 'Build';
 
-        const affordable = state.money >= opt.cost;
+        const affordable = opt.cost <= 0 || state.money >= opt.cost;
         if (!affordable) {
           buildBtn.disabled = true;
           const shortfall = document.createElement('div');
@@ -404,6 +561,113 @@ export function openTemplatePicker(sheetHost, { state, holeId, onBuilt }) {
   });
 }
 
+/**
+ * Opens the rebuild flow for an already-built hole: a template picker
+ * (see `rebuildOptions`), then a second, explicit confirmation naming
+ * what is being replaced before anything is charged — the same standard
+ * the start screen's wipe confirmation uses (see `confirmNewGame` in
+ * src/ui/start.js), because this is just as destructive and irreversible:
+ * every hazard on the hole is gone the moment it is confirmed.
+ * `onRebuilt(next)` receives the new game state (see `rebuildHole`); the
+ * caller decides what to do with it, same as `onBuilt` above.
+ */
+export function openRebuildPicker(sheetHost, { state, hole, holeId, onRebuilt }) {
+  injectStyles();
+  const currentLabel = TEMPLATES[hole.template]?.name ?? hole.template;
+  const hazardCount = hole.features.length;
+
+  function openConfirm(opt) {
+    sheetHost.open({
+      id: `rebuild-hole-confirm-${holeId}`,
+      title: 'Rebuild this hole?',
+      render(body) {
+        const text = document.createElement('p');
+        text.className = 'rebuild-confirm-body';
+        const fromStrong = document.createElement('strong');
+        fromStrong.textContent = currentLabel;
+        const toStrong = document.createElement('strong');
+        toStrong.textContent = opt.label;
+        text.append(
+          'This regrades the ',
+          fromStrong,
+          ` — clearing ${hazardCount} hazard${hazardCount === 1 ? '' : 's'} on it — and replants it as a `,
+          toStrong,
+          `, ${rebuildPricePhrase(opt.cost)}. This can't be undone.`
+        );
+        body.appendChild(text);
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.type = 'button';
+        confirmBtn.className = 'rebuild-confirm-btn rebuild-confirm-btn--danger';
+        confirmBtn.textContent = opt.cost > 0
+          ? `Rebuild for $${opt.cost.toLocaleString()}`
+          : `Rebuild, get $${Math.abs(opt.cost).toLocaleString()} back`;
+        confirmBtn.addEventListener('click', () => {
+          const next = rebuildHole(state, holeId, opt.name);
+          sheetHost.dismiss(); // the confirm sheet
+          sheetHost.dismiss(); // the template picker underneath it
+          onRebuilt(next);
+        });
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'rebuild-confirm-btn';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.addEventListener('click', () => sheetHost.dismiss());
+
+        body.append(confirmBtn, cancelBtn);
+      },
+    });
+  }
+
+  sheetHost.open({
+    id: `rebuild-hole-${holeId}`,
+    title: 'Rebuild this hole',
+    render(body) {
+      const note = document.createElement('p');
+      note.className = 'rebuild-note';
+      note.textContent =
+        `Replaces the ${currentLabel} outright — every hazard on it is lost, refunded ` +
+        'into the price below. Pick what replaces it.';
+      body.appendChild(note);
+
+      for (const opt of rebuildOptions(hole)) {
+        const card = document.createElement('div');
+        card.className = 'template-card';
+
+        const info = document.createElement('div');
+        info.className = 'template-card-info';
+        const title = document.createElement('div');
+        title.className = 'template-card-title';
+        title.textContent = opt.label;
+        const stats = document.createElement('div');
+        stats.className = 'template-card-stats';
+        stats.textContent = `Par ${opt.par} · ${Math.round(opt.length)} yd · $${opt.cost.toLocaleString()}`;
+        info.append(title, stats);
+
+        const rebuildBtn = document.createElement('button');
+        rebuildBtn.type = 'button';
+        rebuildBtn.className = 'template-card-build';
+        rebuildBtn.textContent = 'Rebuild';
+
+        const affordable = state.money >= opt.cost;
+        if (!affordable) {
+          rebuildBtn.disabled = true;
+          const shortfall = document.createElement('div');
+          shortfall.className = 'template-card-shortfall';
+          shortfall.textContent = `$${(opt.cost - state.money).toLocaleString()} short`;
+          info.appendChild(shortfall);
+        }
+
+        rebuildBtn.addEventListener('click', () => openConfirm(opt));
+
+        card.append(info, rebuildBtn);
+        body.appendChild(card);
+      }
+    },
+  });
+}
+
 // ---------------------------------------------------------------------
 // DOM: the built-hole editor — canvas dragging plus a persistent toolbar.
 // ---------------------------------------------------------------------
@@ -419,8 +683,15 @@ export function openTemplatePicker(sheetHost, { state, holeId, onBuilt }) {
  * the caller is responsible for calling `render` every frame while the
  * editor screen is active (drawHole itself is cheap — it is only
  * expectedMinutes that must be throttled).
+ *
+ * `sheetHost` and `onRebuild` are only needed for the Rebuild button (see
+ * `openRebuildPicker`): rebuilding replaces `hole` outright with a
+ * different object, which this editor instance — built around mutating
+ * the one it was handed — cannot reflect in place, so `onRebuild(next)`
+ * hands the new state back to the caller instead, the same way `onDone`
+ * already does for a plain exit.
  */
-export function mountHoleEditor({ canvas, surface, container, state, hole, carts = false, onDone }) {
+export function mountHoleEditor({ canvas, surface, container, state, hole, carts = false, sheetHost, onDone, onRebuild }) {
   injectStyles();
 
   const dockEl = document.createElement('div');
@@ -576,13 +847,13 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
   function onPointerUp() {
     if (!dragging) return;
     if (!dragMoved && dragging.feature) {
-      // A tap on an existing feature removes it and refunds half its cost,
-      // rounded down — this, not a confirmation dialog, is what makes a
-      // misclick safe: it costs half, never everything.
+      // A tap on an existing feature removes it and refunds it in full, at
+      // its current (possibly resized) value — this, not a confirmation
+      // dialog, is what makes a misclick safe: it costs nothing.
       const idx = hole.features.indexOf(dragging.feature);
       if (idx !== -1) {
         const [removed] = hole.features.splice(idx, 1);
-        const refund = refundFor(featureCost(removed.type));
+        const refund = removalRefund(removed);
         state.money += refund;
         sessionSpend -= refund;
         if (selectedFeature === removed) selectedFeature = null;
@@ -730,6 +1001,25 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
       sub: sizeSub(shrinkPreview, { grow: false }),
     });
 
+    // Rebuild replaces this hole outright — a different, expensive,
+    // deliberate action from everything else on this toolbar, which only
+    // ever adds to or adjusts what's already here. Disabled with no
+    // shortfall shown when `sheetHost` isn't wired up at all, rather than
+    // just omitted, so it's clear the button exists even where the host
+    // hasn't given it anywhere to open a picker.
+    const rebuildPrice = rebuildCost(hole);
+    const rebuildButton = makeButton('Rebuild', () => {
+      openRebuildPicker(sheetHost, {
+        state,
+        hole,
+        holeId: hole.id,
+        onRebuilt: (next) => onRebuild?.(next),
+      });
+    }, {
+      disabled: !sheetHost || !onRebuild || state.money < rebuildPrice,
+      sub: sheetHost ? costSub(rebuildPrice) : undefined,
+    });
+
     toolbarEl.replaceChildren(
       ...hazardButtons,
       shrinkButton,
@@ -737,6 +1027,7 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
       makeButton('Width −', () => adjustCorridorWidth(-CORRIDOR_WIDTH_STEP)),
       makeButton('Width +', () => adjustCorridorWidth(CORRIDOR_WIDTH_STEP)),
       greenButton,
+      rebuildButton,
       Object.assign(makeButton('Done', () => onDone?.()), { className: 'editor-btn editor-btn--done' })
     );
     remeasureChrome();
