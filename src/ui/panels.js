@@ -329,7 +329,24 @@ export function openStaffSheet(sheetHost, { state, onChange }) {
 // ---------------------------------------------------------------------
 
 const GREEN_FEE_MIN = 10;
-const GREEN_FEE_MAX = 120;
+
+/**
+ * How far above a round's worth the fee slider will let the player go.
+ *
+ * The cap used to be a flat $120, unrelated to anything in the economy,
+ * so a well-built course could be worth $130 a round and the player
+ * could not even charge what it was worth - the interface, not the
+ * market, was setting the ceiling. Deriving it from perceived value
+ * means the limit is always the demand curve punishing you for
+ * overpricing, which is a decision, rather than a slider running out,
+ * which is just a wall.
+ */
+const GREEN_FEE_HEADROOM = 1.6;
+const GREEN_FEE_FLOOR_MAX = 60;
+
+export function greenFeeCeiling(valuePerRound) {
+  return Math.max(GREEN_FEE_FLOOR_MAX, Math.ceil(valuePerRound * GREEN_FEE_HEADROOM));
+}
 const TEE_INTERVAL_MIN = 6;
 const TEE_INTERVAL_MAX = 30;
 
@@ -391,7 +408,6 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
       feeSlider.type = 'range';
       feeSlider.className = 'panel-slider';
       feeSlider.min = String(GREEN_FEE_MIN);
-      feeSlider.max = String(GREEN_FEE_MAX);
       feeSlider.step = '1';
       feeSlider.value = String(current.resort.pricing.greenFee);
 
@@ -411,6 +427,9 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
 
       function updateFeeConsequence() {
         const value = currentValuePerRound();
+        // The ceiling follows what the course is worth, so improving the
+        // resort always buys room to charge more.
+        feeSlider.max = String(greenFeeCeiling(value));
         const fee = current.resort.pricing.greenFee;
         feeValue.textContent = `$${fee}`;
         feeConsequence.replaceChildren();

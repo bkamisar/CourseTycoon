@@ -290,3 +290,16 @@ test('the pricing sheet says plainly whether the course will back up, naming the
   const clear = host.body.findAll((n) => n.textContent === 'No backup expected.')[0];
   assert.ok(clear, 'expected "No backup expected." at the longest possible interval');
 });
+
+test('the green fee ceiling follows what a round is worth', () => {
+  // A flat $120 cap meant a course worth $130 a round could not be charged
+  // at its own value: the slider, not the market, was setting the ceiling.
+  assert.ok(greenFeeCeiling(130) > 130, 'must be able to charge above value');
+  assert.ok(greenFeeCeiling(200) > greenFeeCeiling(130), 'a better course buys more room');
+});
+
+test('a struggling course still has room to price above its worth', () => {
+  // Early on a round may be worth very little; the ceiling must not collapse
+  // to something below a sensible fee.
+  assert.ok(greenFeeCeiling(12) >= 60);
+});
