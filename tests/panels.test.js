@@ -80,7 +80,7 @@ const fakeDocument = {
 
 globalThis.document = fakeDocument;
 
-const { openBuildSheet, openStaffSheet, openPricingSheet, paceConsequence } = await import('../src/ui/panels.js');
+const { openBuildSheet, openStaffSheet, openPricingSheet, paceConsequence, greenFeeCeiling } = await import('../src/ui/panels.js');
 
 function fakeSheetHost() {
   let body = null;
