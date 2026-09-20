@@ -309,11 +309,28 @@ as its binding constraint.
 **Two model changes came out of the balance pass, not just constants.**
 
 *Value scales with holes offered.* Perceived value is multiplied by
-`holesOpen / 9`. Without it, a three-hole resort drew exactly the same crowd at
-the same price as a finished nine — about 132 golfers a day, some $2.1M a year —
-which forced every cost in the game to be inflated to compensate. Three holes
-are now worth about a third of nine, which is why the starting green fee is $22
-and why building holes is what lets the player charge more.
+`(holesOpen / 18) ** 0.7`. Without any such scaling, a three-hole resort drew
+exactly the same crowd at the same price as a finished nine — about 132 golfers
+a day, some $2.1M a year — which forced every cost in the game to be inflated to
+compensate.
+
+**A full round is eighteen holes, not nine.** Dividing by nine capped the whole
+game's economy: an eighteen-hole round was worth no more than a nine, so the
+back nine in Act III earned nothing and no runway was left for Act IV. The arc
+from the end of Act I to a finished eighteen was 46% of value growth where it
+should be closer to threefold.
+
+**The curve is sublinear** because a nine is worth rather more than half an
+eighteen — some of what a golfer pays for, the place and the clubhouse and the
+round being a round at all, does not halve with the hole count. A straight
+ratio made the opening three holes worth so little that nobody turned up at any
+sane green fee.
+
+The resulting arc, at representative ratings and prestige: **$21 a round at the
+opening three holes, $73 at the end of Act I, $102 with a full amenity set, and
+$172 for a finished eighteen** — with room above that for Act IV. The Act I
+economy is unchanged by the rescale; the balance run after it moved every
+measure by less than noise.
 
 *Demand answers to satisfaction.* Word of mouth scales turnout by recent
 satisfaction. Before it, guests rated the resort 11 out of 100 and turned up in

@@ -22,8 +22,19 @@ export const AMENITIES = {
   cartBarn:     { upkeep: 110, build: 9000,  satisfaction: 3 },
 };
 
-/** A full round is nine holes. Fewer, and you are selling less golf. */
-const FULL_COURSE_HOLES = 9;
+/**
+ * A full round is eighteen holes. Fewer, and you are selling less golf.
+ *
+ * This was nine, which quietly capped the whole game's economy: an
+ * eighteen hole round was worth no more than a nine, so the back nine in
+ * Act III earned nothing and there was no runway left for Act IV. The arc
+ * from the end of Act I to a finished eighteen was 46% of value growth,
+ * where it should be closer to threefold.
+ *
+ * Act I's nine is therefore half a golf course, priced accordingly, and
+ * completing the eighteen is what doubles what a round is worth.
+ */
+const FULL_COURSE_HOLES = 18;
 
 /**
  * What a round here is worth to a golfer, in dollars.
@@ -42,7 +53,14 @@ export function perceivedValue({
     (s, a) => s + (AMENITIES[a.type]?.satisfaction ?? 0) * 1.6,
     0
   );
-  const completeness = clamp(holesOpen / FULL_COURSE_HOLES, 0.15, 1);
+  // Sublinear, not proportional: a nine is worth rather more than half an
+  // eighteen, because some of what a golfer pays for - the place, the
+  // clubhouse, the round itself being a round - does not halve with the
+  // hole count. A straight ratio made the opening three holes worth so
+  // little that nobody turned up at any sane green fee.
+  const completeness = clamp(
+    Math.pow(holesOpen / FULL_COURSE_HOLES, 0.7), 0.15, 1
+  );
   return (18 + courseRating * 0.62 + prestige * 0.45 + amenityValue) * completeness;
 }
 
