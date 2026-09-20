@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, openHoles } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
-import { computeReportData } from '../src/ui/report.js';
+import { computeReportData, paceVerdict } from '../src/ui/report.js';
 import { ordinal } from '../src/sim/satisfaction.js';
 import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
 
@@ -93,4 +93,24 @@ test('the target round time is 16 minutes times however many holes are open', ()
   assert.equal(data.targetRoundMinutes, openHoles(state).length * TARGET_MINUTES_PER_HOLE);
   // Sanity: the starting resort has exactly 3 open holes.
   assert.equal(data.targetRoundMinutes, 3 * TARGET_MINUTES_PER_HOLE);
+});
+
+test('a round inside its target reads as on pace', () => {
+  const r = paceVerdict({ avgMinutes: 44, targetMinutes: 48, hadWaits: false });
+  assert.equal(r.kind, 'onPace');
+});
+
+test('over target with waiting is a backup, and points at the tee interval', () => {
+  const r = paceVerdict({ avgMinutes: 210, targetMinutes: 144, hadWaits: true });
+  assert.equal(r.kind, 'backedUp');
+  assert.match(r.verdict, /tee interval/i);
+});
+
+test('over target with nobody waiting blames the holes, not a queue', () => {
+  // The bug this covers: the report said "groups are backing up" on the same
+  // screen as "nobody waited on anybody today". Long punishing holes exceed
+  // the target with no queue at all, and the fix is the opposite one.
+  const r = paceVerdict({ avgMinutes: 210, targetMinutes: 144, hadWaits: false });
+  assert.equal(r.kind, 'slowHoles');
+  assert.doesNotMatch(r.verdict, /backing up/i);
 });

@@ -32,6 +32,36 @@ const RATING_SPECS = [
  * one, is `state.history[state.history.length - 2]`: `history`'s last
  * entry is today's, pushed by `runDay` before it returned.
  */
+/**
+ * What the pace line should actually say.
+ *
+ * Round time is playing time PLUS waiting, so a course of long, punishing
+ * holes blows past the target with nobody queueing at all. The report used
+ * to call that "groups are backing up" while the very next line said
+ * nobody waited on anybody - a flat contradiction, and worse, it pointed
+ * the player at the wrong lever.
+ *
+ * The two problems have opposite fixes. Backing up means the tee interval
+ * is too tight, and the interval slider fixes it. Slow holes with no queue
+ * mean the course itself is punishing, and softening holes or buying carts
+ * fixes that. So the verdict has to know which one it is looking at.
+ */
+export function paceVerdict({ avgMinutes, targetMinutes, hadWaits }) {
+  if (avgMinutes <= targetMinutes) {
+    return { kind: 'onPace', verdict: 'Right on pace.' };
+  }
+  if (hadWaits) {
+    return {
+      kind: 'backedUp',
+      verdict: 'Groups are backing up. Try a wider tee interval.',
+    };
+  }
+  return {
+    kind: 'slowHoles',
+    verdict: 'Nobody queued - these holes just play slowly.',
+  };
+}
+
 export function computeReportData(state, report) {
   const history = state.history;
   const previous = history.length >= 2 ? history[history.length - 2] : null;
@@ -355,7 +385,11 @@ export function mountReport(root, { state, report, onContinue } = {}) {
   const target = Math.round(data.targetRoundMinutes);
   const strongMinutes = document.createElement('strong');
   strongMinutes.textContent = `${avgMinutes} min`;
-  const verdict = avgMinutes > target ? 'Groups are backing up.' : 'Right on pace.';
+  const { verdict } = paceVerdict({
+    avgMinutes,
+    targetMinutes: target,
+    hadWaits: Boolean(data.bottleneckHoleName),
+  });
   roundLine.append(strongMinutes, ` — target ${target}. ${verdict}`);
   pace.appendChild(roundLine);
 
