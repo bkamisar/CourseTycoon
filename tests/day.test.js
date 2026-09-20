@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
 import { runDay, marshalPaceFactor } from '../src/sim/day.js';
+import { SEGMENT_KEYS } from '../src/sim/segments.js';
 
 test('runDay returns a next state, a report and a timeline', () => {
   const { state, report, timeline } = runDay(newGame(1), 1);
@@ -50,9 +51,58 @@ test('profit is revenue minus costs', () => {
 test('the report carries everything the evening screen needs', () => {
   const { report } = runDay(newGame(8), 1);
   for (const key of ['day', 'groupsPlayed', 'revenue', 'costs', 'profit',
-    'averageSatisfaction', 'averageRoundMinutes', 'courseRating', 'prestige',
-    'complaints', 'gate']) {
+    'averageSatisfaction', 'averageRoundMinutes', 'courseRating', 'courseDifficulty',
+    'prestige', 'crowd', 'complaints', 'gate']) {
     assert.ok(key in report, `report missing: ${key}`);
+  }
+});
+
+test('crowd segment counts sum to the total golfers', () => {
+  const { report } = runDay(newGame(14), 1);
+  const total = SEGMENT_KEYS.reduce((s, key) => s + report.crowd[key].count, 0);
+  assert.equal(total, report.groupsPlayed * 4,
+    `crowd counts summed to ${total}, expected ${report.groupsPlayed * 4} golfers`);
+});
+
+test('the crowd breakdown covers every segment with a count and a satisfaction figure', () => {
+  const { report } = runDay(newGame(15), 1);
+  for (const key of SEGMENT_KEYS) {
+    assert.ok(key in report.crowd, `crowd missing segment: ${key}`);
+    assert.equal(typeof report.crowd[key].count, 'number');
+    assert.ok(report.crowd[key].count >= 0);
+    // No guests of a segment on a given day means nothing to average.
+    if (report.crowd[key].count === 0) {
+      assert.equal(report.crowd[key].averageSatisfaction, null);
+    } else {
+      assert.equal(typeof report.crowd[key].averageSatisfaction, 'number');
+    }
+  }
+});
+
+test('the same state and seed produce an identical crowd breakdown', () => {
+  const a = runDay(newGame(16), 42).report.crowd;
+  const b = runDay(newGame(16), 42).report.crowd;
+  assert.deepEqual(a, b);
+});
+
+test('courseDifficulty is the mean difficulty across the open holes, zero with none open', () => {
+  const closed = newGame(17);
+  for (const h of closed.resort.courses[0].holes) h.open = false;
+  const { report } = runDay(closed, 1);
+  assert.equal(report.courseDifficulty, 0);
+
+  const open = runDay(newGame(17), 1).report;
+  assert.ok(open.courseDifficulty > 0, `expected a positive difficulty, got ${open.courseDifficulty}`);
+});
+
+test('a course priced far above what anyone thinks it is worth draws nobody, without crashing', () => {
+  const state = newGame(18);
+  state.resort.pricing.greenFee = 5000;
+  const { report } = runDay(state, 1);
+  assert.equal(report.groupsPlayed, 0);
+  for (const key of SEGMENT_KEYS) {
+    assert.equal(report.crowd[key].count, 0);
+    assert.equal(report.crowd[key].averageSatisfaction, null);
   }
 });
 

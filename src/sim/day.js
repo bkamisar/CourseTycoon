@@ -8,6 +8,7 @@ import { guestSatisfaction, buildComplaints } from './satisfaction.js';
 import { courseRating, nextPrestige } from './ratings.js';
 import { actOneGate } from './acts.js';
 import { openHoles } from './state.js';
+import { SEGMENT_KEYS } from './segments.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -64,6 +65,21 @@ export function runDay(state, seed) {
 
   const rating = holes.length ? courseRating(holes, next.turfQuality) : 0;
 
+  // The mean difficulty across every open hole is what the segments react
+  // to — both when deciding whether to turn up (economy.demandGroups) and
+  // when deciding how they felt about the round (satisfaction.
+  // guestSatisfaction). Computed once here and threaded through both, so
+  // the crowd that arrives and the crowd that leaves happy can never
+  // disagree about what this course's difficulty actually is.
+  const courseDifficulty = holes.length
+    ? holes.reduce((s, h) => s + holeStats(h).difficulty, 0) / holes.length
+    : 0;
+  const averageScenery = holes.length
+    ? holes.reduce((s, h) => s + holeStats(h).scenery, 0) / holes.length
+    : 0;
+  // Destination guests are mostly an Act II crowd; Act I has no rooms yet.
+  const hasRooms = (next.resort.rooms?.count ?? 0) > 0;
+
   // Word of mouth from the last few days. No history yet (day one) is
   // neutral, so the resort isn't punished or rewarded before it has played.
   const recentHistory = next.satisfactionHistory.slice(-3);
@@ -71,14 +87,12 @@ export function runDay(state, seed) {
     ? recentHistory.reduce((s, v) => s + v, 0) / recentHistory.length
     : 50;
 
-  // Nobody comes to a resort with no golf.
-  //
-  // demandGroups now also returns a per-segment breakdown (see
-  // economy.js); wiring that breakdown into the crowd this day actually
-  // generates, and into the report, is Task 5's job. This call site is
-  // touched here only so the return shape's change does not leave the
-  // build red between the two commits.
-  const groupCount = holes.length
+  // Nobody comes to a resort with no golf. Otherwise, each segment's own
+  // appeal for this exact course decides its own slice of the tee sheet
+  // (see economy.demandGroups); `share` is that same appeal expressed as
+  // proportions, and is what decides which segment each guest belongs to
+  // below.
+  const demand = holes.length
     ? demandGroups({
         courseRating: rating,
         prestige: next.prestige,
@@ -87,13 +101,18 @@ export function runDay(state, seed) {
         teeInterval,
         recentSatisfaction,
         holesOpen: holes.length,
-      }).total
-    : 0;
+        courseDifficulty,
+        scenery: averageScenery,
+        turfQuality: next.turfQuality,
+        hasRooms,
+      })
+    : { total: 0, share: Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0])) };
+  const groupCount = demand.total;
 
   resetGuestIds();
   const groups = [];
   for (let i = 0; i < groupCount; i++) {
-    groups.push(makeGroup(rng, { prestige: next.prestige, greenFee }, i));
+    groups.push(makeGroup(rng, { prestige: next.prestige, greenFee, share: demand.share }, i));
   }
 
   // Play every group through every open hole, recording strokes and time.
@@ -150,34 +169,48 @@ export function runDay(state, seed) {
     holesOpen: holes.length,
   });
   const amenityBonus = amenityTypes.length * 1.5;
-  const averageScenery = holes.length
-    ? holes.reduce((s, h) => s + holeStats(h).scenery, 0) / holes.length
-    : 0;
 
   const satisfactions = [];
+  const crowdCount = Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0]));
+  const crowdSatisfactionSum = Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0]));
+
   groups.forEach((group, gi) => {
     const wait = schedule.rounds[gi]?.waitMinutes ?? 0;
     group.guests.forEach((guest, idx) => {
       const strokes = perGroupScores[gi].reduce((s, holeScores) => s + holeScores[idx].strokes, 0);
       const par = perGroupScores[gi].reduce((s, holeScores) => s + holeScores[idx].par, 0);
-      satisfactions.push(
-        guestSatisfaction({
-          handicap: guest.handicap,
-          strokesOverPar: strokes - par,
-          waitMinutes: wait,
-          greenFee,
-          perceivedValue: value,
-          scenery: averageScenery,
-          turfQuality: next.turfQuality,
-          amenityBonus,
-        })
-      );
+      const guestSat = guestSatisfaction({
+        handicap: guest.handicap,
+        strokesOverPar: strokes - par,
+        waitMinutes: wait,
+        greenFee,
+        perceivedValue: value,
+        scenery: averageScenery,
+        turfQuality: next.turfQuality,
+        amenityBonus,
+        segment: guest.segment,
+        courseDifficulty,
+      });
+      satisfactions.push(guestSat);
+      crowdCount[guest.segment] += 1;
+      crowdSatisfactionSum[guest.segment] += guestSat;
     });
   });
 
   const averageSatisfaction = satisfactions.length
     ? satisfactions.reduce((s, v) => s + v, 0) / satisfactions.length
     : 50;
+
+  // Who came, and what each of them made of it — the report's answer to
+  // "which crowd am I running", per segment rather than as one blended
+  // average that hides the composition.
+  const crowd = Object.fromEntries(SEGMENT_KEYS.map((key) => [
+    key,
+    {
+      count: crowdCount[key],
+      averageSatisfaction: crowdCount[key] > 0 ? crowdSatisfactionSum[key] / crowdCount[key] : null,
+    },
+  ]));
 
   // Money.
   const holeUpkeep = holes.reduce((s, h) => s + holeStats(h).upkeep, 0);
@@ -228,8 +261,10 @@ export function runDay(state, seed) {
     bottleneckHoleIndex: schedule.bottleneckHoleIndex,
     overrunGroups: schedule.overrunGroups,
     courseRating: rating,
+    courseDifficulty,
     prestige: next.prestige,
     turfQuality: next.turfQuality,
+    crowd,
     complaints,
     gate,
   };
