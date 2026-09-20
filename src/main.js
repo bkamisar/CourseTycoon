@@ -66,7 +66,11 @@ const router = createScreenRouter('overview');
 // underneath it. We cannot see or measure that bar from in here, so the
 // page leaves room for one whenever it is embedded rather than top-level.
 // A standalone page (GitHub Pages, a local server) is unaffected.
-const EMBEDDED_TOP_INSET = 44;
+// A guess, not a measurement: the host's bar is drawn outside this frame
+// and cannot be inspected from in here. 44 was still being covered, so this
+// errs generous - a small empty strip is a far better failure than hidden
+// content, and a standalone page (GitHub Pages) never pays it at all.
+const EMBEDDED_TOP_INSET = 72;
 let embedded = false;
 try {
   embedded = window.self !== window.top;
