@@ -1,5 +1,6 @@
 /**
- * The top HUD bar: money, day number, and the three ratings.
+ * The top HUD bar: money, day number, and four ratings — satisfaction
+ * included.
  *
  * `computeHudData` is the pure half — every figure it returns is read
  * straight off `state` or off a `src/sim/ratings.js` call, never computed
@@ -7,6 +8,15 @@
  * does for the same state (rating is 0 with no open holes, otherwise
  * `courseRating(openHoles(state), state.turfQuality)`), so the HUD figure
  * always agrees with what the day's own report will say.
+ *
+ * Satisfaction is the one figure here that isn't derived from `state`
+ * directly — it's read off the most recent day's own report,
+ * `state.history[state.history.length - 1].averageSatisfaction`, because
+ * that's the only place "satisfaction" is actually computed (in
+ * `src/sim/day.js`, from a day's simulated rounds). Day one has no report
+ * yet, so `satisfaction` is `null` rather than a misleading zero — the DOM
+ * half below shows a dash for that case instead of pretending nobody is
+ * enjoying themselves.
  */
 import { PALETTE } from '../render/palette.js';
 import { openHoles } from '../sim/state.js';
@@ -15,12 +25,14 @@ import { courseRating } from '../sim/ratings.js';
 export function computeHudData(state) {
   const holes = openHoles(state);
   const rating = holes.length ? courseRating(holes, state.turfQuality) : 0;
+  const lastReport = state.history.length ? state.history[state.history.length - 1] : null;
   return {
     money: state.money,
     day: state.day,
     courseRating: Math.round(rating),
     prestige: Math.round(state.prestige),
     turfQuality: Math.round(state.turfQuality),
+    satisfaction: lastReport ? Math.round(lastReport.averageSatisfaction) : null,
   };
 }
 
@@ -89,7 +101,8 @@ export function mountHud(root) {
     const data = computeHudData(state);
     money.textContent = `$${Math.round(data.money).toLocaleString()}`;
     day.textContent = `Day ${data.day}`;
-    ratings.textContent = `CR ${data.courseRating} · Prestige ${data.prestige} · Turf ${data.turfQuality}`;
+    const satText = data.satisfaction === null ? '—' : data.satisfaction;
+    ratings.textContent = `Sat ${satText} · CR ${data.courseRating} · Prestige ${data.prestige} · Turf ${data.turfQuality}`;
     return data;
   }
 

@@ -152,3 +152,31 @@ test('HUD course rating is exactly what ratings.courseRating reports for the ope
   const expected = Math.round(courseRating(openHoles(state), state.turfQuality));
   assert.equal(data.courseRating, expected);
 });
+
+test('HUD satisfaction is null on day one, before any report exists', () => {
+  const state = newGame(1);
+  assert.equal(state.history.length, 0);
+  const data = computeHudData(state);
+  assert.equal(data.satisfaction, null);
+});
+
+test('HUD satisfaction is the most recent day report\'s averageSatisfaction, rounded', async () => {
+  const { runDay } = await import('../src/sim/day.js');
+  const state = newGame(1);
+  const { state: next } = runDay(state, 1);
+  const data = computeHudData(next);
+  assert.equal(next.history.length, 1);
+  assert.equal(data.satisfaction, Math.round(next.history[0].averageSatisfaction));
+});
+
+test('HUD satisfaction tracks the LAST day\'s report, not an earlier one, after several days', async () => {
+  const { runDay } = await import('../src/sim/day.js');
+  let state = newGame(1);
+  for (let i = 0; i < 3; i++) {
+    ({ state } = runDay(state, i + 1));
+  }
+  const data = computeHudData(state);
+  const lastReport = state.history[state.history.length - 1];
+  assert.equal(state.history.length, 3);
+  assert.equal(data.satisfaction, Math.round(lastReport.averageSatisfaction));
+});
