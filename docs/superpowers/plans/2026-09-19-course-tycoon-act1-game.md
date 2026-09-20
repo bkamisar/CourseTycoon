@@ -127,7 +127,9 @@ Report which sprites were hardest to read; those are the ones to iterate on.
 
 - [ ] **Step 1: Implement `drawHole(ctx, hole, { width, height })`**
 
-Draws a single hole to fill a portrait area: tee at the bottom, green at the top. Must compute a transform from hole yards to screen pixels that fits the whole corridor with a margin, then draw in order: rough as background, fairway band along the corridor, ponds, bunkers, tree clumps, the green, the tee box, and the flag at the green centre.
+Draws a single hole to fill a portrait area: tee at the bottom, green at the top. Must compute a transform from hole yards to screen pixels that fits the whole corridor with a margin, then draw in **`lieAt`'s own priority order**, back to front: rough, fairway band, the green, then ponds, bunkers and tree clumps on top, then the tee box and the flag.
+
+**The green goes down before the hazards, not after.** `lieAt` tests water, sand and trees *before* it tests the green, so a bunker overlapping the green edge — which happens on `straightPar4` and `doglegPar4` — plays as sand. Painting the green last covers it, and the player sees putting surface where the ball will find a bunker. Any draw order that disagrees with `lieAt`'s priority is a bug, however natural it reads as prose.
 
 The corridor and its width come from the hole data; fairway is generated from the centreline exactly as `terrain.js` classifies it, so what is drawn matches what the simulation resolves shots against. **A hole that looks different from how it plays is the worst bug this file can have.**
 
