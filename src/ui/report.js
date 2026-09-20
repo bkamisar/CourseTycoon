@@ -16,6 +16,8 @@
  */
 import { PALETTE } from '../render/palette.js';
 import { ordinal } from '../sim/satisfaction.js';
+import { openHoles } from '../sim/state.js';
+import { TARGET_MINUTES_PER_HOLE } from '../sim/schedule.js';
 
 const RATING_SPECS = [
   { key: 'courseRating', label: 'Course Rating' },
@@ -46,6 +48,12 @@ export function computeReportData(state, report) {
       ? null
       : ordinal(report.bottleneckHoleIndex + 1);
 
+  // A bare minutes figure means nothing to a new player. 16 minutes a hole
+  // (TARGET_MINUTES_PER_HOLE, see schedule.js) is the clean-round pace from
+  // the balance pass, so the target for THIS course is that times however
+  // many holes are actually open today.
+  const targetRoundMinutes = openHoles(state).length * TARGET_MINUTES_PER_HOLE;
+
   return {
     day: report.day,
     profit: report.profit,
@@ -53,6 +61,7 @@ export function computeReportData(state, report) {
     costs: report.costs,
     ratings,
     averageRoundMinutes: report.averageRoundMinutes,
+    targetRoundMinutes,
     bottleneckHoleName,
     overrunGroups: report.overrunGroups,
     groupsPlayed: report.groupsPlayed,
@@ -343,9 +352,11 @@ export function mountReport(root, { state, report, onContinue } = {}) {
   pace.className = 'report-pace';
   const roundLine = document.createElement('div');
   const avgMinutes = Math.round(data.averageRoundMinutes);
+  const target = Math.round(data.targetRoundMinutes);
   const strongMinutes = document.createElement('strong');
   strongMinutes.textContent = `${avgMinutes} min`;
-  roundLine.append('Average round: ', strongMinutes);
+  const verdict = avgMinutes > target ? 'Groups are backing up.' : 'Right on pace.';
+  roundLine.append(strongMinutes, ` — target ${target}. ${verdict}`);
   pace.appendChild(roundLine);
 
   if (data.bottleneckHoleName) {

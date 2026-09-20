@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame } from '../src/sim/state.js';
+import { newGame, openHoles } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { computeReportData } from '../src/ui/report.js';
 import { ordinal } from '../src/sim/satisfaction.js';
+import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
 
 test('computeReportData reads profit and the revenue/cost breakdown straight from the report', () => {
   const { state, report } = runDay(newGame(1), 1);
@@ -84,4 +85,12 @@ test('average round minutes is read straight from the report, never recomputed',
   const { state, report } = runDay(newGame(8), 1);
   const data = computeReportData(state, report);
   assert.equal(data.averageRoundMinutes, report.averageRoundMinutes);
+});
+
+test('the target round time is 16 minutes times however many holes are open', () => {
+  const { state, report } = runDay(newGame(9), 1);
+  const data = computeReportData(state, report);
+  assert.equal(data.targetRoundMinutes, openHoles(state).length * TARGET_MINUTES_PER_HOLE);
+  // Sanity: the starting resort has exactly 3 open holes.
+  assert.equal(data.targetRoundMinutes, 3 * TARGET_MINUTES_PER_HOLE);
 });

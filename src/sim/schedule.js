@@ -70,3 +70,12 @@ export function scheduleRounds({
 export function maxGroupsForDay(teeInterval, dayStart = 420, dayEnd = 1080) {
   return Math.max(1, Math.floor((dayEnd - dayStart) / teeInterval));
 }
+
+/**
+ * Roughly how long a hole should take when the course is playing cleanly —
+ * the measured clean-round pace from the balance pass (see tools/balance.js
+ * and the design spec's pace-of-play section). The evening report and the
+ * glossary both hold a course's actual pace against this, so it lives here
+ * once rather than being retyped in each of them.
+ */
+export const TARGET_MINUTES_PER_HOLE = 16;
