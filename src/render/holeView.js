@@ -37,10 +37,6 @@ const ROUGH_MARGIN = 22;
 const TEE_HEADROOM = 10;
 const GREEN_HEADROOM = 14;
 
-/** Tee box footprint in yards, purely cosmetic. */
-const TEE_DEPTH_YARDS = 8;
-const TEE_WIDTH_YARDS = 16;
-
 function computeBounds(hole) {
   const halfBand = hole.corridorWidth / 2 + ROUGH_MARGIN;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -139,32 +135,24 @@ function drawCircle(ctx, t, centre, radiusYards, color) {
   ctx.fill();
 }
 
-/** A small rect at the corridor's start, oriented toward the first bend. */
+/**
+ * The tee sprite at the corridor's start. Like `drawFlag`, this is placed
+ * unrotated at a fixed pixel size regardless of hole scale or corridor
+ * direction — `lieAt` has no opinion about the tee (`LIE.TEE` is never
+ * actually returned; see the file-level comment), so unlike the corridor
+ * band, hazards and green, there is no geometry here that has to agree
+ * with anything the simulation resolves shots against. Fixed-size is also
+ * simply what already reads correctly at both hole-editor scale and the
+ * much smaller overview-plot scale, per the flag it's drawn the same way
+ * as.
+ */
 function drawTeeBox(ctx, t, hole) {
   const start = hole.corridor[0];
-  const next = hole.corridor[1] ?? { x: start.x, y: start.y + 1 };
-  const dx = next.x - start.x;
-  const dy = next.y - start.y;
-  const len = Math.hypot(dx, dy) || 1;
-  const dirX = dx / len;
-  const dirY = dy / len;
-
   const p = t.toScreen(start);
-  // Yard direction (dirX, dirY) maps to screen direction (dirX, -dirY)
-  // under toScreen's y-flip; rotate the local frame to match.
-  const angle = Math.atan2(-dirY, dirX);
-
-  const depthPx = TEE_DEPTH_YARDS * t.scale;
-  const widthPx = Math.min(TEE_WIDTH_YARDS, hole.corridorWidth * 0.7) * t.scale;
-
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.rotate(angle);
-  ctx.fillStyle = PALETTE.TEE;
-  // Sits mostly behind the corridor's start point, not centred on it, so
-  // it reads as the platform the corridor leads away from.
-  ctx.fillRect(-depthPx * 0.75, -widthPx / 2, depthPx, widthPx);
-  ctx.restore();
+  const sprite = SPRITES.tee;
+  const w = sprite[0].length;
+  const h = sprite.length;
+  drawSprite(ctx, sprite, p.x - w / 2, p.y - h / 2);
 }
 
 function drawFlag(ctx, t, greenCentrePoint) {

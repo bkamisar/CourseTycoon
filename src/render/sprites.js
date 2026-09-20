@@ -66,6 +66,24 @@ const golferWalk2 = [
   '........',
 ];
 
+/** The tee box: an outlined mat with two tee markers up front. Purely
+ * decorative — `lieAt` has no `TEE` lie a real shot can land in (see the
+ * comment on drawTeeBox in holeView.js) — so, like `flag`, it is placed
+ * unrotated at fixed size regardless of hole scale. That is deliberate:
+ * the flag already proved this reads fine both at full hole-editor scale
+ * and shrunk onto an overview plot, so the tee follows the same rule
+ * rather than inventing a second, scaled convention. */
+const tee = [
+  '........',
+  '.OOOOOO.',
+  'OEEEEEEO',
+  'OEA..AEO',
+  'OEEEEEEO',
+  'OEEEEEEO',
+  'OOOOOOOO',
+  '........',
+];
+
 const flag = [
   '...AAA..',
   '...AAA..',
