@@ -16,7 +16,9 @@ export const PALETTE = Object.freeze({
   // clearly distinct from FAIRWAY at a glance, even on a small screen
   ROUGH_SHADOW: '#5E6B28', // shaded / deeper rough
   TREE: '#1B4D2E', // tree clumps and out-of-bounds woods
+  TREE_SHADOW: '#133620', // shaded canopy texture inside a tree clump
   SAND: '#E8C170', // bunkers
+  SAND_SHADOW: '#A2874E', // the shaded, recessed part of a bunker's bowl
   WATER: '#3A8FD4', // ponds and hazards, surface
   WATER_DEEP: '#1B4F91', // ponds and hazards, deep water
   GREEN_SURFACE: '#A8E68C', // the putting green itself

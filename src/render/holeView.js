@@ -110,7 +110,91 @@ export function computeHoleTransform(hole, { x, y, width, height }) {
   return { toScreen, toWorld, scale, bounds };
 }
 
-function drawBand(ctx, t, corridor, widthYards, color) {
+// --- Texture: fairway/rough shading, and hazard depth/depression -------
+//
+// `drawBand`'s stroke is the exact geometric region `lieAt` tests as
+// fairway or rough, so texture painted as the STROKE STYLE ITSELF (a tiled
+// CanvasPattern, in place of a flat colour) rides along for free: the
+// browser only ever paints the pattern inside the stroke's own shape,
+// round caps/joins included, with no separate clip math to keep in sync
+// and no way for it to disagree with the band underneath it.
+//
+// Patterns and gradients need a live `document`/canvas, so nothing here
+// runs at module load — only on first actual draw, in a browser. Every
+// caller (resortView.js, the hole editor) only ever runs in one, but
+// `tests/holeView.test.js` imports this module in plain Node for
+// `computeHoleTransform`, and that import must not touch `document`.
+
+let fairwayPattern = null;
+let roughPattern = null;
+
+/** 4x4 tile: solid `base`, with a 2px band of `stripe` across the top —
+ * tiled, this reads as mowed fairway stripes, matching what the palette
+ * already names FAIRWAY_SHADOW for. */
+function makeStripeTile(base, stripe) {
+  const tile = document.createElement('canvas');
+  tile.width = 4;
+  tile.height = 4;
+  const tctx = tile.getContext('2d');
+  tctx.fillStyle = base;
+  tctx.fillRect(0, 0, 4, 4);
+  tctx.fillStyle = stripe;
+  tctx.fillRect(0, 0, 4, 2);
+  return tile;
+}
+
+/** 4x4 tile: solid `base` with a few single-pixel `speckle` flecks at
+ * fixed (not random — this is redrawn every frame, and a random tile
+ * would shimmer) offsets — coarser and patchier than the fairway's clean
+ * stripes, so rough keeps reading as visually distinct from fairway the
+ * way the palette requires, texture included. */
+function makeSpeckleTile(base, speckle) {
+  const tile = document.createElement('canvas');
+  tile.width = 4;
+  tile.height = 4;
+  const tctx = tile.getContext('2d');
+  tctx.fillStyle = base;
+  tctx.fillRect(0, 0, 4, 4);
+  tctx.fillStyle = speckle;
+  tctx.fillRect(0, 1, 1, 1);
+  tctx.fillRect(2, 3, 1, 1);
+  tctx.fillRect(3, 0, 1, 1);
+  return tile;
+}
+
+function fairwayFill(ctx) {
+  if (!fairwayPattern) fairwayPattern = ctx.createPattern(makeStripeTile(PALETTE.FAIRWAY, PALETTE.FAIRWAY_SHADOW), 'repeat');
+  return fairwayPattern;
+}
+
+function roughFill(ctx) {
+  if (!roughPattern) roughPattern = ctx.createPattern(makeSpeckleTile(PALETTE.ROUGH, PALETTE.ROUGH_SHADOW), 'repeat');
+  return roughPattern;
+}
+
+/** Radial gradient reading as a pond's surface-to-depth falloff: deep
+ * water at the centre, lightening toward the shore. Same circle `lieAt`
+ * tests as water either way — only the fill style changes. */
+function pondFill(ctx, p, r) {
+  const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+  gradient.addColorStop(0, PALETTE.WATER_DEEP);
+  gradient.addColorStop(1, PALETTE.WATER);
+  return gradient;
+}
+
+/** Radial gradient reading as a bunker's bowl: shaded and recessed
+ * through the middle, catching light only at the rim — the same
+ * "lighter edge, darker centre" language `pondFill` uses for depth,
+ * applied to sand instead of water. */
+function bunkerFill(ctx, p, r) {
+  const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+  gradient.addColorStop(0, PALETTE.SAND_SHADOW);
+  gradient.addColorStop(0.75, PALETTE.SAND_SHADOW);
+  gradient.addColorStop(1, PALETTE.SAND);
+  return gradient;
+}
+
+function drawBand(ctx, t, corridor, widthYards, style) {
   if (corridor.length < 2) return;
   ctx.beginPath();
   const p0 = t.toScreen(corridor[0]);
@@ -119,20 +203,58 @@ function drawBand(ctx, t, corridor, widthYards, color) {
     const p = t.toScreen(corridor[i]);
     ctx.lineTo(p.x, p.y);
   }
-  ctx.strokeStyle = color;
+  ctx.strokeStyle = style;
   ctx.lineWidth = Math.max(1, widthYards * t.scale);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.stroke();
 }
 
-function drawCircle(ctx, t, centre, radiusYards, color) {
+/**
+ * Fills a circle at `centre` (hole-yard coordinates) with `style` — a
+ * flat colour, or a function `(ctx, screenPoint, screenRadius) => style`
+ * for a gradient that needs to know where on screen it's centred. Returns
+ * the resolved screen point/radius so a caller (tree clumps, in
+ * particular) can clip further drawing to the exact same circle.
+ */
+function drawCircle(ctx, t, centre, radiusYards, style) {
   const p = t.toScreen(centre);
   const r = Math.max(0.5, radiusYards * t.scale);
   ctx.beginPath();
   ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-  ctx.fillStyle = color;
+  ctx.fillStyle = typeof style === 'function' ? style(ctx, p, r) : style;
   ctx.fill();
+  return { p, r };
+}
+
+/** Fixed (not random, for the same never-jitter reason as the rough
+ * speckle tile) relative offsets for a tree clump's canopy blobs — a
+ * handful of overlapping circles rather than one flat disc. Clipped to
+ * the clump's own outer circle by the caller, so despite a couple of
+ * these mathematically poking past the radius at their own offset+size,
+ * nothing they draw can ever land outside it: the promise `lieAt`'s
+ * radius test depends on is enforced by the clip, not by these numbers
+ * being carefully tuned to stay inside on their own. */
+const TREE_CANOPY_BLOBS = [
+  { dx: -0.35, dy: -0.3, dr: 0.55 },
+  { dx: 0.4, dy: -0.15, dr: 0.5 },
+  { dx: -0.05, dy: 0.4, dr: 0.5 },
+  { dx: 0.35, dy: 0.3, dr: 0.4 },
+];
+
+function drawTreeClump(ctx, t, feature) {
+  const { p, r } = drawCircle(ctx, t, feature, feature.size, PALETTE.TREE);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = PALETTE.TREE_SHADOW;
+  for (const b of TREE_CANOPY_BLOBS) {
+    ctx.beginPath();
+    ctx.arc(p.x + b.dx * r, p.y + b.dy * r, b.dr * r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 /**
@@ -185,8 +307,8 @@ export function drawHole(ctx, hole, rect) {
   ctx.fillStyle = PALETTE.TREE;
   ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
 
-  drawBand(ctx, t, hole.corridor, hole.corridorWidth + ROUGH_MARGIN * 2, PALETTE.ROUGH);
-  drawBand(ctx, t, hole.corridor, hole.corridorWidth, PALETTE.FAIRWAY);
+  drawBand(ctx, t, hole.corridor, hole.corridorWidth + ROUGH_MARGIN * 2, roughFill(ctx));
+  drawBand(ctx, t, hole.corridor, hole.corridorWidth, fairwayFill(ctx));
 
   const gc = greenCentre(hole);
   const gr = greenRadius(hole);
@@ -195,15 +317,13 @@ export function drawHole(ctx, hole, rect) {
   // Hazards paint over the green/fairway/rough wherever they overlap,
   // matching lieAt checking them before anything else.
   for (const f of hole.features) {
-    if (f.type !== 'pond') continue;
-    drawCircle(ctx, t, f, f.size, PALETTE.WATER);
-    drawCircle(ctx, t, f, f.size * 0.55, PALETTE.WATER_DEEP);
+    if (f.type === 'pond') drawCircle(ctx, t, f, f.size, pondFill);
   }
   for (const f of hole.features) {
-    if (f.type === 'bunker') drawCircle(ctx, t, f, f.size, PALETTE.SAND);
+    if (f.type === 'bunker') drawCircle(ctx, t, f, f.size, bunkerFill);
   }
   for (const f of hole.features) {
-    if (f.type === 'trees') drawCircle(ctx, t, f, f.size, PALETTE.TREE);
+    if (f.type === 'trees') drawTreeClump(ctx, t, f);
   }
 
   drawTeeBox(ctx, t, hole);
