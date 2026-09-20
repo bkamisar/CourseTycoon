@@ -14,13 +14,9 @@
  * pointerup — showing the previous minutes value while a drag is in
  * progress rather than blanking it, via `deriveReadout`'s `minutesOverride`.
  *
- * A note on $12,000: the design spec fixes the cost of a new hole at
- * $12,000 (docs/superpowers/specs/2026-09-19-golf-resort-tycoon-design.md,
- * "Build a new hole"), but `src/sim/economy.js` has no export for it —
- * `AMENITIES` covers buildings, `WAGES` covers staff, neither covers holes.
- * `HOLE_BUILD_COST` below is the one place that number is written down in
- * this codebase; it is not computed, just named. Flagged in the Task 6
- * report as a gap worth closing in `src/sim/economy.js` itself.
+ * The cost of a new hole comes from `BUILD_COSTS` in `src/sim/economy.js`,
+ * beside the amenity build costs. It is re-exported here only so existing
+ * callers keep working; this file does not decide what anything costs.
  */
 import { PALETTE } from '../render/palette.js';
 import { drawHole, computeHoleTransform } from '../render/holeView.js';
@@ -28,8 +24,9 @@ import { makeHole, holeStats, clamp, GREEN_DIFFICULTY } from '../sim/hole.js';
 import { expectedMinutes } from '../sim/round.js';
 import { TEMPLATE_NAMES, TEMPLATES } from '../sim/templates.js';
 import { pathLength, pointAtDistance } from '../sim/geometry.js';
+import { BUILD_COSTS } from '../sim/economy.js';
 
-export const HOLE_BUILD_COST = 12000;
+export const HOLE_BUILD_COST = BUILD_COSTS.hole;
 
 const GREEN_PRESETS = Object.keys(GREEN_DIFFICULTY);
 const MIN_CORRIDOR_WIDTH = 22;

@@ -111,3 +111,19 @@ export function dailyCosts({ holeUpkeep, staff, amenities }) {
     total: Math.round(holeUpkeep + payroll + amenityUpkeep),
   };
 }
+
+/**
+ * One-off construction costs, per §8.3 of the spec.
+ *
+ * These belong here beside the amenity build costs rather than in the UI.
+ * A price written down in a screen drifts from the simulation the first
+ * time anything is retuned, and the player is then quoted one number and
+ * charged another.
+ */
+export const BUILD_COSTS = Object.freeze({
+  hole: 12000,
+  bunker: 800,
+  pond: 2500,
+  trees: 300,
+  greenUpgrade: 1500,
+});
