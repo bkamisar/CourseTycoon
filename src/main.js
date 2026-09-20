@@ -16,6 +16,7 @@ import { runDay } from './sim/day.js';
 import { holeStats } from './sim/hole.js';
 import { createClock, PLAYBACK_SPEEDS } from './play/clock.js';
 import { mountHud } from './ui/hud.js';
+import { mountAmenityBar } from './ui/amenityBar.js';
 import { mountSheetHost } from './ui/sheet.js';
 import { createScreenRouter } from './ui/screens.js';
 import { mountHoleEditor, openTemplatePicker } from './ui/editor.js';
@@ -52,7 +53,21 @@ const uiRoot = document.getElementById('ui-root');
 const surface = createSurface(canvas, { width: 180, height: 320 });
 
 const router = createScreenRouter('overview');
-const hud = mountHud(uiRoot);
+
+// The HUD bar and the amenity strip stack in normal document flow inside
+// one shared fixed-at-top wrapper, rather than each hand-placing itself
+// with its own "top: N px" -- the exact hardcoded-offset trap a previous
+// pass got caught by (see the comment on .editor-dock in src/ui/editor.js).
+// Stacking them in flow means the amenity strip always sits directly under
+// the HUD no matter how the HUD's own height changes.
+const topChrome = document.createElement('div');
+topChrome.className = 'top-chrome';
+topChrome.style.cssText =
+  'position:fixed;top:0;left:0;right:0;z-index:10;display:flex;flex-direction:column;pointer-events:none;';
+uiRoot.appendChild(topChrome);
+
+const hud = mountHud(topChrome);
+const amenityBar = mountAmenityBar(topChrome, { onTap: () => onAmenityTap() });
 const sheets = mountSheetHost(uiRoot);
 const chiptune = createChiptune();
 
@@ -80,6 +95,7 @@ function drawOverview() {
   const { ctx, width, height } = surface;
   regions = drawResort(ctx, state, { x: 0, y: 0, width, height });
   hud.update(state);
+  amenityBar.update(state);
 }
 
 function stopEditorLoop() {
@@ -306,6 +322,7 @@ function drawPlayback() {
   drawTokens(ctx, computeTokens(dayResult.timeline, holes, regions, minute));
   drawEffects(ctx, computeEffects(dayResult.timeline, holes, regions, minute));
   hud.update(state); // yesterday's figures -- today's are still a secret until the report
+  amenityBar.update(state);
 }
 
 function enterReport() {
@@ -349,6 +366,7 @@ function frame(now) {
       break;
     case 'editor':
       hud.update(state);
+      amenityBar.update(state);
       activeEditor?.render(surface.ctx, { x: 0, y: 0, width: surface.width, height: surface.height });
       break;
     case 'playback': {

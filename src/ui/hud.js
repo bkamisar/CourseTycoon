@@ -42,11 +42,13 @@ function injectStyles() {
   stylesInjected = true;
   const style = document.createElement('style');
   style.textContent = `
+    /* No position:fixed here — this bar is mounted into a shared
+       ".top-chrome" wrapper (see main.js) that is itself fixed at the
+       top of the viewport, alongside the amenity strip below it. Both
+       stack in normal flow inside that one wrapper, so the amenity strip
+       always sits directly under whatever height this bar actually
+       renders at, instead of assuming one. */
     .hud-bar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;

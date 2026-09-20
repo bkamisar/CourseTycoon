@@ -376,7 +376,12 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
   dockEl.append(readoutEl, toolbarEl);
   container.append(dockEl);
 
-  const hudEl = container.querySelector('.hud-bar');
+  // The HUD bar and the amenity strip stack together inside one
+  // `.top-chrome` wrapper (see main.js) — measuring the wrapper rather
+  // than `.hud-bar` alone means this stays correct if that stack's
+  // content ever grows another row, with no second hardcoded offset to
+  // keep in sync.
+  const topChromeEl = container.querySelector('.top-chrome') ?? container.querySelector('.hud-bar');
 
   let minutesCache = minutesFor(hole, { carts });
   let currentRect = { x: 0, y: 0, width: surface.width, height: surface.height };
@@ -385,14 +390,15 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
   // a game outcome, so it is tracked here rather than inside deriveReadout.
   let sessionSpend = 0;
   // Real measured pixel heights of the fixed chrome around the canvas
-  // (HUD bar above, the readout+toolbar dock below), re-measured whenever
-  // either changes size. `render()` insets the hole's drawing rect by
-  // these so the hole is never drawn underneath them, on any viewport.
+  // (HUD/amenity stack above, the readout+toolbar dock below), re-measured
+  // whenever either changes size. `render()` insets the hole's drawing
+  // rect by these so the hole is never drawn underneath them, on any
+  // viewport.
   let hudChromePx = 0;
   let dockChromePx = 0;
 
   function remeasureChrome() {
-    hudChromePx = hudEl ? hudEl.getBoundingClientRect().height : 0;
+    hudChromePx = topChromeEl ? topChromeEl.getBoundingClientRect().height : 0;
     dockChromePx = dockEl.getBoundingClientRect().height;
   }
 

@@ -2,52 +2,63 @@
  * Draws the resort overview: the nine-plot map the player spends most of
  * their time on. A built hole is drawn as a small version of its actual
  * shape (via `drawHole`, so the overview never diverges from what the hole
- * renderer already draws for it); an empty plot is a dashed outline with a
- * plus, an unambiguous "build here" affordance distinguishable from a
- * built hole even at a glance. Amenities — including the clubhouse itself,
- * which is just another entry in `state.resort.amenities` — are drawn as a
- * cluster of building sprites, kept together rather than scattered near
- * individual hole plots the way they'd have no principled position to
- * anchor to (the simulation gives holes yard coordinates; it gives
- * amenities none).
+ * renderer already draws for it), with a small par/difficulty label
+ * overlaid so the player can tell what they're looking at without opening
+ * the editor; an empty plot is a dashed outline with a plus, an
+ * unambiguous "build here" affordance distinguishable from a built hole
+ * even at a glance.
  *
- * Also returns the tappable regions for every plot and amenity drawn, in
- * the same coordinate space `ctx` was drawn in. This is deliberately the
- * only place that layout maths happens — a later input-handling task reads
- * this list rather than re-deriving hit boxes from scratch.
+ * Amenities used to be drawn here too, as a cluster of unlabelled 8x8
+ * sprites — playtesting found that unreadable at this scale ("the top
+ * left bar with sprites... I can't tell what they are at all"). They now
+ * live in `src/ui/amenityBar.js`, a DOM strip mounted alongside the HUD,
+ * which can afford to spend real pixels on text. This file no longer
+ * knows about `state.resort.amenities` at all.
+ *
+ * Also returns the tappable regions for every hole plot drawn, in the
+ * same coordinate space `ctx` was drawn in. This is deliberately the only
+ * place that layout maths happens — input-handling reads this list rather
+ * than re-deriving hit boxes from scratch.
  */
 import { PALETTE } from './palette.js';
-import { SPRITES, drawSprite } from './sprites.js';
 import { drawHole } from './holeView.js';
-
-const AMENITY_ROW_HEIGHT = 20;
-const AMENITY_ICON = 8;
-const AMENITY_GAP = 4;
+import { holeStats } from '../sim/hole.js';
 
 const GRID_COLS = 3;
 const GRID_ROWS = 3;
 const GRID_PAD = 4;
 const CELL_GAP = 4;
 
-function drawAmenityRow(ctx, amenities, { x, y, width }) {
-  const regions = [];
-  let ax = x + GRID_PAD;
-  const ay = y + Math.round((AMENITY_ROW_HEIGHT - AMENITY_ICON) / 2);
+/** Terse "P4 · D52" label, sized to still read at the plot's actual
+ * on-screen size (these cells render well under 100px even on a real
+ * phone) rather than at whatever size a zoomed-in screenshot suggests. */
+const LABEL_FONT = '7px monospace';
+const LABEL_PAD_X = 2;
+const LABEL_HEIGHT = 9;
 
-  for (const amenity of amenities) {
-    const sprite = SPRITES[amenity.type];
-    if (!sprite) continue; // unknown amenity type: nothing to draw, nothing tappable
-    if (ax + AMENITY_ICON > x + width - GRID_PAD) break; // ran out of row width
+function drawHoleLabel(ctx, hole, rect) {
+  const stats = holeStats(hole);
+  const text = `P${stats.par} · D${Math.round(stats.difficulty)}`;
 
-    drawSprite(ctx, sprite, ax, ay);
-    regions.push({
-      kind: 'amenity', id: amenity.type,
-      x: ax, y: ay, width: AMENITY_ICON, height: AMENITY_ICON,
-    });
-    ax += AMENITY_ICON + AMENITY_GAP;
-  }
+  ctx.save();
+  ctx.font = LABEL_FONT;
+  ctx.textBaseline = 'middle';
+  const textWidth = ctx.measureText(text).width;
+  const labelWidth = Math.min(rect.width, textWidth + LABEL_PAD_X * 2);
+  const labelX = rect.x + Math.round((rect.width - labelWidth) / 2);
+  const labelY = rect.y + rect.height - LABEL_HEIGHT;
 
-  return regions;
+  // A solid chip behind the text, not just the text itself — the hole art
+  // underneath ranges from dark tree green to pale sand, and white text
+  // alone would vanish against the lighter parts of it.
+  ctx.fillStyle = PALETTE.OUTLINE;
+  ctx.globalAlpha = 0.78;
+  ctx.fillRect(labelX, labelY, labelWidth, LABEL_HEIGHT);
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = PALETTE.WHITE;
+  ctx.fillText(text, labelX + Math.round((labelWidth - textWidth) / 2), labelY + LABEL_HEIGHT / 2 + 0.5);
+  ctx.restore();
 }
 
 function drawEmptyPlot(ctx, rect) {
@@ -76,23 +87,12 @@ function drawEmptyPlot(ctx, rect) {
 export function drawResort(ctx, state, { x = 0, y = 0, width, height }) {
   const course = state.resort.courses[0];
   const holes = course.holes;
-  const amenities = state.resort.amenities;
   const regions = [];
 
   ctx.fillStyle = PALETTE.UI_DARK;
   ctx.fillRect(x, y, width, height);
 
-  // The amenity row gets its own ground-coloured band (rather than sharing
-  // the UI_DARK backdrop) because several building sprites — the clubhouse
-  // among them — use UI_DARK for a roof or a door. Left on a UI_DARK
-  // background those parts would vanish into it instead of reading as
-  // part of the icon.
-  ctx.fillStyle = PALETTE.PATH;
-  ctx.fillRect(x, y, width, AMENITY_ROW_HEIGHT);
-
-  regions.push(...drawAmenityRow(ctx, amenities, { x, y, width }));
-
-  const gridY0 = y + AMENITY_ROW_HEIGHT + CELL_GAP;
+  const gridY0 = y + GRID_PAD;
   const gridW = width - GRID_PAD * 2;
   const gridH = height - (gridY0 - y) - GRID_PAD;
   const cellW = Math.floor((gridW - (GRID_COLS - 1) * CELL_GAP) / GRID_COLS);
@@ -110,6 +110,7 @@ export function drawResort(ctx, state, { x = 0, y = 0, width, height }) {
 
     if (hole.open) {
       drawHole(ctx, hole, rect);
+      drawHoleLabel(ctx, hole, rect);
     } else {
       drawEmptyPlot(ctx, rect);
     }

@@ -145,7 +145,10 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-function titleCase(type) {
+/** "proShop" -> "Pro Shop". Exported so anywhere else that names an
+ * amenity type to the player (the overview's amenity strip, in
+ * particular) uses the exact same label this sheet does. */
+export function titleCase(type) {
   return type.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 }
 
