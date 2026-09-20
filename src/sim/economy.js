@@ -3,15 +3,15 @@ import { clamp } from './hole.js';
 
 /** Daily wage by role. */
 export const WAGES = {
-  groundskeeper: 120,
-  marshal: 100,
-  shopStaff: 90,
-  kitchenStaff: 95,
+  groundskeeper: 240,
+  marshal: 180,
+  shopStaff: 170,
+  kitchenStaff: 180,
 };
 
 /** Daily upkeep by amenity, and what each contributes. */
 export const AMENITIES = {
-  clubhouse:    { upkeep: 60,  build: 0,     satisfaction: 2 },
+  clubhouse:    { upkeep: 400, build: 0,     satisfaction: 2 },
   proShop:      { upkeep: 70,  build: 6000,  satisfaction: 3, spendPerGuest: 14 },
   snackShack:   { upkeep: 55,  build: 3500,  satisfaction: 3, spendPerGuest: 9 },
   halfwayHouse: { upkeep: 65,  build: 4500,  satisfaction: 5, spendPerGuest: 11 },
@@ -22,13 +22,28 @@ export const AMENITIES = {
   cartBarn:     { upkeep: 110, build: 9000,  satisfaction: 3 },
 };
 
-/** What a round here is worth to a golfer, in dollars. */
-export function perceivedValue({ courseRating, prestige, amenities }) {
+/** A full round is nine holes. Fewer, and you are selling less golf. */
+const FULL_COURSE_HOLES = 9;
+
+/**
+ * What a round here is worth to a golfer, in dollars.
+ *
+ * Scaled by how much golf is actually on offer. Without this a three-hole
+ * resort is worth exactly as much as a finished nine and draws the same
+ * crowd at the same price, which is nonsense and forces every cost in the
+ * game to be inflated to compensate. Three holes are worth about a third
+ * of nine, so a full green fee is a rip-off until the course is built -
+ * which is what gives the player a reason to build it.
+ */
+export function perceivedValue({
+  courseRating, prestige, amenities, holesOpen = FULL_COURSE_HOLES,
+}) {
   const amenityValue = amenities.reduce(
     (s, a) => s + (AMENITIES[a.type]?.satisfaction ?? 0) * 1.6,
     0
   );
-  return 18 + courseRating * 0.62 + prestige * 0.45 + amenityValue;
+  const completeness = clamp(holesOpen / FULL_COURSE_HOLES, 0.15, 1);
+  return (18 + courseRating * 0.62 + prestige * 0.45 + amenityValue) * completeness;
 }
 
 /**
@@ -37,14 +52,15 @@ export function perceivedValue({ courseRating, prestige, amenities }) {
  * cannot sell more rounds than daylight allows.
  */
 export function demandGroups({
-  courseRating, prestige, amenities, greenFee, teeInterval, recentSatisfaction = 50,
+  courseRating, prestige, amenities, greenFee, teeInterval,
+  recentSatisfaction = 50, holesOpen = FULL_COURSE_HOLES,
 }) {
-  const value = perceivedValue({ courseRating, prestige, amenities });
+  const value = perceivedValue({ courseRating, prestige, amenities, holesOpen });
   // 1.0 when priced at value; falls away above it, gains slowly below it.
   const ratio = greenFee / Math.max(1, value);
   const appetite = ratio <= 1
     ? 1 + (1 - ratio) * 0.35
-    : Math.max(0, 1 - (ratio - 1) * 1.15);
+    : Math.max(0, 1 - (ratio - 1) * 1.8);
 
   const reputationPull = 0.35 + (prestige / 100) * 0.9;
 

@@ -32,7 +32,7 @@ export function newGame(seed) {
       staff: [{ role: 'groundskeeper' }],
       rooms: { count: 0, quality: 0 },                 // Act II
       shuttles: [],                                    // Act III
-      pricing: { greenFee: 45, teeInterval: 10, foodMultiplier: 1, roomRate: 0 },
+      pricing: { greenFee: 22, teeInterval: 16, foodMultiplier: 1, roomRate: 0 },
     },
     properties: [{ id: 1, name: 'Pinehollow' }],       // Act IV
     history: [],

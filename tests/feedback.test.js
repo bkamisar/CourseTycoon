@@ -26,7 +26,11 @@ test('demandGroups with no recentSatisfaction behaves like the old, unaffected c
 });
 
 test('a poor-satisfaction resort does not grow its group count over ten days', () => {
+  // A deliberately tight tee interval, well under how long these holes take
+  // to play, so the tee sheet oversells itself and satisfaction stays poor
+  // for the whole run regardless of how the game's default pricing is tuned.
   let state = newGame(21);
+  state.resort.pricing.teeInterval = 6;
   const groupsByDay = [];
   const satisfactionByDay = [];
   for (let i = 0; i < 10; i++) {

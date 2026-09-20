@@ -2,9 +2,9 @@ import { TEMPLATES } from './templates.js';
 import { pathLength, pointAtDistance, distanceToPath } from './geometry.js';
 
 /** Daily upkeep in dollars. */
-const UPKEEP_BASE = 40;
-const UPKEEP_PER_BUNKER = 15;
-const UPKEEP_PER_POND = 30;
+const UPKEEP_BASE = 200;
+const UPKEEP_PER_BUNKER = 25;
+const UPKEEP_PER_POND = 45;
 
 /** Relative putting difficulty by green preset. */
 export const GREEN_DIFFICULTY = {

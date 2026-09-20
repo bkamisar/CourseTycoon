@@ -35,8 +35,8 @@ test('the wide data model fields are present and narrow', () => {
 
 test('pricing starts at the spec defaults', () => {
   const s = newGame(1);
-  assert.equal(s.resort.pricing.greenFee, 45);
-  assert.equal(s.resort.pricing.teeInterval, 10);
+  assert.equal(s.resort.pricing.greenFee, 22);
+  assert.equal(s.resort.pricing.teeInterval, 16);
 });
 
 test('a round trip through serialize and deserialize preserves the state', () => {

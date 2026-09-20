@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { demandGroups, dailyRevenue, dailyCosts, perceivedValue } from '../src/sim/economy.js';
+import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, WAGES } from '../src/sim/economy.js';
 
 const amenities = [{ type: 'clubhouse' }, { type: 'proShop' }];
 const staff = [{ role: 'groundskeeper' }, { role: 'marshal' }];
@@ -55,7 +55,7 @@ test('happier guests spend more in the shop', () => {
 test('costs include hole upkeep, payroll and amenity upkeep', () => {
   const c = dailyCosts({ holeUpkeep: 500, staff, amenities });
   assert.equal(c.holeUpkeep, 500);
-  assert.equal(c.payroll, 120 + 100);
+  assert.equal(c.payroll, WAGES.groundskeeper + WAGES.marshal);
   assert.ok(c.amenityUpkeep > 0);
   assert.equal(c.total, c.holeUpkeep + c.payroll + c.amenityUpkeep);
 });

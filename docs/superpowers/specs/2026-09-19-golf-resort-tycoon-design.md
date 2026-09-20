@@ -267,25 +267,54 @@ hazards fixes the cause rather than the symptom.
 
 ### 8.3 Starting values
 
-These are initial values, deliberately chosen to be tuned by the balance tool
-(§13) rather than guessed at once and left alone.
+Tuned against the balance harness on 2026-09-19. The headline result: a passive
+operator who never builds, prices or hires ends 60 days with roughly $48–83k
+against the $72,000 it costs to finish the course — so money is scarce relative
+to ambition without being punishing. A properly built and staffed nine runs
+profitably at $2,810/day and reaches the Act I gate with satisfaction, not cash,
+as its binding constraint.
 
-| Item | Starting value |
-|---|---|
-| Starting cash | $25,000 |
-| Green fee | $45 |
-| Tee interval | 10 minutes |
-| Playing day | 7:00am – 6:00pm |
-| Hole upkeep, base | $40/day |
-| Per bunker | $15/day |
-| Per pond | $30/day |
-| Groundskeeper | $120/day |
-| Marshal | $100/day |
-| Build a bunker | $800 |
-| Build a pond | $2,500 |
-| Plant trees | $300 |
-| Upgrade a green | $1,500 |
-| Build a new hole | $12,000 |
+| Item | Value | Note |
+|---|---|---|
+| Starting cash | $25,000 | |
+| Green fee | **$22** | Matched to what three holes are actually worth; raising it is the reward for building more |
+| Tee interval | **16 minutes** | At the queueing crossover, so the player creates their own congestion rather than inheriting it |
+| Playing day | 7:00am – 6:00pm | |
+| Hole upkeep, base | **$200/day** | $40 implied $14.6k a year to maintain a hole; real figures are $50–80k |
+| Per bunker | **$25/day** | |
+| Per pond | **$45/day** | |
+| Clubhouse upkeep | **$400/day** | Fixed overhead — utilities, insurance, front desk |
+| Groundskeeper | **$240/day** | One holds about three holes; a nine needs two to three |
+| Marshal | **$180/day** | |
+| Build a bunker | $800 | |
+| Build a pond | $2,500 | |
+| Plant trees | $300 | |
+| Upgrade a green | $1,500 | |
+| Build a new hole | $12,000 | |
+
+**Two model changes came out of the balance pass, not just constants.**
+
+*Value scales with holes offered.* Perceived value is multiplied by
+`holesOpen / 9`. Without it, a three-hole resort drew exactly the same crowd at
+the same price as a finished nine — about 132 golfers a day, some $2.1M a year —
+which forced every cost in the game to be inflated to compensate. Three holes
+are now worth about a third of nine, which is why the starting green fee is $22
+and why building holes is what lets the player charge more.
+
+*Demand answers to satisfaction.* Word of mouth scales turnout by recent
+satisfaction. Before it, guests rated the resort 11 out of 100 and turned up in
+growing numbers every day, so the player's worst mistakes never reached their
+wallet.
+
+**What did not converge: bankruptcy sits at 0%, against a 15–45% target.** This
+looks like a structural limit rather than a tuning failure. With a passive
+operator and no random shocks, every seed has near-identical economics — demand
+is a smooth function of state with no variance source — so bankruptcy is
+effectively deterministic and lands at 0% or 100%, never in between. Reaching
+the target band needs either random events (weather, equipment failure — both
+deferred in §16) or a starting position balanced on a knife edge, which would
+make the opening feel arbitrary. Recommend accepting 0% for now and revisiting
+if weather is ever built.
 
 ---
 

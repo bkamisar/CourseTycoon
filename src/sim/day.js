@@ -67,6 +67,7 @@ export function runDay(state, seed) {
         greenFee,
         teeInterval,
         recentSatisfaction,
+        holesOpen: holes.length,
       })
     : 0;
 
@@ -127,6 +128,7 @@ export function runDay(state, seed) {
   // Satisfaction, once each group's waiting is known.
   const value = perceivedValue({
     courseRating: rating, prestige: next.prestige, amenities: next.resort.amenities,
+    holesOpen: holes.length,
   });
   const amenityBonus = amenityTypes.length * 1.5;
   const averageScenery = holes.length
@@ -174,7 +176,7 @@ export function runDay(state, seed) {
   // Turf: one groundskeeper holds roughly three holes steady.
   const keepers = next.resort.staff.filter((m) => m.role === 'groundskeeper').length;
   const wear = holes.length * 1.4 + groupCount * 0.12;
-  const care = keepers * 4.6;
+  const care = keepers * 6.8;
   next.turfQuality = clamp(next.turfQuality - wear + care, 0, 100);
 
   next.prestige = nextPrestige(next.prestige, rating, averageSatisfaction);
