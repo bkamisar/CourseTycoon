@@ -16,6 +16,8 @@ import { AMENITIES, WAGES, perceivedValue } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
 import { openHoles } from '../sim/state.js';
 import { courseRating } from '../sim/ratings.js';
+import { expectedMinutes } from '../sim/round.js';
+import { ordinal } from '../sim/satisfaction.js';
 
 /** Plain-words blurb per amenity. Flavour text only — never a number. */
 const AMENITY_BLURB = {
@@ -327,6 +329,30 @@ const GREEN_FEE_MAX = 120;
 const TEE_INTERVAL_MIN = 6;
 const TEE_INTERVAL_MAX = 30;
 
+/**
+ * Whether the tee sheet will back up at `teeInterval`, given the expected
+ * playing minutes of every currently open hole (`holeMinutesByIndex`, in
+ * `openHoles` order — the same order `src/sim/schedule.js`'s
+ * `bottleneckHoleIndex` uses, so naming a hole from this matches how the
+ * evening report names one).
+ *
+ * Pure and DOM-free on purpose: the one rule this whole fix exists to
+ * teach — queueing begins the moment the interval drops below the
+ * slowest hole's playing time (see schedule.js's flow-shop rule) — needs
+ * to be testable without a browser.
+ */
+export function paceConsequence(teeInterval, holeMinutesByIndex) {
+  if (holeMinutesByIndex.length === 0) {
+    return { backup: false, slowestIndex: null, slowestMinutes: 0 };
+  }
+  let slowestIndex = 0;
+  for (let i = 1; i < holeMinutesByIndex.length; i++) {
+    if (holeMinutesByIndex[i] > holeMinutesByIndex[slowestIndex]) slowestIndex = i;
+  }
+  const slowestMinutes = holeMinutesByIndex[slowestIndex];
+  return { backup: teeInterval < slowestMinutes, slowestIndex, slowestMinutes };
+}
+
 /** Builds one line of consequence text with a single bolded figure. */
 function consequenceLine(before, figure, after) {
   const line = document.createElement('div');
@@ -424,6 +450,14 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
       const intervalConsequence = document.createElement('div');
       intervalConsequence.className = 'panel-consequence';
 
+      // expectedMinutes simulates twelve groups per hole — far too slow to
+      // call on every slider tick. The holes don't change while this sheet
+      // is open, so it is computed once, here, at sheet-open time, and the
+      // slider's `input` handler below only ever does the cheap comparison
+      // against this cached array.
+      const carts = state.resort.amenities.some((a) => a.type === 'cartBarn');
+      const holeMinutesByIndex = openHoles(state).map((h) => expectedMinutes(h, { carts }));
+
       function updateIntervalConsequence() {
         const interval = current.resort.pricing.teeInterval;
         intervalValue.textContent = `${interval} min`;
@@ -433,9 +467,20 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
           consequenceLine(
             `At ${interval} minutes apart, the tee sheet fits `,
             `${groups}`,
-            ' groups a day. Shorter than a hole actually plays and groups back up behind each other.'
+            ' groups a day.'
           )
         );
+
+        const pace = paceConsequence(interval, holeMinutesByIndex);
+        const paceLine = document.createElement('div');
+        if (!pace.backup) {
+          paceLine.textContent = 'No backup expected.';
+        } else {
+          const strongHole = document.createElement('strong');
+          strongHole.textContent = ordinal(pace.slowestIndex + 1);
+          paceLine.append('Groups will back up on the ', strongHole, '.');
+        }
+        intervalConsequence.appendChild(paceLine);
       }
 
       intervalSlider.addEventListener('input', () => {

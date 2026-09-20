@@ -80,7 +80,7 @@ const fakeDocument = {
 
 globalThis.document = fakeDocument;
 
-const { openBuildSheet, openStaffSheet, openPricingSheet } = await import('../src/ui/panels.js');
+const { openBuildSheet, openStaffSheet, openPricingSheet, paceConsequence } = await import('../src/ui/panels.js');
 
 function fakeSheetHost() {
   let body = null;
@@ -224,4 +224,69 @@ test('moving the green fee slider updates state.resort.pricing.greenFee exactly'
 
   assert.equal(changed.resort.pricing.greenFee, 77);
   assert.equal(state.resort.pricing.greenFee, 22, 'the original state must not be mutated');
+});
+
+// --- Tee interval consequence line: whether the course will back up -------
+//
+// paceConsequence is the pure threshold logic behind it: queueing begins
+// the moment the interval drops below the slowest open hole's playing time
+// (schedule.js's flow-shop rule). It takes plain numbers, not a state
+// object, so the threshold itself is tested head-on, separate from the DOM.
+
+test('no backup when the interval comfortably exceeds every hole', () => {
+  const result = paceConsequence(20, [10, 12, 9]);
+  assert.equal(result.backup, false);
+});
+
+test('a backup is reported once the interval drops below the slowest hole', () => {
+  const result = paceConsequence(10, [10, 12, 9]);
+  assert.equal(result.backup, true);
+  assert.equal(result.slowestIndex, 1); // the 12-minute hole
+  assert.equal(result.slowestMinutes, 12);
+});
+
+test('the threshold is exclusive: an interval exactly equal to the slowest hole does not back up', () => {
+  const result = paceConsequence(12, [10, 12, 9]);
+  assert.equal(result.backup, false);
+});
+
+test('one minute under the slowest hole is enough to back up', () => {
+  const result = paceConsequence(11, [10, 12, 9]);
+  assert.equal(result.backup, true);
+  assert.equal(result.slowestIndex, 1);
+});
+
+test('the slowest hole is named by its position among the open holes, not its id', () => {
+  // Position 3 (0-based) is the slowest, regardless of what a hole's own id is.
+  const result = paceConsequence(5, [8, 9, 7, 15, 6]);
+  assert.equal(result.slowestIndex, 3);
+  assert.equal(result.slowestMinutes, 15);
+});
+
+test('no open holes means no backup and no named hole', () => {
+  const result = paceConsequence(6, []);
+  assert.equal(result.backup, false);
+  assert.equal(result.slowestIndex, null);
+});
+
+test('the pricing sheet says plainly whether the course will back up, naming the slowest hole', () => {
+  // The starting resort's three holes are all short par 3s/4s that play in
+  // well under 16 minutes, so a very short interval should trip a backup,
+  // and a long one should not.
+  const state = newGame(1);
+  const host = fakeSheetHost();
+  openPricingSheet(host, { state, onChange: () => {} });
+
+  const sliders = host.body.findAll((n) => n.tagName === 'input');
+  const intervalSlider = sliders[1];
+
+  intervalSlider.value = '6'; // the slider's own minimum — certain to jam
+  intervalSlider.fireInput();
+  const jammed = host.body.findAll((n) => n.textContent.includes('back up'))[0];
+  assert.ok(jammed, 'expected a "back up" line at the shortest possible interval');
+
+  intervalSlider.value = '30'; // the slider's own maximum — should be clear
+  intervalSlider.fireInput();
+  const clear = host.body.findAll((n) => n.textContent === 'No backup expected.')[0];
+  assert.ok(clear, 'expected "No backup expected." at the longest possible interval');
 });
