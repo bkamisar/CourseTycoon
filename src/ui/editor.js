@@ -33,11 +33,24 @@ const MIN_CORRIDOR_WIDTH = 22;
 const MAX_CORRIDOR_WIDTH = 60;
 const CORRIDOR_WIDTH_STEP = 2;
 
-/** Default sizes for a freshly added feature, in yards. */
-const NEW_FEATURE_SIZE = { bunker: 9, pond: 20, trees: 18 };
+/** Default sizes for a freshly added feature, in yards. BUILD_COSTS prices
+ * a hazard for this size — resizing scales that price by area, see
+ * `sizedFeatureCost` below. */
+export const NEW_FEATURE_SIZE = { bunker: 9, pond: 20, trees: 18 };
 
 /** Toolbar label for each hazard type. */
 const FEATURE_LABEL = { bunker: 'Bunker', pond: 'Pond', trees: 'Trees' };
+
+/** How far one tap of Size +/- moves a hazard's radius, in yards. */
+const SIZE_STEP_YARDS = 2;
+
+/** Sane size bounds, as a multiple of NEW_FEATURE_SIZE's radius for that
+ * type: shrinking can't make a hazard vanish to nothing, and growing is
+ * capped at a fixed multiple of its own normal size rather than left
+ * unbounded, so no hazard can be dragged out into something that
+ * dominates the hole regardless of how much money is thrown at it. */
+const MIN_SIZE_FACTOR = 0.4;
+const MAX_SIZE_FACTOR = 2;
 
 // ---------------------------------------------------------------------
 // Pure charge/refund arithmetic — test-first, see tests/editor.test.js.
@@ -65,6 +78,48 @@ export function refundFor(cost) {
  */
 export function greenCycleCost(fromPreset, toPreset) {
   return GREEN_DIFFICULTY[toPreset] > GREEN_DIFFICULTY[fromPreset] ? BUILD_COSTS.greenUpgrade : 0;
+}
+
+/**
+ * The min/max size (radius, in yards) a hazard of `type` can be resized
+ * to, as a fixed multiple of the size it starts at (`NEW_FEATURE_SIZE`).
+ * Every hazard type gets the same proportional headroom to shrink or
+ * grow regardless of its own default footprint.
+ */
+export function sizeBounds(type) {
+  const base = NEW_FEATURE_SIZE[type];
+  return {
+    min: Math.round(base * MIN_SIZE_FACTOR),
+    max: Math.round(base * MAX_SIZE_FACTOR),
+  };
+}
+
+/**
+ * What a hazard of `type` is worth at `size` yards: `BUILD_COSTS[type]`
+ * prices it for `NEW_FEATURE_SIZE[type]`, and a circle's area scales with
+ * the square of its radius, so this scales the base price by
+ * `(size / defaultSize) ** 2` — double the radius, quadruple the price,
+ * matching how much more hazard is actually there.
+ */
+export function sizedFeatureCost(type, size) {
+  const base = NEW_FEATURE_SIZE[type];
+  return Math.round(BUILD_COSTS[type] * (size * size) / (base * base));
+}
+
+/**
+ * The signed charge to resize one hazard of `type` from `fromSize` to
+ * `toSize` yards. Positive means money leaves the player: growing a
+ * hazard costs the full area-scaled difference, the same rate buying it
+ * at that size outright would. Negative means money comes back: shrinking
+ * refunds half of the area-scaled difference, rounded down — the same
+ * half-back rule `refundFor` already applies to removing a hazard
+ * outright, so resizing up and back down can never turn a profit either.
+ */
+export function resizeFeatureCost(type, fromSize, toSize) {
+  const fromCost = sizedFeatureCost(type, fromSize);
+  const toCost = sizedFeatureCost(type, toSize);
+  if (toCost >= fromCost) return toCost - fromCost;
+  return -Math.floor((fromCost - toCost) / 2);
 }
 
 // ---------------------------------------------------------------------
@@ -389,6 +444,12 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
   // plain bookkeeping on BUILD_COSTS figures already read from the sim, not
   // a game outcome, so it is tracked here rather than inside deriveReadout.
   let sessionSpend = 0;
+  // The hazard Size +/- act on, if any. Selected by successfully dragging
+  // a hazard (a tap that moves it) rather than by tapping it in place —
+  // a plain tap already has a job, removing the hazard, so reusing drag
+  // (a gesture the player is already using to place hazards) avoids
+  // inventing a second tap meaning that would collide with the first.
+  let selectedFeature = null;
   // Real measured pixel heights of the fixed chrome around the canvas
   // (HUD/amenity stack above, the readout+toolbar dock below), re-measured
   // whenever either changes size. `render()` insets the hole's drawing
@@ -414,6 +475,9 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
       ['Upkeep', `$${Math.round(r.upkeep)}`],
       ['Spent', `$${sessionSpend.toLocaleString()}`],
     ];
+    if (selectedFeature) {
+      rows.push([FEATURE_LABEL[selectedFeature.type], `${Math.round(selectedFeature.size)}y`]);
+    }
     for (const [label, value] of rows) {
       const row = document.createElement('div');
       row.className = 'editor-readout-row';
@@ -474,6 +538,15 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
       dragging = { feature };
       dragStart = canvasPt;
       dragMoved = false;
+      return;
+    }
+
+    // A tap that hits neither the tee nor a hazard deselects, so the
+    // player has a way to back out of Size +/- without having to drag
+    // something else first.
+    if (selectedFeature) {
+      selectedFeature = null;
+      renderToolbar();
     }
   }
 
@@ -507,8 +580,14 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
         const refund = refundFor(featureCost(removed.type));
         state.money += refund;
         sessionSpend -= refund;
+        if (selectedFeature === removed) selectedFeature = null;
         renderToolbar();
       }
+    } else if (dragging.feature) {
+      // A drag that actually moved a hazard selects it, so Size +/- has
+      // something to act on without a separate selection gesture.
+      selectedFeature = dragging.feature;
+      renderToolbar();
     }
     dragging = null;
     dragStart = null;
@@ -528,14 +607,47 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
     sessionSpend += cost;
     const len = pathLength(hole.corridor);
     const mid = pointAtDistance(hole.corridor, len / 2);
-    hole.features.push({
+    const feature = {
       type,
       x: mid.x + 10,
       y: mid.y,
       size: NEW_FEATURE_SIZE[type],
-    });
+    };
+    hole.features.push(feature);
+    // Selecting what was just placed means Size +/- is immediately
+    // available for it, with no extra drag needed first.
+    selectedFeature = feature;
     recomputeMinutes();
     renderToolbar(); // affordability of the remaining features may have changed
+  }
+
+  /** What Size +/- would do to the selected hazard: the size it would end
+   * up at and the signed charge, or null if there is no selection or the
+   * hazard is already at that bound (nothing to preview). */
+  function previewResize(deltaYards) {
+    if (!selectedFeature) return null;
+    const bounds = sizeBounds(selectedFeature.type);
+    const toSize = clamp(selectedFeature.size + deltaYards, bounds.min, bounds.max);
+    if (toSize === selectedFeature.size) return null;
+    return { toSize, charge: resizeFeatureCost(selectedFeature.type, selectedFeature.size, toSize) };
+  }
+
+  function applyResize(deltaYards) {
+    const preview = previewResize(deltaYards);
+    if (!preview) return;
+    if (preview.charge > 0 && state.money < preview.charge) return; // belt and suspenders
+    state.money -= preview.charge;
+    sessionSpend += preview.charge;
+    selectedFeature.size = preview.toSize;
+    recomputeMinutes();
+    renderToolbar();
+  }
+
+  /** Sublabel for a Size +/- button. */
+  function sizeSub(preview, { grow }) {
+    if (!preview) return selectedFeature ? (grow ? 'max size' : 'min size') : 'drag one first';
+    if (grow) return costSub(preview.charge);
+    return `+$${(-preview.charge).toLocaleString()} back`;
   }
 
   function adjustCorridorWidth(delta) {
@@ -602,8 +714,21 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
       sub: greenCost > 0 ? costSub(greenCost) : undefined,
     });
 
+    const growPreview = previewResize(SIZE_STEP_YARDS);
+    const shrinkPreview = previewResize(-SIZE_STEP_YARDS);
+    const growButton = makeButton('Size +', () => applyResize(SIZE_STEP_YARDS), {
+      disabled: !growPreview || (growPreview.charge > 0 && state.money < growPreview.charge),
+      sub: sizeSub(growPreview, { grow: true }),
+    });
+    const shrinkButton = makeButton('Size −', () => applyResize(-SIZE_STEP_YARDS), {
+      disabled: !shrinkPreview,
+      sub: sizeSub(shrinkPreview, { grow: false }),
+    });
+
     toolbarEl.replaceChildren(
       ...hazardButtons,
+      shrinkButton,
+      growButton,
       makeButton('Width −', () => adjustCorridorWidth(-CORRIDOR_WIDTH_STEP)),
       makeButton('Width +', () => adjustCorridorWidth(CORRIDOR_WIDTH_STEP)),
       greenButton,
@@ -635,6 +760,22 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
     ctx.fillStyle = PALETTE.OUTLINE;
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
     drawHole(ctx, hole, insetRect);
+
+    // A ring around the hazard Size +/- would act on — otherwise
+    // selection is invisible on the canvas itself and only legible from
+    // the readout row below.
+    if (selectedFeature && hole.features.includes(selectedFeature)) {
+      const t = computeHoleTransform(hole, insetRect);
+      const p = t.toScreen(selectedFeature);
+      const r = Math.max(1, selectedFeature.size * t.scale);
+      ctx.save();
+      ctx.strokeStyle = PALETTE.ACCENT;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   function destroy() {

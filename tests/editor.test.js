@@ -15,6 +15,10 @@ import {
   featureCost,
   refundFor,
   greenCycleCost,
+  sizeBounds,
+  sizedFeatureCost,
+  resizeFeatureCost,
+  NEW_FEATURE_SIZE,
 } from '../src/ui/editor.js';
 
 // --- The point of this task: the editor never computes its own numbers ----
@@ -182,4 +186,81 @@ test('cycling every green preset in a full loop cannot generate money', () => {
     totalCost += cost;
   }
   assert.ok(totalCost > 0, 'at least one hop in a full loop must be an upgrade');
+});
+
+// --- Resizing a hazard: cost scales with area ------------------------------
+
+test('sizedFeatureCost at the default NEW_FEATURE_SIZE is exactly the base BUILD_COSTS price', () => {
+  for (const type of ['bunker', 'pond', 'trees']) {
+    assert.equal(sizedFeatureCost(type, NEW_FEATURE_SIZE[type]), BUILD_COSTS[type]);
+  }
+});
+
+test('sizedFeatureCost scales with area, not radius: doubling the radius quadruples the price', () => {
+  for (const type of ['bunker', 'pond', 'trees']) {
+    const base = NEW_FEATURE_SIZE[type];
+    assert.equal(sizedFeatureCost(type, base * 2), BUILD_COSTS[type] * 4);
+    // Halving the radius quarters the price too, the same relationship
+    // run backwards.
+    assert.equal(sizedFeatureCost(type, base / 2), Math.round(BUILD_COSTS[type] / 4));
+  }
+});
+
+test('sizedFeatureCost grows monotonically with size', () => {
+  const sizes = [4, 6, 9, 12, 18, 20];
+  let previous = -Infinity;
+  for (const size of sizes) {
+    const cost = sizedFeatureCost('pond', size);
+    assert.ok(cost > previous, `cost at size ${size} (${cost}) should exceed the previous size's (${previous})`);
+    previous = cost;
+  }
+});
+
+test('resizeFeatureCost charges the full area-scaled difference when growing', () => {
+  const from = NEW_FEATURE_SIZE.bunker;
+  const to = from + 4;
+  const expected = sizedFeatureCost('bunker', to) - sizedFeatureCost('bunker', from);
+  assert.ok(expected > 0, 'growing should cost something positive to sanity-check the fixture');
+  assert.equal(resizeFeatureCost('bunker', from, to), expected);
+});
+
+test('resizeFeatureCost refunds half the area-scaled difference, rounded down, when shrinking', () => {
+  const from = NEW_FEATURE_SIZE.pond;
+  const to = from - 6;
+  const fullDifference = sizedFeatureCost('pond', from) - sizedFeatureCost('pond', to);
+  const charge = resizeFeatureCost('pond', from, to);
+  assert.ok(charge < 0, 'shrinking should refund money (a negative charge)');
+  assert.equal(-charge, Math.floor(fullDifference / 2));
+});
+
+test('resizeFeatureCost is zero for a same-size no-op resize', () => {
+  for (const type of ['bunker', 'pond', 'trees']) {
+    assert.equal(resizeFeatureCost(type, NEW_FEATURE_SIZE[type], NEW_FEATURE_SIZE[type]), 0);
+  }
+});
+
+test('growing then shrinking straight back to the original size never turns a profit', () => {
+  // Same "no round-trip profit" property greenCycleCost and refundFor
+  // already guarantee, checked here for resizing: growing by a step and
+  // then shrinking by that same step must cost strictly more than zero
+  // net, never refund more than was charged.
+  for (const type of ['bunker', 'pond', 'trees']) {
+    const start = NEW_FEATURE_SIZE[type];
+    const grown = start + 4;
+    const up = resizeFeatureCost(type, start, grown);
+    const down = resizeFeatureCost(type, grown, start);
+    assert.ok(up > 0, `${type}: growing should cost money`);
+    assert.ok(down < 0, `${type}: shrinking back should refund money`);
+    assert.ok(up + down > 0, `${type}: the round trip should cost more than it refunds (up=${up}, down=${down})`);
+  }
+});
+
+test('sizeBounds keeps the default NEW_FEATURE_SIZE strictly inside [min, max]', () => {
+  for (const type of ['bunker', 'pond', 'trees']) {
+    const bounds = sizeBounds(type);
+    const base = NEW_FEATURE_SIZE[type];
+    assert.ok(bounds.min > 0, `${type}: min size must be positive`);
+    assert.ok(bounds.min < base, `${type}: min (${bounds.min}) should be below the default (${base})`);
+    assert.ok(bounds.max > base, `${type}: max (${bounds.max}) should be above the default (${base})`);
+  }
 });
