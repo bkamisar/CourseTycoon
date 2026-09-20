@@ -101,7 +101,17 @@ export function computeHoleTransform(hole, { x, y, width, height }) {
     };
   }
 
-  return { toScreen, scale, bounds };
+  // Exact inverse of toScreen, so a caller reading a pointer position (the
+  // hole editor's drag handling) can recover the hole-yard point under the
+  // finger without re-deriving this layout math a second time.
+  function toWorld(point) {
+    return {
+      x: (point.x - offsetX) / scale + bounds.minX,
+      y: bounds.minY + (bottomY - point.y) / scale,
+    };
+  }
+
+  return { toScreen, toWorld, scale, bounds };
 }
 
 function drawBand(ctx, t, corridor, widthYards, color) {
