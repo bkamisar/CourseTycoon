@@ -1,5 +1,5 @@
 import { TEMPLATES } from './templates.js';
-import { pathLength, pointAtDistance, distanceToPath } from './geometry.js';
+import { pathLength, pointAtDistance, distanceToPath, progressAlongPath } from './geometry.js';
 
 /**
  * Daily upkeep in dollars. Exported so UI copy (the glossary, in
@@ -71,22 +71,63 @@ function parFor(length) {
   return 5;
 }
 
+
+/**
+ * Where balls actually come to rest on a hole, in yards from the tee.
+ *
+ * A representative player covers roughly 205 yards a swing, so they stop
+ * near 205, then 410, and so on, until they reach the green - which is
+ * always a landing zone, because every approach finishes there. A par 3
+ * therefore has one zone (the green) and a par 5 has three.
+ */
+function landingStations(length) {
+  const stations = [];
+  let d = 0;
+  while (d < length - 30) {
+    d += 205;
+    stations.push(Math.min(d, length));
+  }
+  stations.push(length);
+  return stations;
+}
+
+/** How near a point on the hole is to any landing zone, 0 to 1. */
+const ZONE_REACH = 100;
+function landingProximity(along, length) {
+  let best = 0;
+  for (const station of landingStations(length)) {
+    best = Math.max(best, clamp(1 - Math.abs(along - station) / ZONE_REACH, 0, 1));
+  }
+  return best;
+}
+
 function difficultyOf(hole, length, bunkers, ponds, trees) {
   // Narrow corridors punish dispersion most, so width dominates.
   const widthPenalty = clamp((46 - hole.corridorWidth) * 1.6, -10, 40);
 
-  // Hazards matter in proportion to how close they sit to the corridor —
-  // a pond 80 yards offline is scenery, not a hazard.
-  const hazardPressure = [...bunkers, ...ponds].reduce((sum, f) => {
-    const offline = distanceToPath(hole.corridor, { x: f.x, y: f.y });
-    const reach = hole.corridorWidth / 2 + f.size;
-    return sum + (offline < reach ? (f.type === 'pond' ? 9 : 5) : 1.5);
-  }, 0);
+  // A hazard threatens in two dimensions, and the second one used to be
+  // missing. Sideways: a pond 80 yards offline is scenery. Along the hole:
+  // a bunker 20 yards from the tee, which no adult will reach, is also
+  // scenery - yet it used to score exactly as much as one planted in the
+  // landing zone. Play was always right, because shots land where they
+  // land and lieAt catches them; it was this number that lied, rewarding
+  // a player for cluttering the tee box.
+  const hazardScore = (f, base) => {
+    const point = { x: f.x, y: f.y };
+    const offline = distanceToPath(hole.corridor, point);
+    const sideways = offline < hole.corridorWidth / 2 + f.size ? 1 : 0.2;
+    const inPlay = landingProximity(progressAlongPath(hole.corridor, point), length);
+    // Floor of a quarter: even a hazard nobody reaches is still something
+    // to look at and think about from the tee.
+    return base * sideways * (0.25 + 0.75 * inPlay);
+  };
 
-  const treePressure = trees.reduce((sum, f) => {
-    const offline = distanceToPath(hole.corridor, { x: f.x, y: f.y });
-    return sum + (offline < hole.corridorWidth / 2 + f.size ? 4 : 1);
-  }, 0);
+  const hazardPressure = [...bunkers, ...ponds].reduce(
+    (sum, f) => sum + hazardScore(f, f.type === 'pond' ? 9 : 5),
+    0
+  );
+
+  const treePressure = trees.reduce((sum, f) => sum + hazardScore(f, 4), 0);
 
   const lengthPressure = clamp((length - 330) / 12, -8, 20);
   const greenPressure = (GREEN_DIFFICULTY[hole.greenPreset] - 1) * 30;

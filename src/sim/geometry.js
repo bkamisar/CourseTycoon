@@ -43,3 +43,37 @@ function distanceToSegment(a, b, p) {
   t = Math.max(0, Math.min(1, t));
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
+
+/**
+ * How far along the polyline a point sits, in yards, by projecting onto
+ * each segment and keeping the nearest. Closed form, not sampled: this is
+ * called for every hazard on every stat recomputation, and the editor
+ * recomputes while the player drags.
+ */
+export function progressAlongPath(path, point) {
+  let best = 0;
+  let bestDist = Infinity;
+  let cumulative = 0;
+
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSq = dx * dx + dy * dy;
+    const segment = Math.sqrt(lengthSq);
+
+    let t = lengthSq === 0
+      ? 0
+      : ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq;
+    t = Math.max(0, Math.min(1, t));
+
+    const dist = Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = cumulative + t * segment;
+    }
+    cumulative += segment;
+  }
+  return best;
+}

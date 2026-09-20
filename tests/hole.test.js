@@ -65,3 +65,37 @@ test('all derived stats stay within their documented ranges', () => {
     assert.ok(s.upkeep > 0, `${name} upkeep ${s.upkeep}`);
   }
 });
+
+test('a hazard in the landing zone counts for far more than one at the tee', () => {
+  // The bug: difficulty asked only whether a hazard was near the centreline
+  // sideways, never where along the hole it sat. A bunker 20 yards from the
+  // tee, which no adult will reach, scored exactly as much as one in the
+  // drive's landing zone - so a player could clutter the tee box, watch the
+  // number climb, and believe they had made the hole harder.
+  const base = holeStats(makeHole('straightPar4', 1)).difficulty;
+  const at = (y) => {
+    const h = makeHole('straightPar4', 1);
+    h.features.push({ type: 'bunker', x: 8, y, size: 10 });
+    return holeStats(h).difficulty - base;
+  };
+  const atTee = at(20);
+  const inDriveZone = at(205);
+  const greenside = at(385);
+
+  assert.ok(inDriveZone > atTee * 2, `drive zone ${inDriveZone} vs tee ${atTee}`);
+  assert.ok(greenside > atTee * 2, `greenside ${greenside} vs tee ${atTee}`);
+  assert.ok(atTee > 0, 'a hazard is never worth literally nothing');
+});
+
+test('a hazard far offline still counts for less than one in the corridor', () => {
+  const base = holeStats(makeHole('straightPar4', 1)).difficulty;
+  const inCorridor = makeHole('straightPar4', 1);
+  inCorridor.features.push({ type: 'bunker', x: 8, y: 205, size: 10 });
+  const wayOffline = makeHole('straightPar4', 1);
+  wayOffline.features.push({ type: 'bunker', x: 120, y: 205, size: 10 });
+
+  assert.ok(
+    holeStats(inCorridor).difficulty - base > holeStats(wayOffline).difficulty - base,
+    'sideways proximity must still matter'
+  );
+});
