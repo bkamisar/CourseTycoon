@@ -246,19 +246,15 @@ function injectStyles() {
   const style = document.createElement('style');
   style.textContent = `
     .audio-toggle {
-      position: fixed;
-      top: 4px;
-      right: 6px;
-      min-width: 36px;
-      min-height: 36px;
+      min-width: 44px;
+      min-height: 44px;
       padding: 0;
       background: transparent;
       border: none;
       color: inherit;
-      font-size: 16px;
-      line-height: 36px;
+      font-size: 18px;
+      line-height: 44px;
       text-align: center;
-      z-index: 11;
       pointer-events: auto;
       cursor: pointer;
     }
