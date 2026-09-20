@@ -1,10 +1,15 @@
 import { TEMPLATES } from './templates.js';
 import { pathLength, pointAtDistance, distanceToPath } from './geometry.js';
 
-/** Daily upkeep in dollars. */
-const UPKEEP_BASE = 200;
-const UPKEEP_PER_BUNKER = 25;
-const UPKEEP_PER_POND = 45;
+/**
+ * Daily upkeep in dollars. Exported so UI copy (the glossary, in
+ * particular) can quote the real rate instead of retyping it — a number
+ * written twice is a number that silently drifts the first time this file
+ * retunes it.
+ */
+export const UPKEEP_BASE = 200;
+export const UPKEEP_PER_BUNKER = 25;
+export const UPKEEP_PER_POND = 45;
 
 /** Relative putting difficulty by green preset. */
 export const GREEN_DIFFICULTY = {

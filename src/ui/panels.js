@@ -1,5 +1,5 @@
 /**
- * Build, staff and pricing sheets. Every price, wage and capacity number in
+ * Amenities, staff and pricing sheets. Every price, wage and capacity number in
  * these three sheets is read from `src/sim/economy.js` or `src/sim/
  * schedule.js` at render time — nothing here is a second copy of a number
  * that also lives in the simulation. Re-listing a price is how it silently
@@ -163,7 +163,7 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
 
   sheetHost.open({
     id: 'build',
-    title: 'Build',
+    title: 'Amenities',
     render(body) {
       function rerender() {
         body.replaceChildren();

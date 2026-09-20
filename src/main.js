@@ -20,6 +20,7 @@ import { mountSheetHost } from './ui/sheet.js';
 import { createScreenRouter } from './ui/screens.js';
 import { mountHoleEditor, openTemplatePicker } from './ui/editor.js';
 import { openBuildSheet, openStaffSheet, openPricingSheet } from './ui/panels.js';
+import { openGlossarySheet } from './ui/glossary.js';
 import { mountReport } from './ui/report.js';
 import { createSaveAdapter } from './save/adapter.js';
 import { createLocalBackend } from './save/local.js';
@@ -139,11 +140,15 @@ canvas.addEventListener('click', (evt) => {
   else onAmenityTap();
 });
 
-// --- Overview toolbar: Build / Staff / Pricing, and the big "Open the
-// day" button. The map's amenity row already opens the build sheet on a
-// direct tap; this toolbar is what gives Staff and Pricing an affordance
+// --- Overview toolbar: Amenities / Staff / Pricing, and the big "Open the
+// day" button. The map's amenity row already opens the amenities sheet on
+// a direct tap; this toolbar is what gives Staff and Pricing an affordance
 // at all (the sim gives them no position on the map to anchor an icon to),
-// and it is where a day actually begins.
+// and it is where a day actually begins. Named "Amenities" rather than
+// "Build" so it stops sharing a word with the actual way you build a hole
+// (tapping an empty plot, see openTemplatePicker's "Build a hole" sheet) —
+// two different meanings of "build" on one screen read as confusing on
+// first play.
 // ---------------------------------------------------------------------
 
 const overviewToolbar = document.createElement('div');
@@ -159,7 +164,7 @@ function toolbarButton(label, onClick, { primary = false } = {}) {
 }
 
 overviewToolbar.append(
-  toolbarButton('Build', () => onAmenityTap()),
+  toolbarButton('Amenities', () => onAmenityTap()),
   toolbarButton('Staff', () =>
     openStaffSheet(sheets, {
       state,
@@ -178,6 +183,7 @@ overviewToolbar.append(
       },
     })
   ),
+  Object.assign(toolbarButton('?', () => openGlossarySheet(sheets)), { className: 'ov-btn ov-btn--icon' }),
   toolbarButton('Open the day', () => openDay(), { primary: true })
 );
 const overviewMute = mountMuteToggle(overviewToolbar, chiptune);
@@ -399,19 +405,32 @@ function injectToolbarStyles() {
       flex: 1;
       min-height: 44px;
       min-width: 44px;
-      padding: 0 6px;
+      padding: 4px;
       background: ${PALETTE.PATH};
       color: ${PALETTE.WHITE};
       border: 1px solid ${PALETTE.OUTLINE};
       border-radius: 6px;
       font-family: monospace;
-      font-size: 12px;
+      font-size: 11px;
+      line-height: 1.25;
+      /* A narrow phone can't fit "Amenities" or "Open the day" on one
+         line at any reasonable font size — break mid-word rather than
+         silently clipping the tail, which is what happened here before
+         this rule existed (an "Amenities" button rendered as "Amenitie"). */
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     .ov-btn--primary {
       background: ${PALETTE.FAIRWAY};
       color: ${PALETTE.OUTLINE};
       font-weight: bold;
       flex: 1.6;
+    }
+    .ov-btn--icon {
+      flex: 0 0 44px;
+      padding: 0;
+      font-weight: bold;
+      font-size: 16px;
     }
     .ov-btn--active {
       background: ${PALETTE.ACCENT};
