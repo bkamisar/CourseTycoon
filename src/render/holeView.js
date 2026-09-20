@@ -172,57 +172,79 @@ function roughFill(ctx) {
   return roughPattern;
 }
 
-/** Radial gradient reading as a pond's surface-to-depth falloff: deep
- * water at the centre, lightening toward the shore. Same circle `lieAt`
- * tests as water either way — only the fill style changes. */
-function pondFill(ctx, p, r) {
-  const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-  gradient.addColorStop(0, PALETTE.WATER_DEEP);
-  gradient.addColorStop(1, PALETTE.WATER);
-  return gradient;
+/**
+ * Fills the inner ring of a hard-edged, two-band hazard: a solid colour
+ * on a circle sized `innerFraction` of the outer circle already drawn at
+ * `p`/`r` — two flat steps, no interpolation between them, so every pixel
+ * in each band is one exact palette colour. This is the 8-bit substitute
+ * for a radial gradient's smooth falloff, which is what was reading as
+ * blur once the 180x320 canvas gets integer-scaled up: a gradient spends
+ * hundreds of intermediate shades on a handful of screen pixels, and
+ * pixel art has no use for a shade that isn't one of its named colours.
+ * The outer circle is the caller's own already-drawn `lieAt` radius, so
+ * only the fill inside it changes here.
+ */
+function fillInnerRing(ctx, p, r, inner, innerFraction) {
+  const innerRadius = Math.round(r * innerFraction);
+  if (innerRadius < 1) return;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, innerRadius, 0, Math.PI * 2);
+  ctx.fillStyle = inner;
+  ctx.fill();
 }
 
-/** Radial gradient reading as a bunker's bowl: shaded and recessed
- * through the middle, catching light only at the rim — the same
- * "lighter edge, darker centre" language `pondFill` uses for depth,
- * applied to sand instead of water. */
-function bunkerFill(ctx, p, r) {
-  const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-  gradient.addColorStop(0, PALETTE.SAND_SHADOW);
-  gradient.addColorStop(0.75, PALETTE.SAND_SHADOW);
-  gradient.addColorStop(1, PALETTE.SAND);
-  return gradient;
+/** A pond's surface-to-depth read: a lighter shore ring around a darker
+ * deep-water centre, as two flat bands rather than a gradient's falloff. */
+function drawPondFeature(ctx, t, feature) {
+  const { p, r } = drawCircle(ctx, t, feature, feature.size, PALETTE.WATER);
+  fillInnerRing(ctx, p, r, PALETTE.WATER_DEEP, 0.6);
+}
+
+/** A bunker's bowl read: a lighter rim catching the light around a darker,
+ * recessed body — the same "lighter edge, darker centre" language the
+ * pond uses for depth, applied to sand as two flat bands. */
+function drawBunkerFeature(ctx, t, feature) {
+  const { p, r } = drawCircle(ctx, t, feature, feature.size, PALETTE.SAND);
+  fillInnerRing(ctx, p, r, PALETTE.SAND_SHADOW, 0.7);
+}
+
+/** Rounds a screen point to the pixel grid — a fractional position
+ * anti-aliases against neighbouring pixels, which is exactly the softness
+ * this file exists to remove. Every shape below is drawn from rounded
+ * points so its edges land on whole pixels. */
+function roundPoint(p) {
+  return { x: Math.round(p.x), y: Math.round(p.y) };
 }
 
 function drawBand(ctx, t, corridor, widthYards, style) {
   if (corridor.length < 2) return;
   ctx.beginPath();
-  const p0 = t.toScreen(corridor[0]);
+  const p0 = roundPoint(t.toScreen(corridor[0]));
   ctx.moveTo(p0.x, p0.y);
   for (let i = 1; i < corridor.length; i++) {
-    const p = t.toScreen(corridor[i]);
+    const p = roundPoint(t.toScreen(corridor[i]));
     ctx.lineTo(p.x, p.y);
   }
   ctx.strokeStyle = style;
-  ctx.lineWidth = Math.max(1, widthYards * t.scale);
+  ctx.lineWidth = Math.max(1, Math.round(widthYards * t.scale));
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.stroke();
 }
 
 /**
- * Fills a circle at `centre` (hole-yard coordinates) with `style` — a
- * flat colour, or a function `(ctx, screenPoint, screenRadius) => style`
- * for a gradient that needs to know where on screen it's centred. Returns
- * the resolved screen point/radius so a caller (tree clumps, in
- * particular) can clip further drawing to the exact same circle.
+ * Fills a circle at `centre` (hole-yard coordinates) with a flat `style`,
+ * on rounded pixel coordinates so the edge is crisp rather than
+ * anti-aliased. Returns the resolved screen point/radius so a caller
+ * (tree clumps, ponds, bunkers) can clip or layer further drawing on the
+ * exact same circle.
  */
 function drawCircle(ctx, t, centre, radiusYards, style) {
-  const p = t.toScreen(centre);
-  const r = Math.max(0.5, radiusYards * t.scale);
+  const p = roundPoint(t.toScreen(centre));
+  const r = Math.max(0.5, Math.round(radiusYards * t.scale));
   ctx.beginPath();
   ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-  ctx.fillStyle = typeof style === 'function' ? style(ctx, p, r) : style;
+  ctx.fillStyle = style;
   ctx.fill();
   return { p, r };
 }
@@ -317,10 +339,10 @@ export function drawHole(ctx, hole, rect) {
   // Hazards paint over the green/fairway/rough wherever they overlap,
   // matching lieAt checking them before anything else.
   for (const f of hole.features) {
-    if (f.type === 'pond') drawCircle(ctx, t, f, f.size, pondFill);
+    if (f.type === 'pond') drawPondFeature(ctx, t, f);
   }
   for (const f of hole.features) {
-    if (f.type === 'bunker') drawCircle(ctx, t, f, f.size, bunkerFill);
+    if (f.type === 'bunker') drawBunkerFeature(ctx, t, f);
   }
   for (const f of hole.features) {
     if (f.type === 'trees') drawTreeClump(ctx, t, f);
