@@ -1,8 +1,10 @@
-// TEMPORARY demo harness for Task 6 (the hole editor), building on Task 5's
-// screens/sheets/HUD harness. Tapping a built hole plot opens the hole
-// editor; tapping an empty plot opens the template picker sheet. This file
-// is replaced again once Task 7 wires in the build/hire/pricing panels, and
-// again by Task 12's real screen-driven wiring.
+// TEMPORARY demo harness for Tasks 5-7 (screens/sheets/HUD, the hole
+// editor, and the build/hire/pricing panels). Tapping a built hole plot
+// opens the hole editor; tapping an empty plot opens the template picker;
+// tapping an amenity icon opens the build sheet. A small dev-only row of
+// buttons at the top opens the staff and pricing sheets, since neither has
+// an on-canvas affordance yet (that's Task 12's job, along with the real
+// open-day -> playback -> report flow this harness doesn't attempt).
 
 import { createSurface } from './render/pixel.js';
 import { PALETTE } from './render/palette.js';
@@ -12,6 +14,7 @@ import { mountHud } from './ui/hud.js';
 import { mountSheetHost } from './ui/sheet.js';
 import { createScreenRouter } from './ui/screens.js';
 import { mountHoleEditor, openTemplatePicker } from './ui/editor.js';
+import { openBuildSheet, openStaffSheet, openPricingSheet } from './ui/panels.js';
 
 document.body.style.backgroundColor = PALETTE.OUTLINE;
 
@@ -85,6 +88,16 @@ function onHoleTap(holeId) {
   }
 }
 
+function onAmenityTap() {
+  openBuildSheet(sheets, {
+    state,
+    onChange: (next) => {
+      state = next;
+      drawOverview();
+    },
+  });
+}
+
 drawOverview();
 
 canvas.addEventListener('click', (evt) => {
@@ -93,7 +106,55 @@ canvas.addEventListener('click', (evt) => {
   const hit = regions.find((r) => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height);
   if (!hit) return;
   if (hit.kind === 'hole') onHoleTap(hit.id);
+  else onAmenityTap();
 });
+
+// Dev-only entry points for the staff and pricing sheets, until Task 12
+// gives them a real on-canvas home (a staff office / pricing board icon).
+const devRow = document.createElement('div');
+devRow.style.position = 'fixed';
+devRow.style.top = '30px';
+devRow.style.left = '0';
+devRow.style.right = '0';
+devRow.style.display = 'flex';
+devRow.style.gap = '6px';
+devRow.style.padding = '4px 8px';
+devRow.style.zIndex = '9';
+devRow.style.pointerEvents = 'none';
+
+function devButton(label, onClick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = label;
+  btn.style.pointerEvents = 'auto';
+  btn.style.minHeight = '44px';
+  btn.style.minWidth = '44px';
+  btn.style.fontSize = '11px';
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
+devRow.append(
+  devButton('Staff', () =>
+    openStaffSheet(sheets, {
+      state,
+      onChange: (next) => {
+        state = next;
+        drawOverview();
+      },
+    })
+  ),
+  devButton('Pricing', () =>
+    openPricingSheet(sheets, {
+      state,
+      onChange: (next) => {
+        state = next;
+        drawOverview();
+      },
+    })
+  )
+);
+uiRoot.appendChild(devRow);
 
 window.addEventListener('resize', () => {
   surface.resize();
