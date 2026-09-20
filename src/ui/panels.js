@@ -12,8 +12,9 @@
  * bookkeeping on figures the sim already produced.
  */
 import { PALETTE } from '../render/palette.js';
-import { AMENITIES, WAGES, perceivedValue } from '../sim/economy.js';
+import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
+import { holeStats } from '../sim/hole.js';
 import { marshalPaceFactor } from '../sim/day.js';
 import { openHoles } from '../sim/state.js';
 import { courseRating } from '../sim/ratings.js';
@@ -189,7 +190,16 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
           const blurb = document.createElement('div');
           blurb.className = 'panel-row-blurb';
           blurb.textContent = AMENITY_BLURB[type] ?? '';
-          info.append(title, detail, blurb);
+          // What this amenity actually does, stated plainly: it is not
+          // just flavour, it is the one number that both raises what a
+          // round can be priced at AND draws a bigger crowd — a chain the
+          // player otherwise has no way to see coming (§15a: every choice
+          // states its cost explicitly).
+          const value = document.createElement('div');
+          value.className = 'panel-row-blurb';
+          value.textContent =
+            `Adds $${Math.round(amenityPerceivedValue(type))} to what a round is worth — worth more draws more golfers.`;
+          info.append(title, detail, blurb, value);
 
           const action = document.createElement('button');
           action.type = 'button';
@@ -425,6 +435,48 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
         });
       }
 
+      /**
+       * How many groups actually want to play today, at the current
+       * price, pace and amenities — the same call `src/sim/day.js` makes
+       * to decide who shows up, fed the same inputs it computes (course
+       * difficulty and scenery averaged over the open holes, recent
+       * satisfaction, whether rooms exist). Mirrors `runDay`'s own
+       * demand computation rather than a re-derived shortcut, so this
+       * sheet can never show a demand figure the simulation wouldn't
+       * also produce.
+       *
+       * This is what makes an amenity's demand effect visible: raising
+       * `perceivedValue` (see the Amenities sheet) raises this number
+       * too, and the ONE moment that matters to the player is whether it
+       * has room to land — which `updateIntervalConsequence` below reads
+       * this to say plainly.
+       */
+      function currentDemand() {
+        const holes = openHoles(current);
+        if (holes.length === 0) return { total: 0 };
+        const rating = courseRating(holes, current.turfQuality);
+        const courseDifficulty = holes.reduce((s, h) => s + holeStats(h).difficulty, 0) / holes.length;
+        const averageScenery = holes.reduce((s, h) => s + holeStats(h).scenery, 0) / holes.length;
+        const recentHistory = current.satisfactionHistory.slice(-3);
+        const recentSatisfaction = recentHistory.length
+          ? recentHistory.reduce((s, v) => s + v, 0) / recentHistory.length
+          : 50;
+        const hasRooms = (current.resort.rooms?.count ?? 0) > 0;
+        return demandGroups({
+          courseRating: rating,
+          prestige: current.prestige,
+          amenities: current.resort.amenities,
+          greenFee: current.resort.pricing.greenFee,
+          teeInterval: current.resort.pricing.teeInterval,
+          recentSatisfaction,
+          holesOpen: holes.length,
+          courseDifficulty,
+          scenery: averageScenery,
+          turfQuality: current.turfQuality,
+          hasRooms,
+        });
+      }
+
       function updateFeeConsequence() {
         const value = currentValuePerRound();
         // The ceiling follows what the course is worth, so improving the
@@ -447,6 +499,11 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
         next.resort.pricing.greenFee = Number(feeSlider.value);
         current = next;
         updateFeeConsequence();
+        // The fee is also an input to demand (see currentDemand), so the
+        // tee sheet's "full" line below can flip with the fee alone, not
+        // just the interval — keep it live rather than stale until the
+        // player happens to touch the other slider.
+        updateIntervalConsequence();
         onChange(current);
       });
 
@@ -511,6 +568,24 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
           paceLine.append('Groups will back up on the ', strongHole, '.');
         }
         intervalConsequence.appendChild(paceLine);
+
+        // The one moment more perceived value (a new amenity, a lower
+        // fee) stops helping: the tee sheet is already full. Below this,
+        // every extra golfer an amenity draws is a golfer with nowhere to
+        // tee off — see the Amenities sheet's per-amenity value line for
+        // the other half of this trade.
+        const demand = currentDemand();
+        if (demand.total > 0 && demand.total >= groups) {
+          const capacityLine = document.createElement('div');
+          const strongFull = document.createElement('strong');
+          strongFull.textContent = 'full';
+          capacityLine.append(
+            "Today's tee sheet is ",
+            strongFull,
+            ' — more perceived value won’t bring more golfers, only longer waits.'
+          );
+          intervalConsequence.appendChild(capacityLine);
+        }
       }
 
       intervalSlider.addEventListener('input', () => {

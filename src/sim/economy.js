@@ -37,6 +37,22 @@ export const AMENITIES = {
  */
 const FULL_COURSE_HOLES = 18;
 
+/** How many dollars of perceived value one point of an amenity's
+ * `satisfaction` is worth — see `amenityPerceivedValue` below, which is
+ * what the Amenities sheet reads to tell the player what a given amenity
+ * is actually worth, in the same dollars `perceivedValue` spends it in. */
+const AMENITY_VALUE_PER_SATISFACTION = 1.6;
+
+/** What one amenity of `type` adds to `perceivedValue` — the same dollar
+ * figure that both raises the green fee a round can bear AND (via
+ * `demandGroups`' `valueRatio`) draws more golfers. Exported so UI copy
+ * (the Amenities sheet) can quote the real number instead of re-deriving
+ * it, which is exactly how a shown price and the simulation's own price
+ * drift apart the first time this formula is retuned. */
+export function amenityPerceivedValue(type) {
+  return (AMENITIES[type]?.satisfaction ?? 0) * AMENITY_VALUE_PER_SATISFACTION;
+}
+
 /**
  * What a round here is worth to a golfer, in dollars.
  *
@@ -50,10 +66,7 @@ const FULL_COURSE_HOLES = 18;
 export function perceivedValue({
   courseRating, prestige, amenities, holesOpen = FULL_COURSE_HOLES,
 }) {
-  const amenityValue = amenities.reduce(
-    (s, a) => s + (AMENITIES[a.type]?.satisfaction ?? 0) * 1.6,
-    0
-  );
+  const amenityValue = amenities.reduce((s, a) => s + amenityPerceivedValue(a.type), 0);
   // Sublinear, not proportional: a nine is worth rather more than half an
   // eighteen, because some of what a golfer pays for - the place, the
   // clubhouse, the round itself being a round - does not halve with the

@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
-import { AMENITIES, WAGES } from '../src/sim/economy.js';
+import { AMENITIES, WAGES, amenityPerceivedValue } from '../src/sim/economy.js';
 import { maxGroupsForDay } from '../src/sim/schedule.js';
+import { makeHole } from '../src/sim/hole.js';
+import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 
 /**
  * A minimal fake DOM, just enough of `document.createElement` for panels.js
@@ -112,6 +114,25 @@ test('build sheet shows the exact cost and upkeep AMENITIES holds, for every ame
       (n) => n.tagName === 'div' && n.textContent.includes(`$${spec.build.toLocaleString()}`) && n.textContent.includes(`$${spec.upkeep}/day`)
     );
     assert.ok(details.length > 0, `no row for ${type} shows its real build/upkeep cost`);
+  }
+});
+
+test('every amenity row states its real perceivedValue contribution, and that more value draws more golfers', () => {
+  // §15a: every choice states its cost explicitly. An amenity's demand
+  // effect (raising perceivedValue draws a bigger crowd via
+  // demandGroups) used to be invisible — this is what makes it visible,
+  // reading the real number straight off amenityPerceivedValue rather
+  // than a re-typed copy that could drift from it.
+  const state = newGame(1);
+  const host = fakeSheetHost();
+  openBuildSheet(host, { state, onChange: () => {} });
+
+  for (const type of Object.keys(AMENITIES)) {
+    const expected = Math.round(amenityPerceivedValue(type));
+    const line = host.body.findAll(
+      (n) => n.textContent.includes(`Adds $${expected}`) && n.textContent.toLowerCase().includes('more golfers')
+    );
+    assert.ok(line.length > 0, `no value line for ${type} (expected "Adds $${expected}...more golfers")`);
   }
 });
 
@@ -302,4 +323,62 @@ test('a struggling course still has room to price above its worth', () => {
   // Early on a round may be worth very little; the ceiling must not collapse
   // to something below a sensible fee.
   assert.ok(greenFeeCeiling(12) >= 60);
+});
+
+// --- Tee sheet capacity: the one moment more perceived value stops helping -
+
+/** A fully built, well-appointed, cheaply-priced resort — demand this
+ * strong, at the longest tee interval, fills every slot the tee sheet
+ * has (verified directly against economy.demandGroups: `total` comes back
+ * equal to `maxGroupsForDay(30)`). This is the fixture for asserting the
+ * pricing sheet actually says so. */
+function primedForCapacity() {
+  const state = newGame(1);
+  const holes = state.resort.courses[0].holes;
+  for (let i = 0; i < holes.length; i++) {
+    if (!holes[i].open) {
+      const templateName = TEMPLATE_NAMES[i % TEMPLATE_NAMES.length];
+      holes[i] = { ...makeHole(templateName, holes[i].id), open: true };
+    }
+  }
+  state.prestige = 95;
+  state.turfQuality = 95;
+  state.resort.amenities = Object.keys(AMENITIES).map((type) => ({ type }));
+  state.resort.pricing.greenFee = 10;
+  state.resort.pricing.teeInterval = 30;
+  return state;
+}
+
+test('the pricing sheet says plainly when the tee sheet is full', () => {
+  const state = primedForCapacity();
+  const host = fakeSheetHost();
+  openPricingSheet(host, { state, onChange: () => {} });
+
+  const full = host.body.findAll((n) => n.textContent.includes('full'));
+  assert.ok(full.length > 0, 'expected a "full" tee-sheet line under strong demand at a long interval');
+});
+
+test('the "full" line is absent for a course with room to spare', () => {
+  const state = newGame(1); // day-one Pinehollow: three modest holes, no crowd to speak of
+  const host = fakeSheetHost();
+  openPricingSheet(host, { state, onChange: () => {} });
+
+  const full = host.body.findAll((n) => n.textContent.includes('full'));
+  assert.equal(full.length, 0, 'a day-one course should not claim to be at capacity');
+});
+
+test('the "full" line updates live when the green fee slider moves, not just the interval slider', () => {
+  const state = primedForCapacity();
+  state.resort.pricing.greenFee = 150; // priced high enough to suppress demand below capacity
+  const host = fakeSheetHost();
+  openPricingSheet(host, { state, onChange: () => {} });
+  assert.equal(host.body.findAll((n) => n.textContent.includes('full')).length, 0, 'high fee should keep demand under capacity');
+
+  const sliders = host.body.findAll((n) => n.tagName === 'input');
+  const feeSlider = sliders[0];
+  feeSlider.value = '10';
+  feeSlider.fireInput();
+
+  const full = host.body.findAll((n) => n.textContent.includes('full'));
+  assert.ok(full.length > 0, 'dropping the fee alone should be enough to fill the tee sheet');
 });
