@@ -415,7 +415,21 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
  * would make the entire cost-of-breadth mechanic unreachable — the player
  * could overload a kitchen and have no way to fix it.
  */
-const STAFF_ROLES = ['groundskeeper', 'marshal', 'kitchenStaff'];
+/**
+ * Every role the player can hire, and it must be EVERY role in `WAGES`.
+ *
+ * shopStaff was missing from this list while the wage existed, the
+ * capacity maths ran, guests complained about the queue, and the
+ * Amenities sheet told the player in so many words that the pro shop
+ * "needs a shop hire". There was no way to hire one. A player read an
+ * instruction the game would not let them follow.
+ *
+ * tests/panels.test.js now asserts this list matches WAGES in both
+ * directions. The copy test that existed checked every role had a
+ * description — which passed, because the description was there too. It
+ * was checking the wrong thing.
+ */
+export const STAFF_ROLES = ['groundskeeper', 'marshal', 'shopStaff', 'kitchenStaff'];
 const ROLE_LABEL = {
   groundskeeper: 'Groundskeeper',
   marshal: 'Marshal',

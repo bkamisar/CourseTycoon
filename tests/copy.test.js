@@ -6,7 +6,7 @@ import { AMENITIES, WAGES } from '../src/sim/economy.js';
 import { MENU_SLOTS } from '../src/sim/menu.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../src/sim/segments.js';
 import { buildComplaints } from '../src/sim/satisfaction.js';
-import { amenityBlurb, roleBlurb } from '../src/ui/panels.js';
+import { amenityBlurb, roleBlurb, STAFF_ROLES } from '../src/ui/panels.js';
 
 /**
  * The interface telling the player something the simulation disagrees
@@ -114,5 +114,25 @@ test('every food amenity the copy can mention has slots to fill', () => {
   for (const type of Object.keys(MENU_SLOTS)) {
     assert.ok(AMENITIES[type], `${type} has menu slots but cannot be built`);
     assert.ok(MENU_SLOTS[type] > 0, `${type} has a menu of zero slots`);
+  }
+});
+
+test('EVERY ROLE THE GAME PAYS A WAGE TO CAN ACTUALLY BE HIRED', () => {
+  // shopStaff had a wage, a capacity mechanic, a guest complaint and an
+  // Amenities line reading "Needs a shop hire" — and was missing from the
+  // staff sheet, so there was no way to hire one. The player was told to
+  // do something the game would not let them do.
+  //
+  // The test that existed asserted every role had a description. It
+  // passed. It was checking the wrong thing.
+  for (const role of Object.keys(WAGES)) {
+    assert.ok(STAFF_ROLES.includes(role),
+      `${role} is paid $${WAGES[role]}/day but cannot be hired from the staff sheet`);
+  }
+});
+
+test('the game never offers to hire somebody it cannot pay', () => {
+  for (const role of STAFF_ROLES) {
+    assert.ok(WAGES[role], `the staff sheet offers ${role}, which has no wage`);
   }
 });

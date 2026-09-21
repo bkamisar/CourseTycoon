@@ -25,6 +25,7 @@ import { openGlossarySheet } from './ui/glossary.js';
 import { mountReport } from './ui/report.js';
 import { mountNarrationCard } from './ui/narration.js';
 import { mountEventCard } from './ui/event.js';
+import { mountChanges, liveVersion } from './ui/changes.js';
 import { mountStartScreen, startNewGame, applySaveCode } from './ui/start.js';
 import { createSaveAdapter } from './save/adapter.js';
 import { createLocalBackend } from './save/local.js';
@@ -116,6 +117,12 @@ document.body.appendChild(eventRoot);
 
 const startRoot = document.createElement('div');
 document.body.appendChild(startRoot);
+
+// Above everything, including the start screen: a player whose browser is
+// serving a half-updated set of modules needs to know before they touch
+// anything, not after their save has been through it.
+const changesRoot = document.createElement('div');
+document.body.appendChild(changesRoot);
 
 injectToolbarStyles();
 
@@ -357,6 +364,15 @@ function syncScreenChrome() {
 }
 router.subscribe(syncScreenChrome);
 syncScreenChrome();
+
+// Ask the server what version it is actually serving, and say something
+// if the answer is not what this bundle thinks it is, or if there are
+// notes the player has not read. Deliberately fire-and-forget: a
+// changelog is not worth delaying the game for, and a missing or
+// unreachable version.json just means nothing is shown.
+liveVersion().then((serverBuild) => {
+  mountChanges(changesRoot, { serverBuild });
+});
 
 // ---------------------------------------------------------------------
 // Start screen: Continue (only when a save exists), New Game (wiping any
