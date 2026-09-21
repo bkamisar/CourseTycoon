@@ -110,7 +110,7 @@ export function nightlyRate(kind, roomRate) {
  * who has driven three hours is not going to sleep in the car over twenty
  * dollars. It bites hard above roughly twice what a round is worth.
  */
-export function roomDemand({ crowd, roomRate, valuePerRound = 60 }) {
+export function roomDemand({ crowd, roomRate, valuePerRound = 60, extraNights = 0 }) {
   const wanted = {};
   for (const key of SEGMENT_KEYS) {
     const behaviour = STAY_BEHAVIOUR[key];
@@ -122,7 +122,12 @@ export function roomDemand({ crowd, roomRate, valuePerRound = 60 }) {
     // 1.0 at a rate equal to a round, falling away above it.
     const fair = Math.max(1, valuePerRound * 1.6);
     const priceFit = clamp(1.25 - (roomRate / fair) * 0.55, 0.05, 1.15);
-    wanted[key] = heads * behaviour.chance * priceFit * behaviour.nights;
+    // A kids' club or a spa lengthens the trip rather than attracting
+    // another one — the only way to raise occupancy without raising
+    // demand. Locals are excluded by their zero chance above, so no
+    // amenity can talk a local into a bed.
+    const nights = behaviour.nights + extraNights;
+    wanted[key] = heads * behaviour.chance * priceFit * nights;
   }
   return wanted;
 }
@@ -135,10 +140,10 @@ export function roomDemand({ crowd, roomRate, valuePerRound = 60 }) {
  * than drive home, but not happily, which is what `unmetSuiteDemand`
  * exists to let the rest of the game notice.
  */
-export function occupancyFor({ rooms, crowd, roomRate, valuePerRound = 60 }) {
+export function occupancyFor({ rooms, crowd, roomRate, valuePerRound = 60, extraNights = 0 }) {
   const counts = roomCounts(rooms);
   const capacity = counts.standard + counts.suite;
-  const wanted = roomDemand({ crowd, roomRate, valuePerRound });
+  const wanted = roomDemand({ crowd, roomRate, valuePerRound, extraNights });
 
   let suiteWanted = 0;
   let totalWanted = 0;

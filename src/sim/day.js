@@ -17,6 +17,9 @@ import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEv
 import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
 import { weatherOn, forecast, effectsOf } from './weather.js';
 import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue } from './rooms.js';
+import {
+  hotelUpkeep, extraNightsFrom, divertedShare, hasWeatherProofDraw, HOTEL_AMENITIES,
+} from './hotelAmenities.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -206,7 +209,13 @@ export function runDay(state, seed) {
         hasRooms,
       })
     : { total: 0, share: Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0])) };
-  const groupCount = demand.total;
+  // A short course takes the beginners and the families off the main
+  // course. The only thing in the game that helps pace by subtraction —
+  // everything else draws a crowd onto a course that then has to flow.
+  // They still pay, they simply play somewhere that does not queue.
+  const diverted = divertedShare(next.resort.amenities);
+  const groupCount = Math.max(0, Math.round(demand.total * (1 - diverted)));
+  const divertedGroups = demand.total - groupCount;
 
   resetGuestIds();
   const groups = [];
@@ -387,6 +396,7 @@ export function runDay(state, seed) {
     crowd: crowdCount,
     roomRate: next.resort.pricing.roomRate,
     valuePerRound: value,
+    extraNights: extraNightsFrom(next.resort.amenities),
   });
   revenue.rooms = roomRevenue({ occupancy: hotel, roomRate: next.resort.pricing.roomRate });
   revenue.total += revenue.rooms;
@@ -395,8 +405,22 @@ export function runDay(state, seed) {
   // or not. This is the only thing that makes occupancy a real number
   // rather than a vanity one, and the only thing that makes "build more
   // rooms" a decision rather than a ratchet.
-  costs.rooms = nightlyUpkeep(next.resort.rooms);
+  costs.rooms = nightlyUpkeep(next.resort.rooms) + hotelUpkeep(next.resort.amenities);
   costs.total += costs.rooms;
+
+  // The one thing that earns on a day the course is shut. Weather takes
+  // demand down to a tenth in a storm and leaves every other building
+  // idle; a range under a roof takes money anyway, so it smooths the
+  // variance rather than merely adding to the total.
+  if (hasWeatherProofDraw(next.resort.amenities) && sky.demand < 0.8) {
+    const sheltered = Math.round(
+      HOTEL_AMENITIES.indoorRange.upkeep * 2.4 * (1 - sky.demand)
+    );
+    revenue.indoors = sheltered;
+    revenue.total += sheltered;
+  } else {
+    revenue.indoors = 0;
+  }
 
   const profit = revenue.total - costs.total;
 
@@ -448,6 +472,7 @@ export function runDay(state, seed) {
     kitchen,
     shop,
     hotel,
+    divertedGroups,
     weather: {
       key: weatherKey,
       label: sky.label,
