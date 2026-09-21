@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createScreenRouter, SCREEN_NAMES } from '../src/ui/screens.js';
 import { createSheetStack } from '../src/ui/sheet.js';
-import { computeHudData } from '../src/ui/hud.js';
+import {computeHudData, crowdBars } from '../src/ui/hud.js';
 import { newGame } from '../src/sim/state.js';
 
 // --- Screens --------------------------------------------------------------
@@ -179,4 +179,25 @@ test('HUD satisfaction tracks the LAST day\'s report, not an earlier one, after 
   const lastReport = state.history[state.history.length - 1];
   assert.equal(state.history.length, 3);
   assert.equal(data.satisfaction, Math.round(lastReport.averageSatisfaction));
+});
+
+test('the HUD crowd bars are null before a day has been played', () => {
+  // A resort that has never opened has no crowd, and inventing an even
+  // three-way split would be a lie the player would read as real.
+  assert.equal(crowdBars(null), null);
+  assert.equal(crowdBars({}), null);
+  assert.equal(crowdBars({ crowd: { locals: { count: 0 }, serious: { count: 0 }, destination: { count: 0 } } }), null);
+});
+
+test('the HUD crowd bars are shares of the day, summing to one', () => {
+  const bars = crowdBars({
+    crowd: { locals: { count: 50 }, serious: { count: 30 }, destination: { count: 20 } },
+  });
+  assert.equal(bars.length, 3);
+  assert.ok(Math.abs(bars.reduce((s, b) => s + b.share, 0) - 1) < 1e-9);
+  const locals = bars.find((b) => b.key === 'locals');
+  assert.equal(locals.count, 50);
+  assert.ok(Math.abs(locals.share - 0.5) < 1e-9);
+  // Short labels, because the full names do not fit a phone's top bar.
+  assert.ok(locals.label.length <= 8, `label too long for the bar: ${locals.label}`);
 });

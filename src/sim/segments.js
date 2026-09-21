@@ -12,6 +12,7 @@ import { goodwillFactor } from './goodwill.js';
 export const SEGMENTS = {
   locals: {
     label: 'Locals',
+    shortLabel: 'Locals',   // the HUD bar has no room for the full name
     idealDifficulty: 30,
     tolerance: 26,
     priceSensitivity: 1.6,   // how hard an overpriced round drives them off
@@ -23,6 +24,7 @@ export const SEGMENTS = {
   },
   serious: {
     label: 'Serious golfers',
+    shortLabel: 'Serious',   // the HUD bar has no room for the full name
     idealDifficulty: 72,
     tolerance: 24,
     priceSensitivity: 0.5,
@@ -34,6 +36,7 @@ export const SEGMENTS = {
   },
   destination: {
     label: 'Destination guests',
+    shortLabel: 'Guests',   // the HUD bar has no room for the full name
     idealDifficulty: 52,
     tolerance: 40,           // forgiving about the test itself
     priceSensitivity: 0.35,

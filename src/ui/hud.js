@@ -21,6 +21,7 @@
 import { PALETTE } from '../render/palette.js';
 import { openHoles } from '../sim/state.js';
 import { courseRating } from '../sim/ratings.js';
+import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 
 export function computeHudData(state) {
   const holes = openHoles(state);
@@ -33,7 +34,32 @@ export function computeHudData(state) {
     prestige: Math.round(state.prestige),
     turfQuality: Math.round(state.turfQuality),
     satisfaction: lastReport ? Math.round(lastReport.averageSatisfaction) : null,
+    crowd: crowdBars(lastReport),
   };
+}
+
+/**
+ * The three crowds as shares of yesterday's golfers, for the HUD bars.
+ *
+ * These live in the top bar rather than only in the evening report so that
+ * the thing the whole game turns on - that no course pleases everybody - is
+ * present while the player is building, not discovered at bedtime. Dig a
+ * pond and watch the locals bar sag.
+ *
+ * Null before the first day has been played: a resort that has never opened
+ * has no crowd, and inventing an even split would be a lie.
+ */
+export function crowdBars(report) {
+  if (!report?.crowd) return null;
+  let total = 0;
+  for (const key of SEGMENT_KEYS) total += report.crowd[key]?.count ?? 0;
+  if (total === 0) return null;
+  return SEGMENT_KEYS.map((key) => ({
+    key,
+    label: SEGMENTS[key].label,
+    count: report.crowd[key]?.count ?? 0,
+    share: (report.crowd[key]?.count ?? 0) / total,
+  }));
 }
 
 let stylesInjected = false;
@@ -48,6 +74,52 @@ function injectStyles() {
        stack in normal flow inside that one wrapper, so the amenity strip
        always sits directly under whatever height this bar actually
        renders at, instead of assuming one. */
+    .hud-wrap {
+      display: flex;
+      flex-direction: column;
+      pointer-events: none;
+    }
+    .hud-crowd {
+      display: flex;
+      gap: 6px;
+      padding: 2px 8px 4px;
+      background: ${PALETTE.UI_DARK};
+    }
+    .hud-crowd[hidden] { display: none; }
+    .hud-crowd-cell {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
+    .hud-crowd-label {
+      color: ${PALETTE.UI_LIGHT};
+      font-family: monospace;
+      font-size: 9px;
+      white-space: nowrap;
+    }
+    .hud-crowd-track {
+      flex: 1;
+      height: 4px;
+      min-width: 12px;
+      background: ${PALETTE.OUTLINE};
+    }
+    .hud-crowd-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 200ms linear;
+    }
+    .hud-crowd-fill--locals { background: ${PALETTE.FAIRWAY}; }
+    .hud-crowd-fill--serious { background: ${PALETTE.SAND}; }
+    .hud-crowd-fill--destination { background: ${PALETTE.WATER}; }
+    .hud-crowd-pct {
+      color: ${PALETTE.WHITE};
+      font-family: monospace;
+      font-size: 9px;
+      min-width: 22px;
+      text-align: right;
+    }
     .hud-bar {
       display: flex;
       align-items: center;
@@ -97,7 +169,36 @@ export function mountHud(root) {
   ratings.className = 'hud-ratings';
 
   bar.append(money, day, ratings);
-  root.appendChild(bar);
+
+  // The three crowds, as bars, always on screen. The whole game turns on the
+  // fact that no course pleases everybody, and until now that only showed up
+  // in the evening report - so the player met the consequence hours after the
+  // decision. Here it moves while they build.
+  const crowdRow = document.createElement('div');
+  crowdRow.className = 'hud-crowd';
+  const bars = {};
+  for (const key of SEGMENT_KEYS) {
+    const cell = document.createElement('div');
+    cell.className = 'hud-crowd-cell';
+    const label = document.createElement('span');
+    label.className = 'hud-crowd-label';
+    label.textContent = SEGMENTS[key].shortLabel ?? SEGMENTS[key].label;
+    const track = document.createElement('div');
+    track.className = 'hud-crowd-track';
+    const fill = document.createElement('div');
+    fill.className = `hud-crowd-fill hud-crowd-fill--${key}`;
+    track.appendChild(fill);
+    const pct = document.createElement('span');
+    pct.className = 'hud-crowd-pct';
+    cell.append(label, track, pct);
+    crowdRow.appendChild(cell);
+    bars[key] = { fill, pct };
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'hud-wrap';
+  wrap.append(bar, crowdRow);
+  root.appendChild(wrap);
 
   function update(state) {
     const data = computeHudData(state);
@@ -107,8 +208,18 @@ export function mountHud(root) {
     // "Happy" rather than "Sat": the author read the abbreviation and had to
     // ask what it meant, which is the whole test a HUD label has to pass.
     ratings.textContent = `Happy ${satText} · CR ${data.courseRating} · Prestige ${data.prestige} · Turf ${data.turfQuality}`;
+
+    // Before the first day there is no crowd, and inventing an even split
+    // would be a lie, so the row hides rather than showing three empty bars.
+    crowdRow.hidden = data.crowd === null;
+    if (data.crowd) {
+      for (const entry of data.crowd) {
+        bars[entry.key].fill.style.width = `${Math.round(entry.share * 100)}%`;
+        bars[entry.key].pct.textContent = `${Math.round(entry.share * 100)}%`;
+      }
+    }
     return data;
   }
 
-  return { element: bar, update };
+  return { element: wrap, update };
 }
