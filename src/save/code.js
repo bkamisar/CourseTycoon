@@ -63,13 +63,68 @@ function base64ToBytes(str) {
 }
 
 // ---------------------------------------------------------------------
-// A minimal LZW compressor over UTF-16 code units. Codes are capped at 16
-// bits (the dictionary simply stops growing once it hits that ceiling) so
-// every code fits in one `Uint16`, keeping the framing below trivial — no
+// UTF-8 framing.
+//
+// The compressor below seeds its dictionary with the 256 single-byte
+// strings, which means every character it is handed must fit in a byte.
+// The save JSON does not: this game's prose is full of em dashes, and one
+// of them sits in the Act I gate hint that every save carries. Feeding a
+// character above 255 straight to the compressor returned `undefined` from
+// the dictionary, `setUint16` wrote that as a zero, and the code came back
+// out as a poisoned payload — no error at encode time, a flat "save is not
+// valid JSON" at decode time. Every save code this game produced from a
+// real game was broken that way.
+//
+// So the JSON is converted to its UTF-8 bytes first and compressed as a
+// byte string. ASCII is unchanged by that conversion, so codes copied
+// before this fix (which were necessarily ASCII-only, since anything else
+// never decoded) still load.
+// ---------------------------------------------------------------------
+
+/** The UTF-8 bytes of `str`, one byte per character. */
+function toByteString(str) {
+  const bytes = new TextEncoder().encode(str);
+  let out = '';
+  // Chunked, because `String.fromCharCode(...bytes)` on a whole save blows
+  // the argument limit.
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return out;
+}
+
+/** The inverse: a byte string back to the text it encodes. */
+function fromByteString(byteString) {
+  const bytes = new Uint8Array(byteString.length);
+  for (let i = 0; i < byteString.length; i++) {
+    bytes[i] = byteString.charCodeAt(i) & 0xff;
+  }
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+}
+
+// ---------------------------------------------------------------------
+// A minimal LZW compressor over single bytes. Codes are capped at 16 bits
+// (the dictionary simply stops growing once it hits that ceiling) so every
+// code fits in one `Uint16`, keeping the framing below trivial — no
 // variable bit-width packing, which a save-sized string never needs.
 // ---------------------------------------------------------------------
 
 const MAX_DICT_SIZE = 0xffff;
+
+/**
+ * Looks up a code, refusing to invent one. The em-dash bug got out
+ * precisely because a missing entry was written as `undefined` and only
+ * noticed by the decoder much later, as a generic corruption message. A
+ * character the dictionary cannot represent is a bug in the framing above,
+ * and it should say so here rather than produce a code that does not load.
+ */
+function emit(dict, key) {
+  const code = dict.get(key);
+  if (code === undefined) {
+    throw new Error(`cannot compress character ${JSON.stringify(key)}`);
+  }
+  return code;
+}
 
 function lzwCompress(str) {
   const dict = new Map();
@@ -84,11 +139,11 @@ function lzwCompress(str) {
       w = wc;
       continue;
     }
-    codes.push(dict.get(w));
+    codes.push(emit(dict, w));
     if (dictSize < MAX_DICT_SIZE) dict.set(wc, dictSize++);
     w = c;
   }
-  if (w !== '') codes.push(dict.get(w));
+  if (w !== '') codes.push(emit(dict, w));
   return codes;
 }
 
@@ -123,7 +178,7 @@ function lzwDecompress(codes) {
 /** Encodes a game state into a compressed, copyable save code. */
 export function encode(state) {
   const json = serialize(state);
-  const codes = lzwCompress(json);
+  const codes = lzwCompress(toByteString(json));
 
   const bytes = new Uint8Array(codes.length * 2);
   const view = new DataView(bytes.buffer);
@@ -159,7 +214,7 @@ export function decode(text) {
 
   let json;
   try {
-    json = lzwDecompress(codes);
+    json = fromByteString(lzwDecompress(codes));
   } catch (err) {
     throw new Error(`corrupt save code: ${err.message}`);
   }
