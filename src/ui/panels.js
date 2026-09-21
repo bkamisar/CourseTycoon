@@ -17,7 +17,7 @@ import { amenity } from '../sim/state.js';
 import { openMenuBoard } from './menuBoard.js';
 import { kitchenCapacity, kitchenLoad } from '../sim/kitchen.js';
 import { shopCapacity, PER_SHOP_STAFF } from '../sim/shop.js';
-import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups } from '../sim/economy.js';
+import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups, demolitionRefund } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
 import { holeStats } from '../sim/hole.js';
 import { marshalPaceFactor } from '../sim/day.js';
@@ -206,6 +206,58 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
     id: 'build',
     title: 'Amenities',
     render(body) {
+      /**
+       * Demolition, behind a confirmation.
+       *
+       * Amenities could be built and never removed, which turned a
+       * wrong guess into a permanent one — and wrong guesses are easy
+       * here, since a halfway house loses $1,437 a day once a snack shack
+       * and a cart are already feeding people and nothing says so until
+       * it has happened. A game whose effects depend on combinations has
+       * to let the player take a combination apart again.
+       */
+      function removeButton(type) {
+        const refund = demolitionRefund(type);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'panel-btn panel-btn--danger';
+        btn.textContent = 'Remove';
+        btn.addEventListener('click', () => {
+          sheetHost.open({
+            id: `remove-${type}`,
+            title: `Remove the ${titleCase(type).toLowerCase()}?`,
+            render(confirmBody, { close }) {
+              const spec = AMENITIES[type];
+              const words = document.createElement('div');
+              words.className = 'panel-row-blurb';
+              words.textContent =
+                `It cost $${spec.build.toLocaleString()} to build. You get $${refund.toLocaleString()} back `
+                + `and stop paying $${spec.upkeep}/day to run it. Anything on its menu goes with it.`;
+              const go = document.createElement('button');
+              go.type = 'button';
+              go.className = 'panel-btn panel-btn--danger';
+              go.textContent = `Remove it for $${refund.toLocaleString()} back`;
+              go.addEventListener('click', () => {
+                const next = structuredClone(current);
+                next.money += refund;
+                next.resort.amenities = next.resort.amenities.filter((a) => a.type !== type);
+                current = next;
+                onChange(current);
+                close();
+                rerender();
+              });
+              const keep = document.createElement('button');
+              keep.type = 'button';
+              keep.className = 'panel-btn';
+              keep.textContent = 'Keep it';
+              keep.addEventListener('click', () => close());
+              confirmBody.append(words, go, keep);
+            },
+          });
+        });
+        return btn;
+      }
+
       function rerender() {
         body.replaceChildren();
         for (const type of Object.keys(AMENITIES)) {
@@ -323,7 +375,12 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
                 onChange: (next) => { current = next; onChange(current); },
               });
             });
-            actions.append(action, menuBtn);
+            actions.append(action, menuBtn, removeButton(type));
+            row.append(info, actions);
+          } else if (owned && AMENITIES[type].build > 0) {
+            const actions = document.createElement('div');
+            actions.className = 'panel-row-actions';
+            actions.append(action, removeButton(type));
             row.append(info, actions);
           } else {
             row.append(info, action);

@@ -816,6 +816,47 @@ whoever is playing, with a pause while it thinks. It suits a game built around
 rhetoric; it does not suit one whose interesting decisions are spatial and
 economic.
 
+## 15b. How to measure anything in this game
+
+Six confident, wrong conclusions were reached on this project, and every
+one has the same shape: **a thing measured where it cannot work, and the
+result reported as a property of the thing.**
+
+| the conclusion | why it was wrong |
+|---|---|
+| "Marshals are a bad buy at every level" | three holes, eight groups — nothing to marshal |
+| "A cook costs its wage and returns nothing" | no kitchen on the resort |
+| "A shop hire does nothing" | no counter — and a real bug hid behind the bad measurement |
+| "The halfway house is worse than nothing" | compared revenue with the wages left out |
+| "A mismatched menu earns more than a matched one" | overloaded kitchen on one side only |
+| "The cart beats the halfway house" | charged a drinks-only cart for a cook it does not need |
+
+Each looked authoritative. Each came from a script that invented a
+baseline inline, in a hurry, choosing one that was easy rather than one
+that was representative. Four of the six used the opening three-hole
+course, which has no congestion, no clientele and no amenities — so
+**every** purchase measures as worthless on it.
+
+Three rules, and `tools/scenarios.js` is where they are enforced:
+
+**Name the scenario.** Baselines live in `tools/scenarios.js` with their
+limits written beside them: what each can measure and what it cannot. A
+measurement that names its scenario is one somebody else can check.
+
+**Measure a thing where it can work.** A marshal needs congestion, a cook
+needs a kitchen, a shop hire needs a counter. `tools/effects.js` declares
+each hire's prerequisite in `STAFF_CONTEXT` and measures it there.
+
+**Measure combinations, not only items.** Amenities raise perceived value,
+which raises demand, which congests the course — they interact hard. The
+halfway house is worth +$140 a day as a first purchase and **-$1,437 as a
+last one**, and nothing that measured items alone could ever have seen it.
+
+The cost of getting this wrong is not a bad number. It is a design change
+made to fix a problem that was not there: the marshal was nearly deleted,
+and a revenue spread was invented to rescue a halfway house that did not
+need rescuing.
+
 ## 16. Deferred decisions
 
 Recorded so they are not silently forgotten, and deliberately excluded from Act

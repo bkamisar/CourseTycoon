@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, WAGES, menuRevenue, MENU_RATE, AMENITIES } from '../src/sim/economy.js';
+import { demolitionRefund } from '../src/sim/economy.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import { menuPrep } from '../src/sim/menu.js';
 import { BASE_CAPACITY, PER_COOK } from '../src/sim/kitchen.js';
@@ -221,4 +222,22 @@ test('amenities that serve no food are skipped', () => {
     amenities: [{ type: 'restrooms', menu: [] }, { type: 'proShop' }], crowd, serviceFactor: 1,
   });
   assert.equal(revenue, 0);
+});
+
+test('demolishing an amenity returns most of what it cost, not all', () => {
+  // A full refund would make "build everything, sell what does not help"
+  // risk-free, and what helps depends on what else you own — the second
+  // order measurements exist because of exactly that.
+  for (const type of Object.keys(AMENITIES)) {
+    const build = AMENITIES[type].build;
+    if (build === 0) continue;
+    const back = demolitionRefund(type);
+    assert.ok(back < build, `${type}: demolition should not be free`);
+    assert.ok(back > build * 0.5, `${type}: losing over half is punitive for a mistake`);
+  }
+});
+
+test('demolishing something that was free returns nothing', () => {
+  assert.equal(demolitionRefund('clubhouse'), 0);
+  assert.equal(demolitionRefund('nonsense'), 0);
 });

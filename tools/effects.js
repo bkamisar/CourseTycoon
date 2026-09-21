@@ -22,10 +22,9 @@
  *
  * Run with `npm run effects`.
  */
-import { newGame, amenity, openHoles } from '../src/sim/state.js';
+import { amenity } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
-import { makeHole } from '../src/sim/hole.js';
-import { TEMPLATE_NAMES } from '../src/sim/templates.js';
+import { bareNine, builtOutNine } from './scenarios.js';
 import { AMENITIES, WAGES } from '../src/sim/economy.js';
 import { menuPrep, MENU_SLOTS } from '../src/sim/menu.js';
 import { kitchenCapacity, kitchenLoad, serviceFactor } from '../src/sim/kitchen.js';
@@ -33,21 +32,16 @@ import { kitchenCapacity, kitchenLoad, serviceFactor } from '../src/sim/kitchen.
 const DAYS = 25;
 const SEEDS = 4;
 
-/** A finished nine with a crowd on it: the only fair place to measure. */
-function baseResort(seed) {
-  const state = newGame(seed);
-  state.money = 150000;
-  state.prestige = 60;
-  state.resort.pricing.greenFee = 80;
-  state.resort.pricing.teeInterval = 13;
-
-  const holes = state.resort.courses[0].holes;
-  for (let i = 0; i < holes.length; i++) {
-    holes[i] = { ...makeHole(TEMPLATE_NAMES[i % TEMPLATE_NAMES.length], holes[i].id), open: true };
-  }
-  for (let i = 0; i < 3; i++) state.resort.staff.push({ role: 'groundskeeper' });
-  return state;
-}
+/**
+ * The baseline, from `tools/scenarios.js` rather than invented here.
+ *
+ * That module exists because this exact measurement has been got wrong
+ * six times by scripts that rolled their own baseline in a hurry, and
+ * chose an easy one rather than a representative one. Naming the scenario
+ * is what lets someone else — or this file in six weeks — check the
+ * assumption instead of trusting the number.
+ */
+const baseResort = bareNine;
 
 function season(mutate, seed) {
   let state = baseResort(seed);
@@ -290,14 +284,13 @@ if (quiet === 0) console.log('  Nothing measured as inert. Every purchase moves 
 // ---------------------------------------------------------------------
 const ALL_AMENITIES = Object.keys(AMENITIES).filter((t) => t !== 'clubhouse');
 
+/** `builtOutNine` minus one thing, so the missing one can be priced as
+ * the last purchase rather than the first. */
 function fullyBuilt(except) {
   return (s) => {
-    for (const t of ALL_AMENITIES) {
-      if (t === except) continue;
-      s.resort.amenities.push(amenity(t));
-    }
-    for (let i = 0; i < 3; i++) s.resort.staff.push({ role: 'kitchenStaff' });
-    s.resort.staff.push({ role: 'shopStaff' });
+    const full = builtOutNine(1, { except });
+    s.resort.amenities = full.resort.amenities;
+    s.resort.staff = full.resort.staff;
   };
 }
 

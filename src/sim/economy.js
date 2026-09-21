@@ -306,6 +306,30 @@ export function menuRevenue({ amenities, crowd, serviceFactor = 1 }) {
   return { revenue: Math.round(revenue), foodCost: Math.round(foodCost) };
 }
 
+/**
+ * What you get back for demolishing an amenity, as a fraction of what it
+ * cost to build.
+ *
+ * Deliberately not the full refund the hole editor gives. That one is full
+ * because rebuilding a hole has to cost the same as stripping it and
+ * rebuilding, or the two routes disagree — a constraint amenities do not
+ * have. Here a partial refund is doing real work: a full one would make
+ * "build everything, sell whatever turns out not to help" a risk-free
+ * strategy, and the whole point of the second-order measurements is that
+ * what helps depends on what else you own.
+ *
+ * Two thirds is enough that discovering a mistake is not ruinous — and
+ * mistakes are easy to make here, since the halfway house is a loss of
+ * $1,437 a day once a snack shack and a cart are already feeding people,
+ * and nothing warns you until it has happened.
+ */
+export const DEMOLITION_REFUND = 0.65;
+
+/** What removing `type` puts back in the bank. */
+export function demolitionRefund(type) {
+  return Math.round((AMENITIES[type]?.build ?? 0) * DEMOLITION_REFUND);
+}
+
 export const BUILD_COSTS = Object.freeze({
   hole: 12000,
   bunker: 800,
