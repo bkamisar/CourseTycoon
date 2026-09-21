@@ -88,8 +88,8 @@ wrap - are the author's own additions, asked for by name. They are marked below.
 | `trailMix` | Trail mix | food | 5 | 2 | 0 | yes | 0.40 | 0.80 | 0.40 | 2 |
 | `turkeyWrap` | Turkey wrap | food | 12 | 4 | 0 | yes | 0.50 | 0.80 | 0.60 | 3 |
 | `chickenCaesarWrap` * | Chicken Caesar wrap | food | 14 | 5 | 0 | yes | 0.60 | 0.85 | 0.60 | 3 |
-| `breakfastSandwich` * | Breakfast sandwich | food | 8 | 2.50 | 2 | no | 0.90 | 0.80 | 0.40 | 3 |
-| `hotDog` | Hot dog | food | 9 | 3 | 1 | no | 1.00 | 0.50 | 0.20 | 2 |
+| `breakfastSandwich` * | Breakfast sandwich | food | 8 | 2.50 | 2 | yes | 0.90 | 0.80 | 0.40 | 3 |
+| `hotDog` | Hot dog | food | 9 | 3 | 1 | yes | 1.00 | 0.50 | 0.20 | 2 |
 | `chiliBowl` | Bowl of chili | food | 10 | 3 | 2 | no | 0.90 | 0.50 | 0.30 | 3 |
 | `burgerFries` | Burger and fries | food | 15 | 5 | 2 | no | 0.90 | 0.60 | 0.40 | 4 |
 | `clubSandwich` | Club sandwich | food | 16 | 5 | 2 | no | 0.60 | 0.80 | 0.70 | 4 |
@@ -107,21 +107,45 @@ golf course orders — and is deliberately the broadest thing on the list at
 what stops it being a free win: the margin is comparable to a draught's, so
 leaning on it is a choice rather than an answer.
 
+**What `cartable` means, and what it does not.** An item is cartable if it can
+be handed over from a moving cart — held cold in a cooler or hot in a warmer.
+A hot dog and a breakfast sandwich qualify; the author was right to say so, and
+an earlier draft of this spec had them wrong. What does not qualify is anything
+poured or finished to order (espresso, wine by the glass) or anything that needs
+a plate and does not survive the trip (chili, burger and fries, salad, oysters,
+lobster roll, steak frites). Twelve of the twenty-one are cartable.
+
+**Cartable is not the same as free.** The earlier draft tied `cartable` to
+`prep 0`, which made the beverage cart kitchen-free by its nature. It is better
+the other way round: a hot dog on the cart still has to be cooked, so it still
+loads the kitchen. The cart is kitchen-free only if the player *chooses* an
+all-drinks board — which is a decision, where the old rule was a property. Ten
+cartable items are `prep 0`, so that choice always remains open.
+
 **Pre-made cold items are `prep 0`.** A wrap assembled in the morning does not
-load the kitchen line during service; a breakfast sandwich cooked to order does.
-That is the rule the table follows, and it is what lets the beverage cart carry
-real food rather than only drinks.
+load the line during service; a breakfast sandwich cooked to order does. That is
+what the `prep` column is measuring.
 
 ## 4. Menus, and what they earn
 
 A menu is a list of item ids on an amenity. Slots by amenity:
 
-| amenity | slots | accepts |
-|---|---|---|
-| `snackShack` | 2 | anything with `prep ≤ 1` |
-| `halfwayHouse` | 3 | anything |
-| `restaurant` | 5 | anything |
-| `beverageCart` | 3 | `cartable` only |
+| amenity | slots | accepts | menus available |
+|---|---|---|---|
+| `snackShack` | 3 | anything with `prep ≤ 1` | 286 |
+| `halfwayHouse` | 5 | anything | 20,349 |
+| `restaurant` | 7 | anything | 116,280 |
+| `beverageCart` | 4 | `cartable` only | 495 |
+
+These are the author's numbers, raised from 2/3/5/3 to make mixing and matching
+worth doing. Measured before adopting them: **more slots does not need more
+food.** Each crowd already has exactly twelve items it wants out of the
+twenty-one — a symmetry that was not designed — so even a seven-slot restaurant
+leaves 792 distinct ways to please destination guests. Nothing is forced.
+
+The consequence that does need handling is revenue: bigger menus raise both pull
+and basket, so `RATE` has to come *down* to hold §4.1's neutrality. Treat the
+rates below as pre-slot-increase values that the balance pass must retune.
 
 For each segment `s`, a menu yields two numbers:
 
@@ -218,6 +242,28 @@ generalist penalty arrived on its own, from three items chosen for flavour
 rather than balance, which is the strongest evidence available that the formula
 is shaped right.
 
+### 4.3 Two results of the cartable rule, found by measurement
+
+**The cart cannot serve destination guests, and that is the right answer.**
+Sweeping all 495 four-slot cart menus, the best any of them manages for
+destination guests is **0.68 pull** — against **0.99 for locals**. Nothing was
+declared to make that true; it falls out of the fact that what guests want
+(oysters, steak, wine, a proper salad) is exactly what cannot ride on a cart. So
+the three food amenities end up with distinct jobs without a single rule saying
+so: the restaurant is where destination money is spent, and the cart is for the
+people actually out playing golf.
+
+**A hot cart barely beats a dry one, and this needs tuning.** Transfusion,
+draught, Caesar wrap and a hot dog gives 0.94 / 0.77 / 0.59 at `prep 1`.
+Swapping the hot dog for an Arnold Palmer gives 0.91 / 0.79 / 0.64 at `prep 0`.
+The best locals item in the game adds almost nothing, because a cart is already
+locals-saturated before it gets there and `pull` reads the mean. The author
+specifically asked for hot food on the cart, so "putting it there is pointless"
+is not an acceptable resting place. §8 must make a hot cart worth its kitchen
+load — most likely through satisfaction or energy rather than through `pull`,
+since a warm meal at the ninth is worth more to a tiring golfer than one more
+cold drink.
+
 ## 5. The kitchen, and making `kitchenStaff` mean something
 
 `kitchenStaff` already exists in `economy.js` as a $180/day wage and **nothing
@@ -237,10 +283,9 @@ serviceFactor = clamp(capacity / load, 0.45, 1)
 ```
 
 `serviceFactor` scales spend (fewer guests get served) and drives a satisfaction
-penalty. **Every `cartable` item is `prep 0`** — that is the rule, not a
-coincidence of the table — which is exactly what lets the beverage cart run with
-no kitchen at all. Espresso is the one drink with a prep cost, and it is
-therefore not cartable: a machine lives somewhere.
+penalty. Ten of the twelve cartable items are `prep 0`, which is what keeps an
+all-drinks beverage cart possible with no kitchen at all — but a cart carrying
+hot dogs and breakfast sandwiches loads the line like anything else. See §3.1.
 
 The decision this creates: a wide menu pleases every crowd a little and carries
 a wage bill; a narrow one aimed at the crowd you actually have is cheap to run.
@@ -320,6 +365,12 @@ way to make a new amenity feel like part of the world.
   than matched, or the segment structure is decorative.
 - **everything** — the widest menu the slots allow, with no kitchen staff hired.
   Should lose money to the `serviceFactor` and prove breadth is a purchase.
+- **cart against halfway house** — build one, then the other, on the same course.
+  Neither may dominate. §4.2 flags that the Transfusion makes the cart strong,
+  and the cart is pace-neutral on top of that, so this is the likeliest place
+  for a dominant option to hide.
+- **hot cart against dry cart** — §4.3's flat spot. A cart carrying food must
+  earn its kitchen load, or the author's hot dogs are decoration.
 
 Any tuning gets recorded here, in this file, with the numbers that prompted it.
 
@@ -334,9 +385,13 @@ Any tuning gets recorded here, in this file, with the numbers that prompted it.
   Currently 0 of 20,349 five-slot menus do, and 0 of the 2- and 3-slot ones. This test is the reason §4's formula
   is what it is — it caught the first draft failing at 87%, and it is the single
   most important assertion in this slice.
-- **Every `cartable` item has `prep` 0**, by test — §3.1's rule, which the
-  beverage cart's whole viability rests on, and which the first draft of the
-  catalogue broke twice.
+- **Nothing that needs a plate is cartable**, by test: no item with `prep ≥ 3`
+  may be `cartable`. That is the line between grab-and-go and table service, and
+  it is what stops the cart quietly becoming a restaurant on wheels.
+- **A kitchen-free cart stays possible**, by test: at least as many `cartable`
+  items are `prep 0` as the cart has slots. Otherwise the all-drinks board — the
+  choice that makes the cart interesting — silently stops existing the next time
+  the catalogue is edited.
 - **Every item has a sprite**, by test — a catalogue entry with no art is a blank
   square on the board, and that is exactly the failure that shipped once already
   when `SPRITES.tee` was defined but never registered.
