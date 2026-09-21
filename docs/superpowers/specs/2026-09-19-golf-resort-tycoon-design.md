@@ -700,6 +700,24 @@ Shipped in playable slices rather than one long disappearance.
 4. **Weather.**
 5. **Amenity tiers and condition.**
 
+### 15a.9 Food and drink, deferred
+
+Not designed yet, but worth recording because it fits the segment structure
+rather than sitting beside it.
+
+**Menus at the halfway house and restaurant.** Choosing what to serve becomes
+another axis where the crowds disagree, exactly like difficulty and price:
+locals want a cheap beer and a hot dog, destination guests want a proper lunch,
+and a menu pitched at one reads as wrong to the other. The machinery already
+exists - each amenity has a per-guest spend and a satisfaction contribution, so
+a menu is those two numbers made choosable.
+
+**A beverage cart** as an amenity, with its own menu. Mechanically distinct from
+the halfway house in a way that matters: she reaches golfers *without them
+stopping*, so she earns revenue without costing pace, where the halfway house
+trades a fixed time cost for its refuel. That makes them a real choice against
+each other rather than two sizes of the same thing.
+
 ## 16. Deferred decisions
 
 Recorded so they are not silently forgotten, and deliberately excluded from Act
