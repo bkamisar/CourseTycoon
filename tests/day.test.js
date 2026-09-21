@@ -665,3 +665,38 @@ test('a snack shack costs the group no time on the clock', () => {
     'both restore the same - only the clock differs'
   );
 });
+
+test('an unstaffed pro shop sells far less than a staffed one', () => {
+  // shopStaff existed as a $170/day wage that nothing in the game read.
+  // Hiring one cost money and moved no number anywhere, which is worse
+  // than a weak amenity — it is a purchase that silently does not exist.
+  function merch(shopHires) {
+    let state = newGame(51);
+    state.money = 120000;
+    state.prestige = 65;
+    state.resort.amenities.push({ id: 'p', type: 'proShop', menu: [] });
+    for (let i = 0; i < shopHires; i++) state.resort.staff.push({ role: 'shopStaff' });
+    let last = null;
+    for (let d = 0; d < 10; d++) { const r = runDay(state, 5100 + d); state = r.state; last = r.report; }
+    return last.revenue.merchandise;
+  }
+  const bare = merch(0);
+  const staffed = merch(1);
+  assert.ok(staffed > bare, `somebody behind the counter must sell more: ${staffed} vs ${bare}`);
+});
+
+test('the day reports the counter, so the UI can warn about it', () => {
+  const state = newGame(52);
+  state.resort.amenities.push({ id: 'p', type: 'proShop', menu: [] });
+  const { report } = runDay(state, 12);
+  assert.equal(report.shop.open, true);
+  assert.ok(Number.isFinite(report.shop.capacity));
+  assert.ok(report.shop.serviceFactor > 0 && report.shop.serviceFactor <= 1);
+});
+
+test('a resort with no pro shop is never penalised for having no shop staff', () => {
+  const state = newGame(53);
+  const { report } = runDay(state, 13);
+  assert.equal(report.shop.open, false);
+  assert.equal(report.shop.serviceFactor, 1, 'no counter, no queue');
+});

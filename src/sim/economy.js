@@ -183,7 +183,9 @@ export function demandGroups({
   return { total, bySegment, share };
 }
 
-export function dailyRevenue({ groupsPlayed, greenFee, amenities, averageSatisfaction }) {
+export function dailyRevenue({
+  groupsPlayed, greenFee, amenities, averageSatisfaction, shopService = 1,
+}) {
   const golfers = groupsPlayed * 4;
   const greenFees = golfers * greenFee;
 
@@ -199,7 +201,10 @@ export function dailyRevenue({ groupsPlayed, greenFee, amenities, averageSatisfa
   for (const a of amenities) {
     const spec = AMENITIES[a.type];
     if (a.type !== 'proShop' || !spec?.spendPerGuest) continue;
-    merchandise += golfers * spec.spendPerGuest * spendMultiplier;
+    // Merchandise is sold by a person. With nobody behind the counter the
+    // queue turns money away — see shop.js, and the kitchen's identical
+    // treatment of food.
+    merchandise += golfers * spec.spendPerGuest * spendMultiplier * shopService;
   }
 
   return {

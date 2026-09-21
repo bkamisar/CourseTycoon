@@ -46,6 +46,7 @@ export function guestSatisfaction({
   segment = 'locals',
   courseDifficulty,
   kitchenServiceFactor = 1,
+  shopServiceFactor = 1,
 }) {
   const seg = SEGMENTS[segment] ?? SEGMENTS.locals;
 
@@ -90,6 +91,7 @@ export function buildComplaints({
   averageSatisfaction,
   nearActGate,
   kitchenServiceFactor = 1,
+  shopServiceFactor = 1,
 }) {
   const complaints = [];
   const groups = Math.max(1, groupsPlayed);
@@ -125,6 +127,9 @@ export function buildComplaints({
   }
   if (!amenityTypes.includes('snackShack') && !amenityTypes.includes('halfwayHouse')) {
     complaints.push('Nowhere to get a drink at the turn.');
+  }
+  if (shopServiceFactor < 0.85) {
+    complaints.push('Queue at the pro shop was six deep. Left without buying anything.');
   }
   if (kitchenServiceFactor < 0.9) {
     complaints.push('Waited twenty minutes for food that never really arrived.');

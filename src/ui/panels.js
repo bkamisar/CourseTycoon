@@ -15,6 +15,8 @@ import { PALETTE } from '../render/palette.js';
 import { ITEMS, MENU_SLOTS } from '../sim/menu.js';
 import { amenity } from '../sim/state.js';
 import { openMenuBoard } from './menuBoard.js';
+import { kitchenCapacity, kitchenLoad } from '../sim/kitchen.js';
+import { shopCapacity, PER_SHOP_STAFF } from '../sim/shop.js';
 import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
 import { holeStats } from '../sim/hole.js';
@@ -35,6 +37,24 @@ const AMENITY_BLURB = {
   drivingRange: 'Lets guests warm up before teeing off.',
   practiceGreen: 'Practice putting before the round starts.',
   cartBarn: 'Stores carts and offers them to guests.',
+};
+
+/**
+ * Amenities that are a building plus a person, and what happens without
+ * the person.
+ *
+ * The game says a consistent thing about staff now: a building with
+ * nobody in it only half works. It said nothing at all until shopStaff
+ * turned out to be a $170/day wage that no part of the simulation read,
+ * and the restaurant turned out to lose $555 a day when built by a player
+ * who had not thought about cooks. Neither was signposted anywhere.
+ */
+const NEEDS_STAFF = {
+  proShop: { role: 'shopStaff', label: 'a shop hire', what: 'sales' },
+  snackShack: { role: 'kitchenStaff', label: 'a cook', what: 'food service' },
+  halfwayHouse: { role: 'kitchenStaff', label: 'a cook', what: 'food service' },
+  restaurant: { role: 'kitchenStaff', label: 'a cook', what: 'food service' },
+  beverageCart: { role: 'kitchenStaff', label: 'a cook', what: 'food service' },
   beverageCart: 'Dee works the course with a cart. She reaches golfers without stopping them, so she earns without costing a minute of pace — and she needs no kitchen if you keep her to drinks. She sells; she does not feed. That is what the snack shack and halfway house are for.',
 };
 
@@ -77,6 +97,12 @@ function injectStyles() {
     .panel-shortfall {
       color: ${PALETTE.ACCENT};
       font-size: 11px;
+    }
+    .panel-row-warn {
+      color: ${PALETTE.SAND};
+      font-size: 11px;
+      line-height: 1.5;
+      margin-top: 4px;
     }
     .panel-row-actions {
       display: flex;
@@ -200,6 +226,28 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
           const blurb = document.createElement('div');
           blurb.className = 'panel-row-blurb';
           blurb.textContent = AMENITY_BLURB[type] ?? '';
+
+          // Loud, and before the money is spent. Read live from the same
+          // capacity functions the day itself runs on.
+          const needs = NEEDS_STAFF[type];
+          const staffWarning = document.createElement('div');
+          staffWarning.className = 'panel-row-warn';
+          if (needs) {
+            const staff = current.resort.staff;
+            if (needs.role === 'shopStaff') {
+              const golfers = (current.history.at(-1)?.groupsPlayed ?? 0) * 4;
+              const capacity = shopCapacity(staff);
+              staffWarning.textContent = golfers > capacity
+                ? `Needs ${needs.label}. ${golfers} golfers came yesterday and the counter serves ${capacity} — the rest walk out without buying.`
+                : `Needs ${needs.label} once you are busy: the counter serves ${capacity} golfers a day, +${PER_SHOP_STAFF} per hire.`;
+            } else {
+              const load = kitchenLoad(current.resort.amenities);
+              const capacity = kitchenCapacity(staff);
+              staffWarning.textContent = load > capacity
+                ? `Needs ${needs.label}. Your boards already ask for ${load} prep against a kitchen of ${capacity} — ${needs.what} is running slow.`
+                : `Needs ${needs.label} if you put hot food on its board. Kitchen is ${load} of ${capacity}.`;
+            }
+          }
           // What this amenity actually does, stated plainly: it is not
           // just flavour, it is the one number that both raises what a
           // round can be priced at AND draws a bigger crowd — a chain the
@@ -209,7 +257,9 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
           value.className = 'panel-row-blurb';
           value.textContent =
             `Adds $${Math.round(amenityPerceivedValue(type))} to what a round is worth — worth more draws more golfers.`;
-          info.append(title, detail, blurb, value);
+          info.append(title, detail, blurb);
+          if (NEEDS_STAFF[type]) info.appendChild(staffWarning);
+          info.appendChild(value);
 
           const action = document.createElement('button');
           action.type = 'button';

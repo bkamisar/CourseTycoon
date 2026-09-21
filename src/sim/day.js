@@ -14,6 +14,7 @@ import { narrationContext, pickNarration, rememberNarration } from './narration.
 import { SEGMENT_KEYS } from './segments.js';
 import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
 import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEvent } from './events.js';
+import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -285,6 +286,15 @@ export function runDay(state, seed) {
   };
   kitchen.serviceFactor = serviceFactor(kitchen.load, kitchen.capacity);
 
+  // The counter, measured the same way the kitchen is: how many people
+  // turned up against how many can be served.
+  const shop = {
+    open: hasShopCounter(next.resort.amenities),
+    golfers: groupCount * 4,
+    capacity: shopCapacity(next.resort.staff),
+  };
+  shop.serviceFactor = shop.open ? shopServiceFactor(shop.golfers, shop.capacity) : 1;
+
   const satisfactions = [];
   const crowdCount = Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0]));
   const crowdSatisfactionSum = Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0]));
@@ -306,6 +316,7 @@ export function runDay(state, seed) {
         segment: guest.segment,
         courseDifficulty,
         kitchenServiceFactor: kitchen.serviceFactor,
+        shopServiceFactor: shop.serviceFactor,
       });
       satisfactions.push(guestSat);
       crowdCount[guest.segment] += 1;
@@ -334,6 +345,7 @@ export function runDay(state, seed) {
     ? dailyRevenue({
         groupsPlayed: groupCount, greenFee,
         amenities: next.resort.amenities, averageSatisfaction,
+        shopService: shop.serviceFactor,
       })
     : { greenFees: 0, merchandise: 0, food: 0, total: 0 };
   const costs = dailyCosts({
@@ -383,6 +395,7 @@ export function runDay(state, seed) {
     averageSatisfaction,
     nearActGate: gate.nearGate,
     kitchenServiceFactor: kitchen.serviceFactor,
+    shopServiceFactor: shop.serviceFactor,
   });
 
   const report = {
@@ -401,6 +414,7 @@ export function runDay(state, seed) {
     turfQuality: next.turfQuality,
     crowd,
     kitchen,
+    shop,
     complaints,
     gate,
   };

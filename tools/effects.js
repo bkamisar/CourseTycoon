@@ -88,6 +88,33 @@ function measure(mutate) {
   };
 }
 
+/**
+ * What each hire needs to exist before it can possibly be worth anything.
+ *
+ * This tool was written to catch exactly one error — judging a purchase on
+ * a resort that gives it nothing to do — and then made it twice itself: a
+ * cook measured against a resort with no kitchen, and a shop hire against
+ * one with no counter. Both came back "costs its wage and returns
+ * nothing", which is true and useless, the same shape as declaring
+ * marshals worthless on a three-hole course.
+ *
+ * So the context is declared rather than special-cased. Adding a role
+ * means adding its prerequisite here, and the tool measures it somewhere
+ * it can actually work.
+ */
+const STAFF_CONTEXT = {
+  kitchenStaff: ['snackShack', 'halfwayHouse', 'restaurant'],
+  shopStaff: ['proShop'],
+  groundskeeper: [],
+  marshal: [],
+};
+
+function withContext(role) {
+  const needs = STAFF_CONTEXT[role] ?? [];
+  if (needs.length === 0) return null;
+  return (s) => { for (const t of needs) s.resort.amenities.push(amenity(t)); };
+}
+
 const base = measure(null);
 
 function delta(after) {
@@ -130,11 +157,9 @@ for (const role of Object.keys(WAGES)) {
   // Measuring one against a resort with no food amenities says only that
   // an idle cook is idle, which is the same false negative that made the
   // marshal look worthless on a three-hole course.
-  const withFood = role === 'kitchenStaff'
-    ? (s) => { for (const t of ['snackShack', 'halfwayHouse', 'restaurant']) s.resort.amenities.push(amenity(t)); }
-    : null;
-  const before = withFood ? measure(withFood) : base;
-  const after = measure((s) => { withFood?.(s); s.resort.staff.push({ role }); });
+  const context = withContext(role);
+  const before = context ? measure(context) : base;
+  const after = measure((s) => { context?.(s); s.resort.staff.push({ role }); });
   const d = {
     money: after.perDay - before.perDay,
     happy: after.happy - before.happy,
@@ -164,11 +189,9 @@ for (const type of Object.keys(AMENITIES)) {
   }
 }
 for (const role of Object.keys(WAGES)) {
-  const withFood = role === 'kitchenStaff'
-    ? (s) => { for (const t of ['snackShack', 'halfwayHouse', 'restaurant']) s.resort.amenities.push(amenity(t)); }
-    : null;
-  const before = withFood ? measure(withFood) : base;
-  const after = measure((s) => { withFood?.(s); s.resort.staff.push({ role }); });
+  const context = withContext(role);
+  const before = context ? measure(context) : base;
+  const after = measure((s) => { context?.(s); s.resort.staff.push({ role }); });
   if (after.perDay - before.perDay < -WAGES[role] * 0.9
     && Math.abs(after.happy - before.happy) < 1
     && Math.abs(after.round - before.round) < 1) {
