@@ -31,7 +31,12 @@ function entries() {
         'Your resort’s reputation. It decides what you can charge and who ' +
         'shows up to play. It moves slowly on purpose, rising from a good ' +
         'course and happy guests and falling just as gradually — one great ' +
-        'day will not rescue a bad course, and one bad day will not sink a good one.',
+        'day will not rescue a bad course, and one bad day will not sink a ' +
+        'good one. It also drifts back: prestige settles toward the level ' +
+        'your guest satisfaction can hold, so a bump you buy — from a ' +
+        'tournament, a magazine feature, a touring pro’s name — is half gone ' +
+        'in about a week. Raise your green fee while you have it, or you ' +
+        'paid for nothing.',
     },
     {
       term: 'Pace',
