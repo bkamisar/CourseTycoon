@@ -1,4 +1,5 @@
 import { clamp } from './hole.js';
+import { goodwillFactor } from './goodwill.js';
 
 /**
  * Three crowds who want incompatible things.
@@ -57,10 +58,17 @@ export function difficultyFit(difficulty, { idealDifficulty, tolerance }) {
  *
  * `courseDifficulty`, `scenery` and `turfQuality` are 0–100. `valueRatio`
  * is green fee over perceived value — 1 means priced exactly at worth.
+ *
+ * `goodwill` is optional — how this crowd currently feels about the resort,
+ * from a decision event's consequence (see `goodwill.js`). Omitting it
+ * leaves every existing caller's behaviour exactly as before; passing it
+ * multiplies the result by `goodwillFactor`, deliberately kept narrow
+ * enough that it cannot manufacture a universal course on its own (see the
+ * grid-sweep test in `tests/segments.test.js` re-run with goodwill maxed).
  */
 export function segmentAppeal(key, {
   courseDifficulty, scenery, turfQuality, amenityScore, valueRatio, hasRooms,
-}) {
+}, goodwill) {
   const seg = SEGMENTS[key];
   const fit = difficultyFit(courseDifficulty, seg);
 
@@ -78,13 +86,15 @@ export function segmentAppeal(key, {
   // day-trippers and far rarer.
   const lodging = key === 'destination' && !hasRooms ? 0.25 : 1;
 
-  return clamp(fit * priceFit * (0.45 + 0.55 * quality) * lodging, 0, 1);
+  const mood = goodwill ? goodwillFactor(goodwill, key) : 1;
+
+  return clamp(fit * priceFit * (0.45 + 0.55 * quality) * lodging * mood, 0, 1);
 }
 
 /** Appeal for every segment, plus each one's share of the crowd. */
-export function crowdMix(conditions) {
+export function crowdMix(conditions, goodwill) {
   const appeal = {};
-  for (const key of SEGMENT_KEYS) appeal[key] = segmentAppeal(key, conditions);
+  for (const key of SEGMENT_KEYS) appeal[key] = segmentAppeal(key, conditions, goodwill);
   const total = SEGMENT_KEYS.reduce((s, k) => s + appeal[k], 0);
   const share = {};
   for (const key of SEGMENT_KEYS) share[key] = total > 0 ? appeal[key] / total : 0;
