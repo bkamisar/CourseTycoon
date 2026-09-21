@@ -32,7 +32,11 @@ export function newGame(seed) {
       courses: [{ id: 1, name: 'Pinehollow', zone: 'near', holes }],
       amenities: [amenity('clubhouse')],
       staff: [{ role: 'groundskeeper' }],
-      rooms: { count: 0, quality: 0 },                 // Act II
+      // Act II. Two kinds, because a hotel carries the same crowd
+      // tension everything else in this game does: serious golfers want a
+      // bed and a dawn tee time, destination guests want somewhere worth
+      // travelling to. See src/sim/rooms.js.
+      rooms: { standard: 0, suite: 0 },
       shuttles: [],                                    // Act III
       pricing: { greenFee: 22, teeInterval: 16, foodMultiplier: 1, roomRate: 0 },
     },
@@ -126,6 +130,13 @@ export function deserialize(text) {
   });
   // Saves made before weather existed get one, derived from something
   // stable about the resort so the same save always has the same climate.
+  // The hotel was once `{ count, quality }`. Nobody can have built one -
+  // Act II did not exist - but a save could carry the old shape, and a
+  // missing hotel must read as no rooms rather than as undefined.
+  const rooms = parsed.resort?.rooms;
+  if (parsed.resort && (!rooms || typeof rooms.standard !== 'number')) {
+    parsed.resort.rooms = { standard: rooms?.count ?? 0, suite: 0 };
+  }
   if (typeof parsed.weatherSeed !== 'number') {
     parsed.weatherSeed = (parsed.seed ?? parsed.day ?? 1) * 31 + 7;
   }

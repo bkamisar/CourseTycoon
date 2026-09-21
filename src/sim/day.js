@@ -16,6 +16,7 @@ import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
 import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEvent } from './events.js';
 import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
 import { weatherOn, forecast, effectsOf } from './weather.js';
+import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue } from './rooms.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -175,7 +176,7 @@ export function runDay(state, seed) {
     ? holes.reduce((s, h) => s + holeStats(h).scenery, 0) / holes.length
     : 0;
   // Destination guests are mostly an Act II crowd; Act I has no rooms yet.
-  const hasRooms = (next.resort.rooms?.count ?? 0) > 0;
+  const hasRooms = totalRooms(next.resort.rooms) > 0;
 
   // Word of mouth from the last few days. No history yet (day one) is
   // neutral, so the resort isn't punished or rewarded before it has played.

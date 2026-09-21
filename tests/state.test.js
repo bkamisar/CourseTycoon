@@ -30,7 +30,11 @@ test('the wide data model fields are present and narrow', () => {
   assert.equal(s.resort.zones[0].id, 'near');
   assert.equal(s.resort.courses.length, 1);
   assert.equal(s.properties.length, 1);
-  assert.equal(s.resort.rooms.count, 0);
+  // The hotel was `{ count, quality }` while it was a placeholder. Act II
+  // gave it two kinds, because a hotel carries the same crowd tension
+  // everything else in this game does.
+  assert.equal(s.resort.rooms.standard, 0);
+  assert.equal(s.resort.rooms.suite, 0);
   assert.deepEqual(s.resort.shuttles, []);
   assert.equal(s.resort.pricing.roomRate, 0);
 });
