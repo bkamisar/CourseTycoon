@@ -1,6 +1,8 @@
 import { newGame } from '../src/sim/state.js';
 import { runDay, applyEventChoice } from '../src/sim/day.js';
 import { EVENTS, STANCES } from '../src/sim/events.js';
+import { play } from './operator.js';
+import { openingResort } from './scenarios.js';
 
 const SEEDS = 60;
 const DAYS = 60;
@@ -167,4 +169,61 @@ for (const r of policyRows) {
 const spread = Math.max(...policyRows.map((r) => r.money)) - Math.min(...policyRows.map((r) => r.money));
 console.log(`
   Spread between best and worst policy: $${Math.round(spread).toLocaleString()}`);
+console.log('');
+
+// ---------------------------------------------------------------------
+// The other end: somebody who actually plays.
+//
+// Everything above measures a passive operator who never builds, prices
+// or hires. That was the right floor when the green fee was the only
+// thing to get wrong, and it had quietly stopped measuring the game — it
+// never builds a food amenity, so menus are invisible to it; never hires,
+// so the whole staffing layer is invisible; never buys, so every price is
+// invisible. It reported the same six numbers through four slices of work
+// that should have moved them.
+//
+// This asks the question the floor cannot: can a reasonable player reach
+// Act II, how long does it take, and does more than one strategy work?
+// The last part matters most. A game with a single winning line is a
+// puzzle with an answer rather than a game with strategies, and this
+// harness reported exactly that until it was pointed out that the
+// operator being measured could not hire a marshal.
+// ---------------------------------------------------------------------
+
+const STRATEGIES = [
+  { label: 'cheap and busy',   greenFee: 65,  teeInterval: 14 },
+  { label: 'balanced',         greenFee: 80,  teeInterval: 14 },
+  { label: 'quiet and pricey', greenFee: 80,  teeInterval: 18 },
+  { label: 'premium',          greenFee: 95,  teeInterval: 18 },
+  { label: 'bargain basement', greenFee: 50,  teeInterval: 12 },
+  { label: 'luxury',           greenFee: 110, teeInterval: 20 },
+];
+
+console.log(`A competent operator — ${SEEDS >= 8 ? 8 : SEEDS} seeds, 150 days, from day one
+`);
+console.log('  strategy             fee  interval   reaches Act II   mean day   bankrupt');
+let viable = 0;
+for (const strat of STRATEGIES) {
+  const runs = [];
+  for (let seed = 1; seed <= 8; seed++) {
+    runs.push(play(openingResort(seed), { ...strat, seed }));
+  }
+  const reached = runs.filter((r) => r.gateDay);
+  const broke = runs.filter((r) => r.bankrupt).length;
+  const meanDay = reached.length
+    ? (reached.reduce((s, r) => s + r.gateDay, 0) / reached.length).toFixed(0) : '-';
+  if (reached.length === 8 && broke === 0) viable += 1;
+  console.log(
+    `  ${strat.label.padEnd(20)}$${String(strat.greenFee).padStart(3)}`
+    + `${String(strat.teeInterval).padStart(8)}min${String(reached.length).padStart(12)}/8`
+    + `${String(meanDay).padStart(11)}${String(broke).padStart(11)}/8`
+  );
+}
+console.log(`
+  ${viable} of ${STRATEGIES.length} strategies reach Act II cleanly.`);
+if (viable <= 1) {
+  console.log('  ONE OR FEWER IS A PUZZLE, NOT A GAME. Before concluding that, check the');
+  console.log('  operator can actually play the strategies being tested — it once could');
+  console.log('  not hire a marshal, and reported a game with one winning line.');
+}
 console.log('');

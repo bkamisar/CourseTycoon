@@ -56,9 +56,30 @@ export function guestSatisfaction({
 
   const waitPenalty = waitMinutes * 0.55 * seg.waitWeight;
   const priceDelta = clamp((perceivedValue - greenFee) * 0.22 * seg.priceSensitivity, -20, 12);
-  const sceneryBonus = (scenery - 50) * 0.16 * seg.sceneryWeight;
-  const turfBonus = (turfQuality - 60) * 0.22 * seg.turfWeight;
-  const amenityBonusWeighted = amenityBonus * seg.amenityWeight;
+  /**
+   * What the player BUILT, as opposed to what they dialled.
+   *
+   * These three coefficients were 0.16, 0.22 and 1.0, and at those values
+   * the entire built resort was worth about ten points of satisfaction
+   * between them — scenery 1.2 across its whole range, turf 6, and all
+   * nine amenities 2.7. Meanwhile waiting, price and difficulty fit were
+   * worth thirty each.
+   *
+   * That is why Act I had exactly one winning line. Satisfaction is the
+   * gate, and the only lever with enough reach to move it was the tee
+   * interval, so every other strategy lost regardless of how well the
+   * resort was built. A hundred and eleven thousand dollars of buildings
+   * moving a guest's mood by under three points is not a balance
+   * preference, it is a mechanic that does not exist.
+   *
+   * The segment weights are untouched — locals still care less about
+   * scenery than destination guests do. What changed is the scale those
+   * weights multiply, so that caring less is a smaller share of something
+   * real rather than a smaller share of nothing.
+   */
+  const sceneryBonus = (scenery - 50) * 0.50 * seg.sceneryWeight;
+  const turfBonus = (turfQuality - 60) * 0.45 * seg.turfWeight;
+  const amenityBonusWeighted = amenityBonus * 2.4 * seg.amenityWeight;
 
   // 1 at the segment's ideal difficulty, falling away either side — the
   // same shape that decides whether this segment even turns up.

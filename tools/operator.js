@@ -21,6 +21,11 @@
  * The policy, in order of priority each morning:
  *
  *   1. Keep the turf alive. One groundskeeper per three open holes.
+ *   1b. Keep the course moving. Marshals while rounds run long — this was
+ *      missing from the first version of this operator, and its absence
+ *      produced a confident, wrong report that Act I had exactly one
+ *      winning line. It has two. The operator simply could not play the
+ *      second, because the second is built on marshals.
  *   2. Staff what is already built, before building more. An amenity with
  *      nobody in it only half works, and an unstaffed kitchen is the
  *      single most expensive mistake available.
@@ -44,6 +49,7 @@ import { EVENTS } from '../src/sim/events.js';
 import { menuPrep } from '../src/sim/menu.js';
 import { kitchenCapacity, kitchenLoad } from '../src/sim/kitchen.js';
 import { shopCapacity } from '../src/sim/shop.js';
+import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
 
 /**
  * Cash kept in hand at all times. Without a buffer the operator spends
@@ -51,6 +57,10 @@ import { shopCapacity } from '../src/sim/shop.js';
  * measures impatience rather than the economy.
  */
 const BUFFER = 12000;
+
+/** Marshals have diminishing returns and this operator is not trying to
+ * find the optimum, only to play sensibly. */
+const MAX_MARSHALS = 3;
 
 /**
  * Amenities in the order a sensible player would buy them: the near
@@ -61,7 +71,31 @@ const BUFFER = 12000;
  */
 const SHOPPING_LIST = [
   'restrooms', 'proShop', 'snackShack', 'beverageCart',
-  'practiceGreen', 'drivingRange', 'cartBarn', 'halfwayHouse', 'restaurant',
+  'cartBarn', 'practiceGreen', 'drivingRange', 'halfwayHouse', 'restaurant',
+];
+
+/**
+ * What this operator deliberately does not do.
+ *
+ * Stated rather than implied, because the danger is never the gaps — it
+ * is forgetting they are there and reading a limitation of the model as a
+ * fact about the game. That has now happened seven times on this project,
+ * most recently here: an operator that could not hire a marshal reported
+ * that Act I had one winning line, when it has four.
+ *
+ * Anything on this list means: do not conclude anything about it from
+ * this harness. Go and measure it deliberately instead.
+ */
+export const LEVERS_NOT_PULLED = [
+  'Tuning a menu to the crowd the course actually draws. Default boards '
+  + 'only, so nothing here says anything about whether menu choice matters.',
+  'Rebuilding holes for variety or difficulty. The course is built once '
+  + 'from templates in order, so course rating and difficulty fit are '
+  + 'whatever that happens to produce.',
+  'Changing price or tee interval as the resort grows. Both are fixed for '
+  + 'a whole run, where a real player would adjust as prestige rises.',
+  'Removing an amenity that turns out not to help. It only ever buys.',
+  'Choosing events by anything but a fixed stance preference.',
 ];
 
 const countRole = (state, role) => state.resort.staff.filter((m) => m.role === role).length;
@@ -79,6 +113,20 @@ function spendTheMorning(state, { greenFee, teeInterval }) {
   if (countRole(state, 'groundskeeper') < Math.ceil(holes / 3)
     && state.money > BUFFER) {
     state.resort.staff.push({ role: 'groundskeeper' });
+    return;
+  }
+
+  // 1b. Keep it moving. Waiting is what hurts guests most, and marshals
+  //     are the cheapest thing that touches it — worthless on a quiet
+  //     course and worth thousands a day on a busy one. Hired against how
+  //     slowly the course is actually running, not a fixed ratio, so this
+  //     is silent until there is congestion to relieve.
+  const lastRound = state.history.at(-1)?.averageRoundMinutes ?? 0;
+  const target = holes * TARGET_MINUTES_PER_HOLE;
+  if (lastRound > target * 1.25
+    && countRole(state, 'marshal') < MAX_MARSHALS
+    && state.money > BUFFER) {
+    state.resort.staff.push({ role: 'marshal' });
     return;
   }
 
