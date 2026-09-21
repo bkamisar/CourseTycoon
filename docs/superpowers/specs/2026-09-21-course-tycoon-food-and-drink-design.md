@@ -458,6 +458,53 @@ who stocks nothing but beer.
 
 Any tuning gets recorded here, in this file, with the numbers that prompted it.
 
+### 8.1 What the cart pass actually found
+
+**The halfway house was worse than building nothing.** Measured over twenty
+days with a cook hired, it returned $84,195 against $81,768 for an empty
+resort while the cart returned $87,078. Two causes, both fixed:
+
+*A stop costs far more than its own length.* `REFUEL_MINUTES` was 3.5,
+chosen as "how long a stop takes". But the group behind cannot start the
+hole until this one clears it, so `scheduleRounds` turned 3.5 minutes into
+**fourteen** — a round went from 125 to 139 minutes at a nine-minute tee
+interval. Now 2.2.
+
+*A seated stop sold no more than a passing cart.* Both were on
+`MENU_RATE` 1.3. A group that has sat down buys a burger and a beer where
+a cart sells one drink, so the halfway house is now 1.7 and the cart 0.9.
+This keeps §4.1's calibration: a matched halfway house board lands at
+about $11 a guest, which is what the flat `spendPerGuest` it replaced
+earned.
+
+**After the fix, over twenty days, cooks hired only as each board needs:**
+
+| tee interval | nothing | halfway house | cart with hot food | gap |
+|---|---|---|---|---|
+| 9 min (congested) | $81,768 | $88,268 | $87,078 | 1.4% |
+| 11 min | $83,176 | $89,662 | $88,238 | 1.6% |
+| 14 min (clear) | $87,752 | $96,255 | $94,594 | 1.8% |
+
+Both clearly beat building nothing, neither runs away, and the gap
+narrows as the course congests — which is the cart's identity doing its
+job. Both facts are now pinned by tests.
+
+**Where this lands differently from §7's prediction.** The spec expected
+the cart to *win* on a congested course and lose on a clear one. She does
+not win; she closes the gap. The real distinction turned out to be
+staffing: a drinks-only cart is `prep 0`, so she runs on $90 a day and
+**no cooks at all**, where a halfway house worth building needs one at
+$180. She is the amenity you can afford before you can afford a kitchen.
+That is a better distinction than the one that was designed, and it is
+recorded rather than tuned away.
+
+**A caution for anyone re-running this.** The first three attempts at this
+comparison were all wrong, in ways that each looked like a design failure:
+comparing revenue without wages, comparing an overloaded kitchen against a
+staffed one, and charging a drinks-only cart for a cook it does not need.
+Hire cooks per board, or the number you get back is about staffing and not
+about the amenity.
+
 ## 9. Tests that must hold
 
 - `src/sim/` stays pure — `tests/purity.test.js` already enforces it, and the

@@ -32,6 +32,7 @@ export const SPEAKERS = {
   press: 'Fairway Monthly',
   gazette: 'The Pinehollow Gazette',
   shop: 'Behind the counter',
+  dee: 'Dee, on the cart',
 };
 
 /**
@@ -100,6 +101,10 @@ export function narrationContext({ report, previousReport, state }) {
     holesOpen,
     nearGate: Boolean(report.gate?.nearGate),
     day: report.day ?? 1,
+    // Dee only speaks if she is actually out there. A voice from an
+    // amenity the player has not built is the world telling them about
+    // something that does not exist.
+    hasCart: state.resort.amenities.some((a) => a.type === 'beverageCart'),
   };
 }
 
@@ -113,6 +118,22 @@ const dom = (key) => (c) => c.total > 0 && c.dominant === key && c.dominantShare
  * than one that lets the player work the mechanic out.
  */
 export const LINES = [
+  // --- Dee, on the beverage cart ---------------------------------------
+  // She sees more of the course in a day than anyone, which is what makes
+  // her worth having as a voice: she is the only member of the cast who
+  // watches the whole field rather than one spot on it. Every line here is
+  // gated on the cart existing.
+  { id: 'dee-1', speaker: 'dee', text: "Ran the loop four times. Ice held. Just.", when: (c) => c.hasCart },
+  { id: 'dee-2', speaker: 'dee', text: "Nobody buys anything on the first two holes. Everybody buys on the sixth.", when: (c) => c.hasCart },
+  { id: 'dee-3', speaker: 'dee', text: "Group on the fourth waved me off. Group behind them bought six.", when: (c) => c.hasCart },
+  { id: 'dee-4', speaker: 'dee', text: "You can tell how the round's going by what they order.", when: (c) => c.hasCart },
+  { id: 'dee-5', speaker: 'dee', text: "Three fellas asked if I do food. Told them to take it up with you.", when: (c) => c.hasCart },
+  { id: 'dee-6', speaker: 'dee', text: "Backed up on the seventh, so I sat there and sold out.", when: (c) => c.hasCart && c.slow },
+  { id: 'dee-7', speaker: 'dee', text: "Quiet out there. I did more waving than selling.", when: (c) => c.hasCart && c.quiet },
+  { id: 'dee-8', speaker: 'dee', text: "Couldn't get round fast enough today. Everyone wanted something.", when: (c) => c.hasCart && c.busy },
+  { id: 'dee-9', speaker: 'dee', text: "They're playing it careful out there. Careful golf is thirsty golf.", when: (c) => c.hasCart && c.tooHard },
+  { id: 'dee-10', speaker: 'dee', text: "Half of them were done before they'd finished a drink.", when: (c) => c.hasCart && c.tooEasy },
+
   // --- A locals' course ------------------------------------------------
   { id: 'loc-1', speaker: 'gus', text: "Same faces as yesterday. That's not a complaint.", when: dom('locals') },
   { id: 'loc-2', speaker: 'regular', text: "Round before work, round after. You've made that easy.", when: dom('locals') },

@@ -148,3 +148,28 @@ test('a real shift in composition is detected', () => {
   assert.equal(context.rising, 'serious');
   assert.equal(context.falling, 'locals');
 });
+
+test('Dee only speaks when the cart exists', () => {
+  // A voice from an amenity the player has not built is the world telling
+  // them about something that is not there.
+  const withoutCart = contextFor({ hasCart: false });
+  const deeLines = LINES.filter((l) => l.speaker === 'dee');
+  assert.ok(deeLines.length >= 8, `only ${deeLines.length} lines for Dee — she will repeat`);
+  for (const line of deeLines) {
+    assert.equal(line.when(withoutCart), false, `${line.id} fired with no cart built`);
+  }
+  const withCart = contextFor({ hasCart: true });
+  assert.ok(deeLines.some((l) => l.when(withCart)), 'Dee should have something to say once she exists');
+});
+
+test('the cart shows up in the narration context', () => {
+  const state = newGame(2);
+  const { report } = runDay(state, 5);
+  const before = narrationContext({ report, previousReport: undefined, state });
+  assert.equal(before.hasCart, false);
+
+  const withCart = newGame(2);
+  withCart.resort.amenities.push({ id: 'c1', type: 'beverageCart', menu: ['draught'] });
+  const after = narrationContext({ report, previousReport: undefined, state: withCart });
+  assert.equal(after.hasCart, true);
+});

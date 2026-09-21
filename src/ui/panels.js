@@ -13,7 +13,7 @@
  */
 import { PALETTE } from '../render/palette.js';
 import { ITEMS, MENU_SLOTS } from '../sim/menu.js';
-import { defaultMenuFor } from '../sim/state.js';
+import { amenity } from '../sim/state.js';
 import { openMenuBoard } from './menuBoard.js';
 import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
@@ -35,6 +35,7 @@ const AMENITY_BLURB = {
   drivingRange: 'Lets guests warm up before teeing off.',
   practiceGreen: 'Practice putting before the round starts.',
   cartBarn: 'Stores carts and offers them to guests.',
+  beverageCart: 'Dee works the course with a cart. She reaches golfers without stopping them — so she earns without costing pace, where the halfway house trades three and a half minutes for a bigger break.',
 };
 
 let stylesInjected = false;
@@ -221,7 +222,8 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
               // What this board is currently worth per guest, quoted from
               // the simulation rather than recomputed here - the same
               // anti-drift rule the perceived-value line above follows.
-              const menu = current.resort.amenities.find((a) => a.type === type)?.menu ?? [];
+              const built = current.resort.amenities.find((a) => a.type === type);
+              const menu = built?.menu ?? [];
               const board = document.createElement('div');
               board.className = 'panel-row-blurb';
               board.textContent = menu.length
@@ -245,7 +247,7 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
               // A newly built food amenity opens with a sensible board.
               // Without this it would be built and serving nothing, which
               // reads as broken rather than as an invitation.
-              next.resort.amenities.push({ type, menu: defaultMenuFor(type) });
+              next.resort.amenities.push(amenity(type));
               current = next;
               onChange(current);
               rerender();
@@ -263,9 +265,11 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
             menuBtn.className = 'panel-btn';
             menuBtn.textContent = 'Menu';
             menuBtn.addEventListener('click', () => {
+              const built = current.resort.amenities.find((a) => a.type === type);
+              if (!built) return;
               openMenuBoard(sheetHost, {
                 state: current,
-                amenityType: type,
+                amenityId: built.id,
                 onChange: (next) => { current = next; onChange(current); },
               });
             });

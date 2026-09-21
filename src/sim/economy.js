@@ -22,6 +22,11 @@ export const AMENITIES = {
   drivingRange: { upkeep: 80,  build: 7000,  satisfaction: 4 },
   practiceGreen:{ upkeep: 45,  build: 3000,  satisfaction: 3 },
   cartBarn:     { upkeep: 110, build: 9000,  satisfaction: 3 },
+  // Reaches golfers without stopping them, which is what separates her
+  // from the halfway house — see round.js's cartStop and spec §7. Cheaper
+  // to build than the halfway house because she carries less, and cheaper
+  // to run because she needs no building.
+  beverageCart: { upkeep: 90,  build: 5000,  satisfaction: 3 },
 };
 
 /**
@@ -221,9 +226,19 @@ export function dailyCosts({ holeUpkeep, staff, amenities }) {
  */
 export const MENU_RATE = Object.freeze({
   snackShack: 1.3,
-  halfwayHouse: 1.3,
+  // Highest of the four, because a group that has stopped and sat down
+  // buys a burger AND a beer, where everywhere else sells one thing. This
+  // was 1.3 — the same as the cart — and at that figure the halfway house
+  // was strictly worse than building nothing at all: it costs three and a
+  // half minutes at the turn, the flow-shop rule in schedule.js turns that
+  // into about seven minutes of round time, and losing three groups a day
+  // buys nothing if the stop does not sell more than a passing cart.
+  halfwayHouse: 1.7,
   restaurant: 1.25,
-  beverageCart: 1.3,
+  // Lowest, because she catches people between shots and they buy one
+  // thing. Her advantage is that she costs no time at all, not that she
+  // sells more.
+  beverageCart: 0.9,
 });
 
 /**

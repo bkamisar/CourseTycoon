@@ -48,6 +48,32 @@ function turnHoleIndex(holeCount) {
  * mechanic. A board with a hot meal on it lands near the old 82; a board
  * of nothing but beer does not.
  */
+/**
+ * How often the cart gets round to a group: every third hole.
+ *
+ * Not every hole, because she is one cart covering a whole course and
+ * cannot be everywhere. Not once, because then she would just be a worse
+ * halfway house. Every third is what makes her a *coverage* amenity
+ * rather than a *stop* — the thing that scales if a later act lets you
+ * run two of her.
+ */
+export const CART_REACHES_EVERY = 3;
+
+/**
+ * What a visit from the cart restores a tiring golfer to, decided by
+ * what is on her board.
+ *
+ * Capped below `halfwayRestoreTo`'s ceiling on purpose. She costs no time
+ * at all (round.js's `cartStop`), so if she could also match a sit-down
+ * stop for energy she would simply be better than the halfway house and
+ * there would be no decision between them. An all-drinks cart restores to
+ * 60; put a hot dog on her and it is 74, against the halfway house's 88
+ * for the same food and three and a half minutes.
+ */
+export function cartRestoreTo(menu) {
+  return clamp(50 + menuBestEnergy(menu) * 2, 50, 76);
+}
+
 export function halfwayRestoreTo(menu) {
   return clamp(60 + menuBestEnergy(menu) * 2, 60, 88);
 }
@@ -90,6 +116,8 @@ export function runDay(state, seed) {
   const carts = amenityTypes.includes('cartBarn');
   const hasRange = amenityTypes.includes('drivingRange');
   const hasPracticeGreen = amenityTypes.includes('practiceGreen');
+  const beverageCart = next.resort.amenities.find((a) => a.type === 'beverageCart');
+  const cartEnergy = beverageCart ? cartRestoreTo(beverageCart.menu) : 0;
   const halfwayHouse = next.resort.amenities.find((a) => a.type === 'halfwayHouse');
   const hasHalfwayHouse = Boolean(halfwayHouse);
   const halfwayEnergy = halfwayRestoreTo(halfwayHouse?.menu);
@@ -166,6 +194,15 @@ export function runDay(state, seed) {
         puttAdjust: warming && hasPracticeGreen ? PRACTICE_GREEN_WARMUP : 0,
         refuel: hasHalfwayHouse && holeIndex === turnHoleIndex(holes.length),
         refuelTo: halfwayEnergy,
+        // Every third hole, and never on the same hole as the turn — a
+        // group that has just sat down for a burger does not need a drink
+        // handed to them thirty seconds later, and stacking the two would
+        // make the pair look better together than either is apart.
+        cartStop:
+          Boolean(beverageCart)
+          && (holeIndex + 1) % CART_REACHES_EVERY === 0
+          && holeIndex !== turnHoleIndex(holes.length),
+        cartStopTo: cartEnergy,
       });
       minutes.push(played.minutes);
       scores.push(played.scores);

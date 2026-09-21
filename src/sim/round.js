@@ -16,9 +16,22 @@ const TIRED_PENALTY = 0.12;  // extra minutes per stroke at zero energy
 
 const MAX_STROKES = 12;      // pick up and move on
 
-/** Energy a refuel stop restores golfers to, and what the stop costs. */
+/** Energy a refuel stop restores golfers to, and what the stop costs.
+ *
+ * The minutes are the whole reason the beverage cart is a different
+ * amenity rather than a smaller halfway house: stopping to eat costs
+ * time, and a cart catching you between shots does not. See `cartStop`
+ * below, and spec §7. */
 const REFUEL_TO = 82;
-const REFUEL_MINUTES = 3.5;
+/**
+ * 3.5 until the beverage cart arrived and made the comparison visible.
+ * The figure was chosen as "how long a stop takes", which ignores that
+ * the group behind cannot start the hole until this one clears it — so
+ * scheduleRounds turns 3.5 minutes of stopping into roughly 7 minutes of
+ * round time and three fewer groups on the sheet. At 3.5 the halfway
+ * house lost money against building nothing.
+ */
+const REFUEL_MINUTES = 2.2;
 
 /**
  * Plays one group through one hole. Mutates each guest's energy — they get
@@ -29,7 +42,11 @@ export function playHole(
   rng,
   hole,
   group,
-  { carts, handicapAdjust = 0, puttAdjust = 0, refuel = false, refuelTo = REFUEL_TO }
+  {
+    carts, handicapAdjust = 0, puttAdjust = 0,
+    refuel = false, refuelTo = REFUEL_TO,
+    cartStop = false, cartStopTo = 0,
+  }
 ) {
   const stats = holeStats(hole);
   const greenDifficulty = GREEN_DIFFICULTY[hole.greenPreset];
@@ -42,6 +59,17 @@ export function playHole(
       guest.energy = Math.max(guest.energy, refuelTo);
     }
     events.push({ type: 'refuel', holeId: hole.id });
+  }
+
+  // The cart reaches them without stopping the round. Same effect on
+  // energy, none at all on the clock — which is the entire difference
+  // between her and the halfway house, and the reason she is worth more
+  // on a course that is already backing up.
+  if (cartStop && cartStopTo > 0) {
+    for (const guest of group.guests) {
+      guest.energy = Math.max(guest.energy, cartStopTo);
+    }
+    events.push({ type: 'cartStop', holeId: hole.id });
   }
 
   let penaltyMinutes = refuel ? REFUEL_MINUTES : 0;

@@ -1,10 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
-import { runDay, marshalPaceFactor, applyEventChoice, halfwayRestoreTo } from '../src/sim/day.js';
+import { runDay, marshalPaceFactor, applyEventChoice, halfwayRestoreTo, cartRestoreTo } from '../src/sim/day.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import { emptyGoodwill, applyGoodwill } from '../src/sim/goodwill.js';
 import { EVENTS, STANCES } from '../src/sim/events.js';
+import { playHole } from '../src/sim/round.js';
+import { makeGroup } from '../src/sim/golfer.js';
+import { makeRng } from '../src/sim/rng.js';
+import { menuPrep } from '../src/sim/menu.js';
+import { BASE_CAPACITY, PER_COOK } from '../src/sim/kitchen.js';
+import { TEMPLATES } from '../src/sim/templates.js';
 
 test('runDay returns a next state, a report and a timeline', () => {
   const { state, report, timeline } = runDay(newGame(1), 1);
@@ -420,4 +426,144 @@ test('changing nothing but the menu changes the day', () => {
   const ra = runDay(a, 5).report;
   const rb = runDay(b, 5).report;
   assert.notEqual(ra.revenue.food, rb.revenue.food, 'the same course with a different board must earn differently');
+});
+
+// --- The beverage cart ------------------------------------------------
+
+test('the cart restores less than the halfway house, whatever is on the board', () => {
+  // She costs no time at all. If she could also match a sit-down stop for
+  // energy she would simply beat the halfway house and there would be no
+  // decision between them.
+  for (const menu of [[], ['draught'], ['hotDog'], ['burgerFries'], ['chiliBowl', 'hotDog']]) {
+    assert.ok(cartRestoreTo(menu) < halfwayRestoreTo(menu),
+      `${menu.join('+') || 'empty'}: cart ${cartRestoreTo(menu)} vs halfway ${halfwayRestoreTo(menu)}`);
+  }
+});
+
+test('hot food on the cart is worth carrying', () => {
+  // The whole reason §7.1 exists. Appeal barely moves when a hot dog joins
+  // a cart that already suits locals, so if energy did not move either,
+  // putting food on the cart would be pointless.
+  const dry = cartRestoreTo(['draught', 'transfusion', 'arnoldPalmer', 'candyBar']);
+  const hot = cartRestoreTo(['draught', 'transfusion', 'arnoldPalmer', 'hotDog']);
+  assert.ok(hot - dry >= 10, `a hot dog added only ${hot - dry} points of energy`);
+});
+
+test('a cart costs no time, and a halfway house does', () => {
+  const hole = { ...structuredClone(TEMPLATES.straightPar4), id: 1 };
+  const group = makeGroup(makeRng(1), { prestige: 40, greenFee: 50, share: { locals: 1, serious: 0, destination: 0 } }, 0);
+  const cartGroup = structuredClone(group);
+  const stopGroup = structuredClone(group);
+  for (const g of [...cartGroup.guests, ...stopGroup.guests]) g.energy = 40;
+
+  const viaCart = playHole(makeRng(2), hole, cartGroup, { carts: false, cartStop: true, cartStopTo: 74 });
+  const viaStop = playHole(makeRng(2), hole, stopGroup, { carts: false, refuel: true, refuelTo: 74 });
+
+  assert.ok(viaCart.minutes < viaStop.minutes,
+    `the cart should not cost the group time: ${viaCart.minutes} vs ${viaStop.minutes}`);
+  assert.equal(
+    Math.round(cartGroup.guests[0].energy),
+    Math.round(stopGroup.guests[0].energy),
+    'both should restore the same energy — only the clock differs'
+  );
+});
+
+test('the cart reaches a group repeatedly, the halfway house once', () => {
+  // Coverage against a stop. She is the amenity that scales with a course,
+  // which is what makes her worth running alongside the halfway house
+  // rather than instead of it.
+  const state = newGame(77);
+  state.resort.amenities.push(
+    { id: 'cart-t', type: 'beverageCart', menu: ['draught', 'hotDog'] },
+    { id: 'hh-t', type: 'halfwayHouse', menu: ['burgerFries', 'draught'] },
+  );
+  const { timeline } = runDay(state, 3);
+  const cartStops = timeline.filter((e) => e.type === 'cartStop').length;
+  const refuels = timeline.filter((e) => e.type === 'refuel').length;
+  assert.ok(refuels > 0, 'the halfway house should have served somebody');
+  assert.ok(cartStops >= refuels,
+    `cart stops ${cartStops} should at least match halfway stops ${refuels}`);
+});
+
+test('the cart and the halfway house never catch the same group on the same hole', () => {
+  // A group that has just sat down for a burger does not need a drink
+  // handed to them thirty seconds later, and stacking the two would make
+  // the pair look better together than either is apart.
+  const state = newGame(78);
+  state.resort.amenities.push(
+    { id: 'cart-t', type: 'beverageCart', menu: ['draught', 'hotDog'] },
+    { id: 'hh-t', type: 'halfwayHouse', menu: ['burgerFries', 'draught'] },
+  );
+  const { timeline } = runDay(state, 4);
+  const at = (type) => new Set(
+    timeline.filter((e) => e.type === type).map((e) => `${e.groupIndex}:${e.holeId}`)
+  );
+  const overlap = [...at('cartStop')].filter((k) => at('refuel').has(k));
+  assert.equal(overlap.length, 0, `both served the same group on the same hole: ${overlap.join(', ')}`);
+});
+
+test('an empty cart still restores something, but barely', () => {
+  assert.equal(cartRestoreTo([]), 50);
+  assert.ok(cartRestoreTo(['draught']) > cartRestoreTo([]));
+});
+
+test('neither the cart nor the halfway house dominates the other', () => {
+  // The spec flagged this as the likeliest place for a dominant option to
+  // hide, and it was right: at the first-pass numbers the cart beat the
+  // halfway house by $3,000-$5,000 over twenty days and the halfway house
+  // barely beat building nothing at all.
+  //
+  // Each is played to its own strength — cooks hired only as the board
+  // actually needs, which is the cart's real edge since a drinks-only
+  // board needs none. Comparing them with the same staffing measures a
+  // kitchen shortage instead of the amenity.
+  function season(build, teeInterval) {
+    let state = newGame(404);
+    state.money = 80000;
+    state.resort.pricing.teeInterval = teeInterval;
+    if (build) state.resort.amenities.push(build);
+    const load = state.resort.amenities.reduce((t, a) => t + menuPrep(a.menu), 0);
+    const cooks = Math.max(0, Math.ceil((load - BASE_CAPACITY) / PER_COOK));
+    for (let i = 0; i < cooks; i++) state.resort.staff.push({ role: 'kitchenStaff' });
+    for (let d = 0; d < 20; d++) state = runDay(state, 4000 + d).state;
+    return state.money;
+  }
+  const halfway = { id: 'h', type: 'halfwayHouse', menu: ['burgerFries', 'draught', 'hotDog', 'chiliBowl', 'candyBar'] };
+  const cart = { id: 'c', type: 'beverageCart', menu: ['draught', 'transfusion', 'hotDog', 'breakfastSandwich'] };
+
+  for (const tee of [9, 11, 14]) {
+    const none = season(null, tee);
+    const h = season(halfway, tee);
+    const c = season(cart, tee);
+    assert.ok(h > none, `${tee}min: the halfway house must beat building nothing (${h} vs ${none})`);
+    assert.ok(c > none, `${tee}min: the cart must beat building nothing (${c} vs ${none})`);
+    // Neither may run away with it. Twelve percent over twenty days is
+    // the line: a real edge is fine, a foregone conclusion is not.
+    const gap = Math.abs(h - c) / Math.min(h, c);
+    assert.ok(gap < 0.12,
+      `${tee}min: one dominates — halfway ${h}, cart ${c} (${(gap * 100).toFixed(1)}% apart)`);
+  }
+});
+
+test('the cart closes the gap as the course gets congested', () => {
+  // Her whole identity. If congestion does not move the comparison, she is
+  // just a smaller halfway house and the pair is one amenity wearing two
+  // hats.
+  function gap(teeInterval) {
+    const run = (build) => {
+      let state = newGame(404);
+      state.money = 80000;
+      state.resort.pricing.teeInterval = teeInterval;
+      state.resort.amenities.push(build);
+      const load = state.resort.amenities.reduce((t, a) => t + menuPrep(a.menu), 0);
+      const cooks = Math.max(0, Math.ceil((load - BASE_CAPACITY) / PER_COOK));
+      for (let i = 0; i < cooks; i++) state.resort.staff.push({ role: 'kitchenStaff' });
+      for (let d = 0; d < 20; d++) state = runDay(state, 4000 + d).state;
+      return state.money;
+    };
+    return run({ id: 'h', type: 'halfwayHouse', menu: ['burgerFries', 'draught', 'hotDog', 'chiliBowl', 'candyBar'] })
+      - run({ id: 'c', type: 'beverageCart', menu: ['draught', 'transfusion', 'hotDog', 'breakfastSandwich'] });
+  }
+  assert.ok(gap(9) < gap(14),
+    `the cart should close the gap when the course backs up: ${gap(9)} at 9min vs ${gap(14)} at 14min`);
 });

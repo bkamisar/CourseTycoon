@@ -232,7 +232,22 @@ const cartBarn = [
   'OOOOOOOO',
 ];
 
+/** The beverage cart out on the course. Distinct from `cart` (a golf
+ * buggy) by the canopy and the crate on the back — at 8x8 the canopy is
+ * the only thing that separates "cart with a roof" from "cart". */
+const beverageCart = [
+  'OOOOOOOO',
+  'OAAAAAAO',
+  'OOOOOOOO',
+  '.OWWWWO.',
+  '.OWSSWO.',
+  '.OWWWWO.',
+  'OOOOOOOO',
+  '.OO..OO.',
+];
+
 export const SPRITES = {
+  beverageCart,
   golferWalk1,
   golferWalk2,
   flag,

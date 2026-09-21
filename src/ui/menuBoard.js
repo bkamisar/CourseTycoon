@@ -187,17 +187,23 @@ function verdict(menu) {
  * the caller owns the state, the same contract the build, staff and
  * pricing sheets already use.
  */
-export function openMenuBoard(sheetHost, { state, amenityType, onChange }) {
+export function openMenuBoard(sheetHost, { state, amenityId, onChange }) {
   injectStyles();
   let current = state;
+
+  // Addressed by id, not by type. A later act gives the player a second
+  // course with its own snack shack and its own board aimed at a
+  // different crowd, and this is the line that makes that an addition
+  // rather than a rewrite.
+  const find = (s) => s.resort.amenities.find((a) => a.id === amenityId);
+  const amenityType = find(state)?.type;
   const slots = MENU_SLOTS[amenityType] ?? 0;
 
-  const menuOf = (s) =>
-    s.resort.amenities.find((a) => a.type === amenityType)?.menu ?? [];
+  const menuOf = (s) => find(s)?.menu ?? [];
 
   function setMenu(next) {
     const updated = structuredClone(current);
-    const amenity = updated.resort.amenities.find((a) => a.type === amenityType);
+    const amenity = find(updated);
     if (!amenity) return;
     amenity.menu = next;
     current = updated;
@@ -205,7 +211,7 @@ export function openMenuBoard(sheetHost, { state, amenityType, onChange }) {
   }
 
   sheetHost.open({
-    id: `menu-${amenityType}`,
+    id: `menu-${amenityId}`,
     title: `${titleCase(amenityType)} menu`,
     render(body) {
       // The sheet's scrolling element, whichever ancestor actually owns

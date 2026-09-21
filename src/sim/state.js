@@ -30,7 +30,7 @@ export function newGame(seed) {
     resort: {
       zones: [{ id: 'near', travelMinutes: 0 }],       // Act III adds 'far'
       courses: [{ id: 1, name: 'Pinehollow', zone: 'near', holes }],
-      amenities: [{ type: 'clubhouse', menu: defaultMenuFor('clubhouse') }],
+      amenities: [amenity('clubhouse')],
       staff: [{ role: 'groundskeeper' }],
       rooms: { count: 0, quality: 0 },                 // Act II
       shuttles: [],                                    // Act III
@@ -61,6 +61,25 @@ export function newGame(seed) {
  * repairing it. Picked by appeal to locals, because locals are who a new
  * resort draws before it has a reputation.
  */
+/**
+ * Builds one amenity.
+ *
+ * The `id` is what lets a later act have two of something. Every reader
+ * that needs a *specific* amenity — the menu board, the Amenities row —
+ * addresses it by this id rather than by type, so Act III can add a
+ * second course with its own snack shack without rewriting any of them.
+ * Readers that only ask "do I have any restrooms at all" keep using type,
+ * because that question is still correct with several.
+ *
+ * Narrow implementation on a wide data model, the same way `zones`,
+ * `courses` and `properties` are single-entry arrays today.
+ */
+let amenitySequence = 0;
+export function amenity(type) {
+  amenitySequence += 1;
+  return { id: `${type}-${amenitySequence}`, type, menu: defaultMenuFor(type) };
+}
+
 export function defaultMenuFor(type) {
   const slots = MENU_SLOTS[type];
   if (!slots) return [];
@@ -93,9 +112,14 @@ export function deserialize(text) {
   // every one of them the default rather than leaving the field missing —
   // menuPrep and the menu board both read it, and an absent menu would
   // silently serve nothing.
-  for (const amenity of parsed.resort?.amenities ?? []) {
-    if (!Array.isArray(amenity.menu)) amenity.menu = defaultMenuFor(amenity.type);
-  }
+  // Saves from before menus existed have amenities with no board, and
+  // saves from before multiples were anticipated have no id. Back-fill
+  // both: menuPrep and the menu board read the menu, and the board now
+  // addresses amenities by id, so an amenity without one is uneditable.
+  (parsed.resort?.amenities ?? []).forEach((a, index) => {
+    if (!Array.isArray(a.menu)) a.menu = defaultMenuFor(a.type);
+    if (!a.id) a.id = `${a.type}-legacy${index}`;
+  });
   return parsed;
 }
 
