@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, openHoles } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
+import { hasBackNine } from '../src/render/resortView.js';
 import { computeTokens, computeEffects, EFFECT_WINDOW_MINUTES } from '../src/render/tokens.js';
 
 /** A resort-overview-shaped region list: one 'hole' rect per open hole,
@@ -163,4 +164,15 @@ test('the cart shows up on more than one hole over a day', () => {
   const { timeline } = runDay(state, 10);
   const holesServed = new Set(timeline.filter((e) => e.type === 'cartStop').map((e) => e.holeId));
   assert.ok(holesServed.size >= 1, 'she should serve at least one hole');
+});
+
+test('the back-nine check survives having no game loaded', () => {
+  // syncScreenChrome runs on the start screen, where state is null. An
+  // unguarded read threw there and took the whole chrome sync down — with
+  // every test green, because no test had ever called it without a game.
+  assert.equal(hasBackNine(null), false);
+  assert.equal(hasBackNine(undefined), false);
+  assert.equal(hasBackNine({}), false);
+  assert.equal(hasBackNine({ resort: {} }), false);
+  assert.equal(hasBackNine(newGame(1)), false, 'a fresh course has no back nine built');
 });

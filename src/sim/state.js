@@ -9,7 +9,12 @@ const STARTING_HOLES = ['shortPar3', 'straightPar4', 'doglegPar4'];
 
 export function newGame(seed) {
   const holes = [];
-  for (let i = 0; i < 9; i++) {
+  // Eighteen plots from day one, of which nine are bare ground until Act
+  // II. The back nine is laid out rather than created later because
+  // `FULL_COURSE_HOLES` in economy.js has always priced a round against
+  // eighteen — Act I's nine is half a golf course and is meant to feel
+  // like one.
+  for (let i = 0; i < 18; i++) {
     if (i < STARTING_HOLES.length) {
       holes.push({ ...makeHole(STARTING_HOLES[i], i + 1), open: true });
     } else {
@@ -130,6 +135,19 @@ export function deserialize(text) {
   });
   // Saves made before weather existed get one, derived from something
   // stable about the resort so the same save always has the same climate.
+  // Saves from before the back nine existed have nine holes. Pad to
+  // eighteen with the same empty-plot shape, so an Act I save gains the
+  // ground without gaining any golf.
+  const courseHoles = parsed.resort?.courses?.[0]?.holes;
+  if (Array.isArray(courseHoles)) {
+    for (let i = courseHoles.length; i < 18; i++) {
+      courseHoles.push({
+        id: i + 1, open: false, template: null, corridor: [],
+        corridorWidth: 0, greenPreset: null, features: [], teePos: null,
+      });
+    }
+  }
+
   // The hotel was once `{ count, quality }`. Nobody can have built one -
   // Act II did not exist - but a save could carry the old shape, and a
   // missing hotel must read as no rooms rather than as undefined.

@@ -102,9 +102,39 @@ function drawEmptyPlot(ctx, rect) {
  * Draws the resort into `{x, y, width, height}` of `ctx` (defaults to the
  * full canvas) and returns the tappable regions for what it drew.
  */
-export function drawResort(ctx, state, { x = 0, y = 0, width, height }) {
+/** Holes per screen. The grid is 3x3 and a golf course comes in nines, so
+ * these are the same number for the same reason. */
+export const HOLES_PER_NINE = GRID_COLS * GRID_ROWS;
+
+/**
+ * Whether this resort has anything on the back nine yet. Until it does,
+ * there is nothing to toggle to and the control stays hidden — Act I
+ * should not carry Act II's furniture.
+ */
+export function hasBackNine(state) {
+  // Tolerates no state at all. `syncScreenChrome` runs on the start
+  // screen, before a game is loaded, and an unguarded read here threw and
+  // took the entire chrome sync down with it — every test passed, and the
+  // page was broken the moment it opened.
+  const holes = state?.resort?.courses?.[0]?.holes;
+  if (!Array.isArray(holes)) return false;
+  return holes
+    .slice(HOLES_PER_NINE)
+    .some((h) => h.corridor?.length > 1);
+}
+
+/**
+ * Draws one nine.
+ *
+ * Eighteen holes will not fit this grid: at 180x320 an 18-cell layout
+ * halves the height of every hole and none of them read. A course comes
+ * in nines and a scorecard has two sides, so the map does too.
+ */
+export function drawResort(ctx, state, { x = 0, y = 0, width, height, nine = 0 }) {
   const course = state.resort.courses[0];
-  const holes = course.holes;
+  const all = course.holes;
+  const offset = nine * HOLES_PER_NINE;
+  const holes = all.slice(offset, offset + HOLES_PER_NINE);
   const regions = [];
 
   ctx.fillStyle = PALETTE.UI_DARK;

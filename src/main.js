@@ -9,7 +9,7 @@
  */
 import { createSurface, topChromeOverlapPx, bottomChromeOverlapPx } from './render/pixel.js';
 import { PALETTE } from './render/palette.js';
-import { drawResort } from './render/resortView.js';
+import { drawResort, hasBackNine } from './render/resortView.js';
 import { computeTokens, computeEffects, drawTokens, drawEffects } from './render/tokens.js';
 import { openHoles } from './sim/state.js';
 import { runDay, applyEventChoice } from './sim/day.js';
@@ -134,6 +134,11 @@ injectToolbarStyles();
 // ---------------------------------------------------------------------
 
 let regions = [];
+// Which nine the overview is showing. The map grid holds nine cells and a
+// course comes in nines, so eighteen holes are two screens rather than
+// smaller ones — at 180x320 an 18-cell layout halves every hole and none
+// of them read.
+let shownNine = 0;
 let activeEditor = null;
 let dayResult = null; // { state, report, timeline } | null
 let clock = null;
@@ -169,7 +174,7 @@ function drawOverview() {
   // comment on render() in src/ui/editor.js for why that matters.
   ctx.fillStyle = PALETTE.OUTLINE;
   ctx.fillRect(0, 0, width, height);
-  regions = drawResort(ctx, state, insetRectForChrome(overviewToolbar));
+  regions = drawResort(ctx, state, { ...insetRectForChrome(overviewToolbar), nine: shownNine });
   hud.update(state);
   amenityBar.update(state);
 }
@@ -265,7 +270,23 @@ function toolbarButton(label, onClick, { primary = false } = {}) {
   return btn;
 }
 
+/**
+ * Flips the map between the front and back nine.
+ *
+ * Hidden until there is a back nine to flip to — Act I should not carry
+ * Act II's furniture around. It updates its own label rather than being
+ * rebuilt, because replacing a button's DOM drops its listener.
+ */
+const nineToggle = toolbarButton('Back 9', () => {
+  shownNine = shownNine === 0 ? 1 : 0;
+  nineToggle.textContent = shownNine === 0 ? 'Back 9' : 'Front 9';
+});
+nineToggle.update = () => {
+  nineToggle.hidden = !hasBackNine(state);
+};
+
 overviewToolbar.append(
+  nineToggle,
   toolbarButton('Amenities', () => onAmenityTap()),
   toolbarButton('Staff', () =>
     openStaffSheet(sheets, {
@@ -361,6 +382,7 @@ function syncScreenChrome() {
   topChrome.style.display = onStart ? 'none' : '';
   overviewMute.update();
   playbackMute.update();
+  nineToggle.update();
 }
 router.subscribe(syncScreenChrome);
 syncScreenChrome();
@@ -472,7 +494,7 @@ function drawPlayback() {
   const { ctx, width, height } = surface;
   ctx.fillStyle = PALETTE.OUTLINE;
   ctx.fillRect(0, 0, width, height);
-  regions = drawResort(ctx, dayResult.state, insetRectForChrome(playbackToolbar));
+  regions = drawResort(ctx, dayResult.state, { ...insetRectForChrome(playbackToolbar), nine: shownNine });
   const holes = openHoles(dayResult.state);
   const minute = clock.minute;
   drawTokens(ctx, computeTokens(dayResult.timeline, holes, regions, minute));

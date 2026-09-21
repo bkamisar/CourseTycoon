@@ -374,7 +374,10 @@ test('the "full" line is absent for a course with room to spare', () => {
 
 test('the "full" line updates live when the green fee slider moves, not just the interval slider', () => {
   const state = primedForCapacity();
-  state.resort.pricing.greenFee = 150; // priced high enough to suppress demand below capacity
+  // An eighteen-hole course at prestige 95 with every amenity is worth a
+  // great deal more than the nine this fixture used to build, so the fee
+  // that suppresses demand below capacity had to rise with it.
+  state.resort.pricing.greenFee = 320;
   const host = fakeSheetHost();
   openPricingSheet(host, { state, onChange: () => {} });
   assert.equal(host.body.findAll((n) => n.textContent.includes('full')).length, 0, 'high fee should keep demand under capacity');

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runDay } from '../src/sim/day.js';
+import { GATE_THRESHOLDS } from '../src/sim/acts.js';
 import { openHoles, newGame, serialize, deserialize, defaultMenuFor } from '../src/sim/state.js';
 import { MENU_SLOTS, ITEMS, itemsFor } from '../src/sim/menu.js';
 
@@ -17,11 +18,40 @@ test('a new game starts with the spec cash and three open holes', () => {
   assert.equal(s.resort.courses[0].holes.filter((h) => h.open).length, 3);
 });
 
-test('there are nine hole slots, six of them empty', () => {
+test('there are eighteen hole slots, three of them actually built', () => {
+  // The back nine is laid out as ground from day one rather than created
+  // in Act II, because economy.js has always priced a round against
+  // eighteen — Act I's nine is half a golf course and is meant to feel
+  // like one.
   const s = newGame(1);
   const holes = s.resort.courses[0].holes;
-  assert.equal(holes.length, 9);
-  assert.equal(holes.filter((h) => !h.open).length, 6);
+  assert.equal(holes.length, 18);
+  assert.equal(holes.filter((h) => h.open).length, 3);
+  assert.equal(holes.filter((h) => !h.open).length, 15);
+});
+
+test('the back nine is ground, not golf', () => {
+  const s = newGame(1);
+  for (const hole of s.resort.courses[0].holes.slice(9)) {
+    assert.equal(hole.open, false);
+    assert.deepEqual(hole.corridor, []);
+    assert.equal(hole.teePos, null);
+  }
+  // openHoles requires geometry, so a bare plot can never make a day NaN.
+  assert.ok(openHoles(s).every((h) => h.corridor.length > 1));
+});
+
+test('an Act I save grows the ground for a back nine when it loads', () => {
+  const short = JSON.parse(serialize(newGame(2)));
+  short.resort.courses[0].holes = short.resort.courses[0].holes.slice(0, 9);
+  const loaded = deserialize(JSON.stringify(short));
+  assert.equal(loaded.resort.courses[0].holes.length, 18);
+  assert.equal(loaded.resort.courses[0].holes[12].open, false);
+  assert.equal(loaded.resort.courses[0].holes[12].id, 13);
+});
+
+test('Act I does not get harder because Act II was written', () => {
+  assert.equal(GATE_THRESHOLDS.holesOpen, 9);
 });
 
 test('the wide data model fields are present and narrow', () => {
