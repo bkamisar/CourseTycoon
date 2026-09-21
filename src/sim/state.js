@@ -1,5 +1,6 @@
 import { makeHole } from './hole.js';
 import { emptyGoodwill } from './goodwill.js';
+import { MENU_SLOTS, itemsFor, ITEMS } from './menu.js';
 
 const SAVE_VERSION = 1;
 
@@ -29,7 +30,7 @@ export function newGame(seed) {
     resort: {
       zones: [{ id: 'near', travelMinutes: 0 }],       // Act III adds 'far'
       courses: [{ id: 1, name: 'Pinehollow', zone: 'near', holes }],
-      amenities: [{ type: 'clubhouse' }],
+      amenities: [{ type: 'clubhouse', menu: defaultMenuFor('clubhouse') }],
       staff: [{ role: 'groundskeeper' }],
       rooms: { count: 0, quality: 0 },                 // Act II
       shuttles: [],                                    // Act III
@@ -51,6 +52,24 @@ export function newGame(seed) {
   };
 }
 
+/**
+ * The board a food amenity opens with.
+ *
+ * Deliberately a decent, obvious menu rather than an empty one: a newly
+ * built halfway house that sells nothing looks broken, and the player
+ * should discover the menu screen by improving something, not by
+ * repairing it. Picked by appeal to locals, because locals are who a new
+ * resort draws before it has a reputation.
+ */
+export function defaultMenuFor(type) {
+  const slots = MENU_SLOTS[type];
+  if (!slots) return [];
+  return itemsFor(type)
+    .slice()
+    .sort((a, b) => ITEMS[b].appeal.locals - ITEMS[a].appeal.locals)
+    .slice(0, slots);
+}
+
 export function serialize(state) {
   return JSON.stringify(state);
 }
@@ -70,6 +89,13 @@ export function deserialize(text) {
   // against a missing key.
   if (!parsed.goodwill) parsed.goodwill = emptyGoodwill();
   if (!parsed.eventsSeen) parsed.eventsSeen = [];
+  // Saves from before menus existed have amenities with no board. Give
+  // every one of them the default rather than leaving the field missing —
+  // menuPrep and the menu board both read it, and an absent menu would
+  // silently serve nothing.
+  for (const amenity of parsed.resort?.amenities ?? []) {
+    if (!Array.isArray(amenity.menu)) amenity.menu = defaultMenuFor(amenity.type);
+  }
   return parsed;
 }
 

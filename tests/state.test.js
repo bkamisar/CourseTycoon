@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, serialize, deserialize } from '../src/sim/state.js';
+import { newGame, serialize, deserialize, defaultMenuFor } from '../src/sim/state.js';
+import { MENU_SLOTS, ITEMS, itemsFor } from '../src/sim/menu.js';
 
 test('a new game starts on day one of act one', () => {
   const s = newGame(1234);
@@ -52,4 +53,42 @@ test('serialize produces a string', () => {
 test('deserialize rejects malformed input rather than returning junk', () => {
   assert.throws(() => deserialize('not json'), /save/i);
   assert.throws(() => deserialize(JSON.stringify({ nope: true })), /save/i);
+});
+
+test('a newly built food amenity opens with a sensible default board', () => {
+  for (const type of Object.keys(MENU_SLOTS)) {
+    const menu = defaultMenuFor(type);
+    assert.equal(menu.length, MENU_SLOTS[type], `${type}: wrong slot count`);
+    const allowed = itemsFor(type);
+    for (const id of menu) {
+      assert.ok(ITEMS[id], `${type}: default names unknown item ${id}`);
+      assert.ok(allowed.includes(id), `${type}: default serves something it cannot`);
+    }
+    assert.equal(new Set(menu).size, menu.length, `${type}: default repeats an item`);
+  }
+});
+
+test('a non-food amenity has no menu', () => {
+  assert.deepEqual(defaultMenuFor('restrooms'), []);
+});
+
+test('a save made before menus existed gets one', () => {
+  // Never make an old save unloadable. The author plays on a phone and on
+  // a desktop, and a save code moves between them.
+  const old = JSON.stringify({
+    version: 1,
+    day: 4, money: 1000, prestige: 10, turfQuality: 50,
+    resort: {
+      courses: [{ holes: [] }],
+      amenities: [{ type: 'halfwayHouse' }, { type: 'restrooms' }],
+      staff: [], pricing: { greenFee: 40, teeInterval: 10 },
+    },
+    history: [], satisfactionHistory: [],
+  });
+  const loaded = deserialize(old);
+  const halfway = loaded.resort.amenities.find((a) => a.type === 'halfwayHouse');
+  assert.ok(Array.isArray(halfway.menu) && halfway.menu.length > 0,
+    'an existing halfway house should come back with a board on it');
+  const restrooms = loaded.resort.amenities.find((a) => a.type === 'restrooms');
+  assert.deepEqual(restrooms.menu, []);
 });
