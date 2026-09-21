@@ -900,9 +900,30 @@ ladder it was written to catch** — a prestige target of 53 against a real
 loose bound is a shape test wearing a calibration test's clothes. Tightened
 to 0.72, it fails with "an early target of 53 is free against a real 80".
 
-Worth auditing anywhere a constant governs difficulty: satisfaction term
-weights, weather multipliers, room demand. Each currently has shape tests
-and, apart from menus and now investors, no calibration.
+**The audit was done.** `tests/calibration.test.js` now pins thirteen
+figures across both acts: what the player builds against what they dial,
+waiting staying the biggest single lever, the shop and kitchen queues
+costing something, the weather's demand spread, kitchen and counter
+capacity binding at a real resort size, a plausible hotel being fillable
+and an implausible one not, a room's upkeep as a share of its rate, the
+three refreshment stops staying distinct by a real margin, and the Act I
+gate being demanding without being out of reach.
+
+Each was verified the only way that counts {D} by breaking the constant on
+purpose. Four sabotages, each leaving the **ordering intact** so that every
+existing shape test still passed:
+
+| what was broken | what the calibration test said |
+|---|---|
+| scenery/turf/amenity weights back to their Act I values | "everything the player builds is worth only 8.4 points; if it cannot compete with a tee-interval change there is only one strategy" |
+| storm demand 0.10 to 0.75 | "the best day is only 1.6x the worst; that is not a variance source" |
+| shop capacity 20 to 500 | "a busy day with nobody behind the counter must turn real money away" |
+| room upkeep $40 to $8 | "$8 a night against a $95 rate is too cheap to stand empty" |
+
+Still uncalibrated and worth doing if these ever move: hole difficulty
+coefficients, goodwill decay, marshal effect size, and the amenity prices
+{D} the last of which are checked by `tools/effects.js` but **not by any
+test**, so a price regression would not fail the suite.
 
 ## 16. Deferred decisions
 
