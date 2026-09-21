@@ -44,15 +44,49 @@ function entries() {
       body:
         `How long a round actually takes, on average. About ${TARGET_MINUTES_PER_HOLE} ` +
         'minutes a hole is a clean pace; drop the tee interval below what your ' +
-        'slowest hole actually plays and groups start backing up behind each other.',
+        'slowest hole actually plays and groups start backing up behind each ' +
+        'other. Carts move it more than anything else you can build, and ' +
+        'marshals more than anyone you can hire — but only when the course ' +
+        'is busy. On an empty one they change nothing, which is correct ' +
+        'rather than broken.',
     },
     {
       term: 'Happy (satisfaction)',
       range: '0–100',
       body:
-        'How guests felt about their round. Waiting hurts it most, then how ' +
-        'they scored against their own handicap, whether the price matched ' +
-        'the value, the scenery, and the turf.',
+        'How guests felt about their round, and the thing Act II is really ' +
+        'waiting on. Waiting hurts it most, then how they scored against ' +
+        'their own handicap, whether the price matched the value, whether ' +
+        'the difficulty suited them, the scenery, the turf, what you have ' +
+        'built, and whether they could actually get served. ' +
+        'Worth knowing: a busy course earns more every day and makes ' +
+        'everybody unhappier, so the profitable answer and the one that ' +
+        'opens the next act are not the same answer.',
+    },
+    {
+      term: 'Locals, Serious, Guests',
+      range: 'the three bars in the top corner',
+      body:
+        'Who is playing today. Locals want a cheap, friendly round; serious ' +
+        'golfers want a real test and will forgive a lot for one; ' +
+        'destination guests want somewhere worth the trip and will pay for ' +
+        'it. You never choose your crowd — the course does. Difficulty, ' +
+        'scenery, price and what you have built decide who turns up, and ' +
+        'they want different things, so no course pleases all three. The ' +
+        'same three bars appear on a menu board, showing who would buy each ' +
+        'item.',
+    },
+    {
+      term: 'Kitchen and counter',
+      range: 'load against capacity',
+      body:
+        'Food is cooked by people and merchandise is sold by people. Each ' +
+        'item on a menu adds kitchen load; each cook adds capacity. Past ' +
+        'capacity, service slows, guests wait, and some of them leave ' +
+        'without buying. The pro shop works the same way with shop staff. ' +
+        'A building with nobody in it only half works, which is why a wide ' +
+        'menu costs wages and a narrow one aimed at the crowd you actually ' +
+        'have is cheap to run.',
     },
     {
       term: 'Turf',
@@ -66,9 +100,14 @@ function entries() {
       term: 'Upkeep',
       range: '$ per day',
       body:
-        `What it costs to keep the course open: $${UPKEEP_BASE} a day per hole, ` +
-        `plus $${UPKEEP_PER_BUNKER} for every bunker and $${UPKEEP_PER_POND} for ` +
-        'every pond you’ve dug.',
+        `What the day costs before anyone tees off. The course itself is ` +
+        `$${UPKEEP_BASE} a day per hole, plus $${UPKEEP_PER_BUNKER} for every ` +
+        `bunker and $${UPKEEP_PER_POND} for every pond you’ve dug — but that ` +
+        'is usually the smallest part of it. Amenities and wages are the ' +
+        'rest, and they are the part that grows: a fully built resort spends ' +
+        'more keeping the buildings open and the staff paid than on the golf ' +
+        'course. An amenity you no longer need can be removed for most of ' +
+        'what it cost.',
     },
   ];
 }

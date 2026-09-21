@@ -70,10 +70,16 @@ export function guestSatisfaction({
   // capacity the kitchen is, so one item over is a shrug and a full
   // restaurant with no cooks is a bad afternoon.
   const kitchenPenalty = (1 - kitchenServiceFactor) * 18;
+  // Queueing at the counter, and smaller than queueing for food: you can
+  // leave a shop without buying and still have had a good round. This was
+  // accepted as a parameter and then never used — the pro shop produced a
+  // complaint about a six-deep queue while costing the guest nothing at
+  // all, which is the interface saying something the simulation does not.
+  const shopPenalty = (1 - shopServiceFactor) * 7;
 
   return clamp(
     55 + scoreDelta - waitPenalty + priceDelta + sceneryBonus + turfBonus +
-      amenityBonusWeighted + difficultyBonus - kitchenPenalty,
+      amenityBonusWeighted + difficultyBonus - kitchenPenalty - shopPenalty,
     0,
     100
   );
@@ -125,8 +131,13 @@ export function buildComplaints({
         : 'There is nowhere out there to use a restroom.'
     );
   }
-  if (!amenityTypes.includes('snackShack') && !amenityTypes.includes('halfwayHouse')) {
-    complaints.push('Nowhere to get a drink at the turn.');
+  // The beverage cart counts. It was left out of this check when it was
+  // added, so a player who had built Dee still heard guests complain there
+  // was nowhere to get a drink — while watching her hand drinks out on the
+  // map during playback.
+  const SELLS_REFRESHMENT = ['snackShack', 'halfwayHouse', 'beverageCart', 'restaurant'];
+  if (!SELLS_REFRESHMENT.some((t) => amenityTypes.includes(t))) {
+    complaints.push('Nowhere out there to get a drink.');
   }
   if (shopServiceFactor < 0.85) {
     complaints.push('Queue at the pro shop was six deep. Left without buying anything.');

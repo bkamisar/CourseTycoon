@@ -16,7 +16,8 @@ import { ITEMS, MENU_SLOTS } from '../sim/menu.js';
 import { amenity } from '../sim/state.js';
 import { openMenuBoard } from './menuBoard.js';
 import { kitchenCapacity, kitchenLoad } from '../sim/kitchen.js';
-import { shopCapacity, PER_SHOP_STAFF } from '../sim/shop.js';
+import { shopCapacity, PER_SHOP_STAFF, BASE_SHOP_CAPACITY } from '../sim/shop.js';
+import { PER_COOK, BASE_CAPACITY } from '../sim/kitchen.js';
 import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups, demolitionRefund } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
 import { holeStats } from '../sim/hole.js';
@@ -37,6 +38,7 @@ const AMENITY_BLURB = {
   drivingRange: 'Lets guests warm up before teeing off.',
   practiceGreen: 'Practice putting before the round starts.',
   cartBarn: 'A fleet of carts. Takes about half an hour off a round and lifts satisfaction more than anything else you can build — and costs more to run than everything else combined. Buy it when you can carry it.',
+  beverageCart: 'Dee works the course with a cart. She reaches golfers without stopping them, so she earns without costing a minute of pace — and she needs no kitchen if you keep her to drinks. She sells; she does not feed. That is what the snack shack and halfway house are for.',
 };
 
 /**
@@ -49,13 +51,19 @@ const AMENITY_BLURB = {
  * and the restaurant turned out to lose $555 a day when built by a player
  * who had not thought about cooks. Neither was signposted anywhere.
  */
+/** What an amenity is for, in words. Exported so a test can assert that
+ * everything buildable has something to say about itself — a silent row
+ * in a shop is a thing the player has no way to evaluate. */
+export function amenityBlurb(type) {
+  return AMENITY_BLURB[type] ?? '';
+}
+
 const NEEDS_STAFF = {
   proShop: { role: 'shopStaff', label: 'a shop hire', what: 'sales' },
   snackShack: { role: 'kitchenStaff', label: 'a cook', what: 'food service' },
   halfwayHouse: { role: 'kitchenStaff', label: 'a cook', what: 'food service' },
   restaurant: { role: 'kitchenStaff', label: 'a cook', what: 'food service' },
   beverageCart: { role: 'kitchenStaff', label: 'a cook', what: 'food service' },
-  beverageCart: 'Dee works the course with a cart. She reaches golfers without stopping them, so she earns without costing a minute of pace — and she needs no kitchen if you keep her to drinks. She sells; she does not feed. That is what the snack shack and halfway house are for.',
 };
 
 let stylesInjected = false;
@@ -411,8 +419,42 @@ const STAFF_ROLES = ['groundskeeper', 'marshal', 'kitchenStaff'];
 const ROLE_LABEL = {
   groundskeeper: 'Groundskeeper',
   marshal: 'Marshal',
+  shopStaff: 'Shop hand',
   kitchenStaff: 'Cook',
 };
+
+/**
+ * What each hire actually does, with the numbers read from the modules
+ * that own them rather than retyped.
+ *
+ * The staff sheet showed a name and a wage and nothing else, which was
+ * survivable when there were two roles doing obvious things and is not
+ * now there are four, three of them situational. A marshal is worthless
+ * on an empty course and worth thousands a day on a busy one; nothing
+ * anywhere said so, and the same silence is what let a wage exist for
+ * months against a role that did nothing at all.
+ */
+export function roleBlurb(role) {
+  switch (role) {
+    case 'groundskeeper':
+      return 'Holds the turf steady — about three holes each. Without enough, '
+        + 'every round played wears the course down faster than it recovers.';
+    case 'marshal':
+      return 'Moves slow groups along. Worth nothing on a quiet course and a '
+        + 'great deal on a busy one, and since waiting is what hurts guests '
+        + 'most, marshals are how a full tee sheet stays bearable.';
+    case 'shopStaff':
+      return `Serves the pro shop counter. The clubhouse desk manages about `
+        + `${BASE_SHOP_CAPACITY} golfers a day on its own; each hire adds `
+        + `${PER_SHOP_STAFF}. Past that the queue turns people away with their money.`;
+    case 'kitchenStaff':
+      return `Cooks. Your boards can ask for ${BASE_CAPACITY} prep with nobody `
+        + `hired; each cook adds ${PER_COOK}. Past capacity the food comes out slowly `
+        + 'and guests notice.';
+    default:
+      return '';
+  }
+}
 
 /** Opens the staff sheet. `onChange(nextState)` fires on every hire/fire. */
 export function openStaffSheet(sheetHost, { state, onChange }) {
@@ -454,7 +496,10 @@ export function openStaffSheet(sheetHost, { state, onChange }) {
           const detail = document.createElement('div');
           detail.className = 'panel-row-detail';
           detail.textContent = `$${WAGES[role]}/day each`;
-          info.append(title, detail);
+          const blurb = document.createElement('div');
+          blurb.className = 'panel-row-blurb';
+          blurb.textContent = roleBlurb(role);
+          info.append(title, detail, blurb);
 
           const stepper = document.createElement('div');
           stepper.className = 'panel-stepper';
