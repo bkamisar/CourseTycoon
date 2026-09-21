@@ -28,7 +28,7 @@ import { ordinal } from '../sim/satisfaction.js';
 const AMENITY_BLURB = {
   clubhouse: 'The resort’s front desk and hub. Always open.',
   proShop: 'Sells merchandise to guests after their round.',
-  snackShack: 'Quick food and drinks out on the course.',
+  snackShack: 'Quick food and drinks near the clubhouse. Golfers grab something early in the round — a smaller lift than the halfway house, but it costs them no time at all.',
   halfwayHouse: 'A stop partway round for food and a breather. Worth most on a long course — golfers finish a nine with plenty left, so the stop costs more time than the rest is worth. It comes into its own over eighteen.',
   restaurant: 'Sit-down dining after the round.',
   restrooms: 'Guests notice sharply when there aren’t enough.',

@@ -155,7 +155,9 @@ export function computeReportData(state, report) {
       passed: report.gate.passed,
       nearGate: report.gate.nearGate,
       outstanding: report.gate.outstanding,
-      items: report.gate.conditions.map((c) => ({ label: c.label, met: c.met })),
+      items: report.gate.conditions.map((c) => ({
+        label: c.label, met: c.met, now: c.now, hint: c.hint,
+      })),
     },
   };
 }
@@ -353,6 +355,17 @@ function injectStyles() {
       gap: 8px;
       font-size: 13px;
       padding: 5px 0;
+    }
+    .report-gate-now {
+      color: ${PALETTE.ACCENT};
+      font-size: 11px;
+    }
+    .report-gate-hint {
+      color: ${PALETTE.UI_LIGHT};
+      font-size: 11px;
+      line-height: 1.5;
+      margin-top: 3px;
+      opacity: 0.85;
     }
     .report-gate-check {
       flex: none;
@@ -639,9 +652,25 @@ export function mountReport(root, { state, report, onContinue } = {}) {
     const check = document.createElement('span');
     check.className = `report-gate-check ${item.met ? 'report-gate-check--met' : 'report-gate-check--unmet'}`;
     check.textContent = item.met ? '✓' : '○';
+    const text = document.createElement('span');
     const label = document.createElement('span');
     label.textContent = item.label;
-    row.append(check, label);
+    text.appendChild(label);
+    if (item.now) {
+      const now = document.createElement('span');
+      now.className = 'report-gate-now';
+      now.textContent = `  ${item.now}`;
+      text.appendChild(now);
+    }
+    // Only the unmet ones get told how to move. A hint under something
+    // already done is noise, and the list is long enough already.
+    if (!item.met && item.hint) {
+      const hint = document.createElement('div');
+      hint.className = 'report-gate-hint';
+      hint.textContent = item.hint;
+      text.appendChild(hint);
+    }
+    row.append(check, text);
     gate.appendChild(row);
   }
   screen.appendChild(gate);

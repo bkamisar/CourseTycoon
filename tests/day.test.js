@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
-import { runDay, marshalPaceFactor, applyEventChoice, halfwayRestoreTo, cartRestoreTo } from '../src/sim/day.js';
+import { runDay, marshalPaceFactor, applyEventChoice, halfwayRestoreTo, cartRestoreTo, snackRestoreTo } from '../src/sim/day.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import { emptyGoodwill, applyGoodwill } from '../src/sim/goodwill.js';
 import { EVENTS, STANCES } from '../src/sim/events.js';
@@ -619,4 +619,49 @@ test('a halfway house pays for itself on eighteen holes and not on nine', () => 
     `a stop should not pay on a nine, saved ${savedOnNine.toFixed(1)} minutes`);
   assert.ok(savedOnEighteen > 4,
     `a stop should clearly pay on an eighteen, saved only ${savedOnEighteen.toFixed(1)} minutes`);
+});
+
+test('the three food amenities restore in a clear order', () => {
+  // The author's framing: the cart sells and does not feed; the snack
+  // shack and halfway house feed. Pinned so a later retune cannot quietly
+  // collapse them into three sizes of the same thing.
+  const board = ['burgerFries', 'draught'];
+  assert.ok(cartRestoreTo(board) < snackRestoreTo(board),
+    `cart ${cartRestoreTo(board)} should restore less than the snack shack ${snackRestoreTo(board)}`);
+  assert.ok(snackRestoreTo(board) < halfwayRestoreTo(board),
+    `snack shack ${snackRestoreTo(board)} should restore less than a sit-down stop ${halfwayRestoreTo(board)}`);
+});
+
+test('a snack shack actually reaches the golfers', () => {
+  const state = newGame(91);
+  state.resort.amenities.push({ id: 's', type: 'snackShack', menu: ['hotDog', 'draught', 'candyBar'] });
+  const { timeline } = runDay(state, 6);
+  assert.ok(timeline.some((e) => e.type === 'cartStop'),
+    'the shack should be handing things out, not sitting there decoratively');
+});
+
+test('a snack shack costs the group no time on the clock', () => {
+  // Measured on the hole itself, not on the day. On the day a shack makes
+  // rounds LONGER - it raises satisfaction, which draws more golfers,
+  // which congests the course - and that is correct emergent behaviour,
+  // the same dynamic the driving range has. What must be true is that the
+  // stop itself is free, the way the cart's is and the halfway house's
+  // deliberately is not.
+  const hole = { ...structuredClone(TEMPLATES.straightPar4), id: 1 };
+  const base = makeGroup(
+    makeRng(1), { prestige: 40, greenFee: 50, share: { locals: 1, serious: 0, destination: 0 } }, 0
+  );
+  const grabbing = structuredClone(base);
+  const sittingDown = structuredClone(base);
+  for (const g of [...grabbing.guests, ...sittingDown.guests]) g.energy = 40;
+
+  const grabbed = playHole(makeRng(2), hole, grabbing, { carts: false, cartStop: true, cartStopTo: 76 });
+  const sat = playHole(makeRng(2), hole, sittingDown, { carts: false, refuel: true, refuelTo: 76 });
+
+  assert.ok(grabbed.minutes < sat.minutes,
+    `grabbing something on the way past must beat sitting down: ${grabbed.minutes} vs ${sat.minutes}`);
+  assert.equal(
+    Math.round(grabbing.guests[0].energy), Math.round(sittingDown.guests[0].energy),
+    'both restore the same - only the clock differs'
+  );
 });

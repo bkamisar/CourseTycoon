@@ -674,6 +674,34 @@ The fix is fewer middles, not a weaker middle: some events should offer only
 two real positions. Deferred, with the count recorded here so the next pass has
 a number to beat.
 
+### 15a.4b A correction about marshals
+
+An earlier balance note in this project concluded that marshals were a bad
+buy at every level: one moved the safe tee interval from 19 to 18 minutes,
+about two extra groups and $176 of revenue against a $180 wage, and three
+cost $540 a day to earn roughly $352. That was recorded, believed, and
+nearly acted on by removing the role.
+
+**It was measured on a three-hole course with eight groups on the sheet**
+— a course with nothing whatsoever for a marshal to do. Re-measured on a
+finished nine with a real crowd:
+
+| tee interval | 1 marshal | 3 marshals |
+|---|---|---|
+| 12 min | +$359/day | +$1,923/day |
+| 16 min | +$2,858/day | +$3,057/day, satisfaction 48 to 75 |
+| 20 min (uncongested) | -$180/day | -$540/day |
+
+Which is exactly what a situational hire should look like: worthless on an
+empty course, transformative on a busy one. And since the Act I gate is in
+practice a satisfaction wall, and waiting is what hurts satisfaction most,
+marshals are close to required for passing it.
+
+No redesign needed. The lesson is about measurement, not about marshals:
+**a balance figure taken on the opening three-hole course says nothing
+about the game.** That configuration has no congestion, no crowd and no
+amenities, so every amenity and every hire measures as worthless on it.
+
 ### 15a.5 Staff morale
 
 Not a constituency to please for its own sake — the **hidden multiplier**.

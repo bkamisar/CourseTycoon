@@ -73,6 +73,18 @@ export const CART_REACHES_EVERY = 3;
  * with a hot dog to 67), because otherwise there would be no reason to
  * put any on her. It just cannot rival sitting down.
  */
+/**
+ * What a stop at the snack shack restores to, from what is on its board.
+ *
+ * Between the cart's 68 and the halfway house's 88, and costing no time
+ * because you pick something up on your way past the second hole rather
+ * than sitting down at the turn. Its ceiling is lower than the halfway
+ * house's because you are eating it walking.
+ */
+export function snackRestoreTo(menu) {
+  return clamp(52 + menuBestEnergy(menu) * 1.8, 52, 76);
+}
+
 export function cartRestoreTo(menu) {
   return clamp(48 + menuBestEnergy(menu) * 1.6, 48, 68);
 }
@@ -119,6 +131,17 @@ export function runDay(state, seed) {
   const carts = amenityTypes.includes('cartBarn');
   const hasRange = amenityTypes.includes('drivingRange');
   const hasPracticeGreen = amenityTypes.includes('practiceGreen');
+  // The snack shack catches them early - it sits by the clubhouse, so it
+  // is the second or third hole, not the turn. A smaller top-up than the
+  // halfway house and it costs no time, because you grab something on the
+  // way past rather than sitting down. It did nothing at all for energy
+  // before, which left it as the one food amenity with no identity: the
+  // author's framing is that the cart sells and the shack and halfway
+  // house feed, and this is the shack's half of that.
+  const snackShack = next.resort.amenities.find((a) => a.type === 'snackShack');
+  const snackEnergy = snackShack ? snackRestoreTo(snackShack.menu) : 0;
+  const snackHoleIndex = Math.min(1, Math.max(0, holes.length - 1));
+
   const beverageCart = next.resort.amenities.find((a) => a.type === 'beverageCart');
   const cartEnergy = beverageCart ? cartRestoreTo(beverageCart.menu) : 0;
   const halfwayHouse = next.resort.amenities.find((a) => a.type === 'halfwayHouse');
@@ -206,6 +229,12 @@ export function runDay(state, seed) {
           && (holeIndex + 1) % CART_REACHES_EVERY === 0
           && holeIndex !== turnHoleIndex(holes.length),
         cartStopTo: cartEnergy,
+        // Reuses the cart's time-free stop: grabbing a roll on the way
+        // past costs the group nothing on the clock either. Whichever of
+        // the two restores more on this hole is the one that counts.
+        ...(snackShack && holeIndex === snackHoleIndex
+          ? { cartStop: true, cartStopTo: Math.max(cartEnergy, snackEnergy) }
+          : {}),
       });
       minutes.push(played.minutes);
       scores.push(played.scores);
