@@ -28,6 +28,35 @@ export const SPEAKERS = {
   charityRep: 'A hospice fundraiser',
 };
 
+/**
+ * The kinds of answer a person can give.
+ *
+ * Every choice carries one. It is not a mechanic — nothing in the
+ * simulation reads a stance, and two choices sharing one are not
+ * otherwise related. It is a reading aid: the cost line underneath says
+ * what a choice does, and this says what sort of person it makes you, so
+ * the shape of a decision is legible before any of the numbers are.
+ *
+ * That matters most where the numbers are close. Paying $600 versus
+ * paying $2,800 to fix a bunker is arithmetic; "splits the difference"
+ * versus "does it properly" is a decision, and the player can recognise
+ * their own habit forming across a sixty-day run.
+ *
+ * The gloss is the half-sentence shown beside the label. Deliberately
+ * short — on a phone this sits above a cost line that is already two
+ * lines long, and a third line of explanation is a line nobody reads.
+ */
+export const STANCES = {
+  populist:   { label: 'Populist',   gloss: 'keeps the regulars onside' },
+  ambitious:  { label: 'Ambitious',  gloss: 'chases the name' },
+  commercial: { label: 'Commercial', gloss: 'takes the money' },
+  thorough:   { label: 'Thorough',   gloss: 'does it properly' },
+  pragmatic:  { label: 'Pragmatic',  gloss: 'splits the difference' },
+  principled: { label: 'Principled', gloss: 'the right thing, at a price' },
+  thrifty:    { label: 'Thrifty',    gloss: 'spends nothing today' },
+  defiant:    { label: 'Defiant',    gloss: 'refuses, and wears it' },
+};
+
 /** The axes an event's consequence can move. Goodwill is per segment. */
 const MONEY_PRESTIGE_TURF = ['money', 'prestige', 'turf'];
 
@@ -71,11 +100,13 @@ export const EVENTS = [
     when: (c) => c.prestige >= 20,
     choices: [
       {
+        stance: 'ambitious',
         label: 'Host it',
         cost: '$2,500 in prep and marshaling, and three days of gallery traffic take a 12-point bite out of the turf.',
         effects: { money: -2500, turf: -12, prestige: 10, goodwill: { serious: 8, locals: -6 } },
       },
       {
+        stance: 'populist',
         label: 'Decline',
         cost: 'Costs nothing today, but word gets around that you turned the city down — prestige drops about 4 points.',
         effects: { prestige: -4, goodwill: { locals: 3 } },
@@ -89,16 +120,19 @@ export const EVENTS = [
     when: (c) => c.rating >= 40,
     choices: [
       {
+        stance: 'ambitious',
         label: 'Sell the test',
         cost: 'Free to say, but serious golfers hear it loud and clear (goodwill +10) while locals read the same line as a warning (goodwill -8).',
         effects: { goodwill: { serious: 10, locals: -8 } },
       },
       {
+        stance: 'populist',
         label: 'Sell the value',
         cost: 'Free to say, but locals feel seen (goodwill +10) while the piece reads thin to anyone chasing a tough track (serious goodwill -8).',
         effects: { goodwill: { locals: 10, serious: -8 } },
       },
       {
+        stance: 'commercial',
         label: 'Sell the scenery',
         cost: 'Destination guests take notice, and prestige ticks up 2 points — but the piece barely mentions the golf, and serious golfers notice that too.',
         effects: { prestige: 2, goodwill: { destination: 10, serious: -4 } },
@@ -112,11 +146,13 @@ export const EVENTS = [
     when: (c) => c.day >= 3,
     choices: [
       {
+        stance: 'thorough',
         label: 'Pay for the rush part',
         cost: '$4,000 today for parts flown in overnight.',
         effects: { money: -4000 },
       },
       {
+        stance: 'thrifty',
         label: 'Wait a week for the standard part',
         cost: 'Free, but the crew falls behind hand-cutting and turf takes a 10-point hit; prestige dips 2 as the course starts to show it.',
         effects: { turf: -10, prestige: -2 },
@@ -130,11 +166,13 @@ export const EVENTS = [
     when: (c) => c.day >= 4,
     choices: [
       {
+        stance: 'commercial',
         label: 'Take the block booking',
         cost: 'Green fee drops $9 a head for the block, crowding regulars off Saturday morning — nets about $1,200 in guaranteed revenue.',
         effects: { money: 1200, prestige: 2, goodwill: { destination: 4, locals: -6 } },
       },
       {
+        stance: 'populist',
         label: 'Turn it down',
         cost: 'You walk away from a guaranteed $1,200, but the regulars keep their usual Saturday slots.',
         effects: { goodwill: { locals: 4 } },
@@ -148,16 +186,19 @@ export const EVENTS = [
     when: () => true,
     choices: [
       {
+        stance: 'principled',
         label: 'Grant standing Tuesday access',
         cost: 'About $300 a week in foregone green fees, every week, for as long as it runs.',
         effects: { money: -300, prestige: 1, goodwill: { locals: 8 } },
       },
       {
+        stance: 'pragmatic',
         label: 'Offer a one-off clinic instead',
         cost: '$600 for a single Saturday clinic with the pro — no standing commitment.',
         effects: { money: -600, prestige: 2, goodwill: { locals: 4 } },
       },
       {
+        stance: 'thrifty',
         label: 'Decline',
         cost: 'Free today, but the club says so publicly, and locals goodwill drops 5.',
         effects: { goodwill: { locals: -5 } },
@@ -171,16 +212,19 @@ export const EVENTS = [
     when: () => true,
     choices: [
       {
+        stance: 'thorough',
         label: 'Pay for boundary netting',
         cost: '$3,000 for netting along the 6th, and the problem stops for good.',
         effects: { money: -3000, prestige: 1 },
       },
       {
+        stance: 'pragmatic',
         label: 'Pay them off for now',
         cost: '$500 today, with no guarantee it does not come up again next month.',
         effects: { money: -500 },
       },
       {
+        stance: 'defiant',
         label: 'Do nothing',
         cost: 'Free, but Gus says they are now talking to a solicitor — prestige takes a 5-point hit.',
         effects: { prestige: -5 },
@@ -194,16 +238,19 @@ export const EVENTS = [
     when: (c) => c.prestige >= 25,
     choices: [
       {
+        stance: 'ambitious',
         label: 'Pay for the feature',
         cost: '$5,000, no promises on tone, but two full pages of exposure.',
         effects: { money: -5000, prestige: 6, goodwill: { destination: 6 } },
       },
       {
+        stance: 'pragmatic',
         label: 'Offer access instead of cash',
         cost: 'Free, but their photographer eats two hours of prime Saturday tee time — regulars notice the bump.',
         effects: { goodwill: { locals: -4, destination: 3 } },
       },
       {
+        stance: 'thrifty',
         label: 'Decline',
         cost: 'Free — $0 spent, nothing gained, and you stay reliant on the unpaid coverage that has been thin lately.',
         effects: {},
@@ -217,16 +264,19 @@ export const EVENTS = [
     when: (c) => c.day >= 5,
     choices: [
       {
+        stance: 'principled',
         label: 'Grant the raise',
         cost: '$800 in back pay to settle it, plus a higher rate going forward.',
         effects: { money: -800, turf: 5 },
       },
       {
+        stance: 'pragmatic',
         label: 'Offer a one-time bonus instead',
         cost: '$300 now, with no change to the weekly rate.',
         effects: { money: -300, turf: 1 },
       },
       {
+        stance: 'defiant',
         label: 'Refuse',
         cost: 'Free today, but the crew\'s mood sours and turf takes a 6-point hit within the week.',
         effects: { turf: -6 },
@@ -240,16 +290,19 @@ export const EVENTS = [
     when: () => true,
     choices: [
       {
+        stance: 'thrifty',
         label: 'Buy the cheap batch',
         cost: '$400, and the greenkeeper isn\'t thrilled about the consistency — prestige takes a 1-point knock.',
         effects: { money: -400, turf: 3, prestige: -1 },
       },
       {
+        stance: 'thorough',
         label: 'Buy from the usual supplier at full price',
         cost: '$1,100 for the reliable stuff.',
         effects: { money: -1100, turf: 6 },
       },
       {
+        stance: 'defiant',
         label: 'Skip this cycle',
         cost: 'Free, but the greens go without topdressing and it shows — a 5-point turf hit.',
         effects: { turf: -5 },
@@ -263,16 +316,19 @@ export const EVENTS = [
     when: (c) => c.prestige >= 35,
     choices: [
       {
+        stance: 'ambitious',
         label: 'Sign the full endorsement',
         cost: '$6,000 for a season of their name on the signage and in the shop.',
         effects: { money: -6000, prestige: 10, goodwill: { serious: 8 } },
       },
       {
+        stance: 'pragmatic',
         label: 'Negotiate a single exhibition day',
         cost: '$1,500 for one day only, no standing deal.',
         effects: { money: -1500, prestige: 4, goodwill: { serious: 3 } },
       },
       {
+        stance: 'thrifty',
         label: 'Decline',
         cost: 'Free, but Gus reckons the course down the road will happily pay for it instead — prestige dips 2.',
         effects: { prestige: -2 },
@@ -286,16 +342,19 @@ export const EVENTS = [
     when: () => true,
     choices: [
       {
+        stance: 'principled',
         label: 'Refund the late groups',
         cost: '$900 in same-day refunds, and prestige takes a 1-point ding as word gets around you had to apologise.',
         effects: { money: -900, prestige: -1, goodwill: { locals: 5, serious: 3 } },
       },
       {
+        stance: 'pragmatic',
         label: 'Offer replay vouchers instead of cash',
         cost: '$400 in admin and printing now, against future green fees you will eventually eat.',
         effects: { money: -400, prestige: 1, goodwill: { locals: 3, serious: 2 } },
       },
       {
+        stance: 'defiant',
         label: 'Apologise, nothing more',
         cost: 'Free, but Gus says those three groups are not rushing back.',
         effects: { goodwill: { locals: -6, serious: -4 } },
@@ -309,16 +368,19 @@ export const EVENTS = [
     when: (c) => c.day >= 6,
     choices: [
       {
+        stance: 'thorough',
         label: 'Install lighting',
         cost: '$3,500 up front, but it stops the problem for good.',
         effects: { money: -3500, prestige: 2, goodwill: { locals: 3 } },
       },
       {
+        stance: 'pragmatic',
         label: "Pay Gus overtime to patrol",
         cost: '$600 for a week of extra night rounds.',
         effects: { money: -600, goodwill: { locals: 2 } },
       },
       {
+        stance: 'defiant',
         label: 'Do nothing',
         cost: 'Free, but the 7th stays torn up — a 6-point turf hit, and prestige drops 2 as it becomes visible from the road.',
         effects: { turf: -6, prestige: -2 },
@@ -332,16 +394,19 @@ export const EVENTS = [
     when: (c) => c.day >= 7,
     choices: [
       {
+        stance: 'principled',
         label: 'Host it free',
         cost: 'Waive the green fee for forty players — about $880 in fees you do not collect.',
         effects: { money: -880, prestige: 3, goodwill: { locals: 6 } },
       },
       {
+        stance: 'pragmatic',
         label: 'Offer half price instead of free',
         cost: 'About $440 in foregone fees rather than the full amount.',
         effects: { money: -440, prestige: 1, goodwill: { locals: 3 } },
       },
       {
+        stance: 'thrifty',
         label: 'Decline',
         cost: 'Costs nothing today, but the organiser says so to anyone who will listen — prestige drops 3.',
         effects: { prestige: -3, goodwill: { locals: -3 } },
@@ -355,16 +420,19 @@ export const EVENTS = [
     when: (c) => c.day >= 3,
     choices: [
       {
+        stance: 'populist',
         label: 'Start a standing punch-card discount',
         cost: 'About $350 a week in discounted fees, ongoing, for everyone who qualifies.',
         effects: { money: -350, goodwill: { locals: 7 } },
       },
       {
+        stance: 'pragmatic',
         label: 'Comp him one round',
         cost: 'One green fee, once — about $22.',
         effects: { money: -22, goodwill: { locals: 2 } },
       },
       {
+        stance: 'defiant',
         label: 'Say no',
         cost: 'Free, but he has been coming three times a week for two years, and it stings.',
         effects: { goodwill: { locals: -4 } },
@@ -378,16 +446,19 @@ export const EVENTS = [
     when: () => true,
     choices: [
       {
+        stance: 'thorough',
         label: 'Full rebuild',
         cost: '$2,800 for a proper rebuild that holds up.',
         effects: { money: -2800, turf: 8 },
       },
       {
+        stance: 'pragmatic',
         label: 'Patch job',
         cost: '$600, but it will not survive the next heavy rain.',
         effects: { money: -600, turf: 2 },
       },
       {
+        stance: 'defiant',
         label: 'Leave it',
         cost: 'Free, but it is an eyesore on the approach shot, and serious golfers notice bunkers — goodwill among them drops 5.',
         effects: { turf: -4, goodwill: { serious: -5 } },
@@ -401,16 +472,19 @@ export const EVENTS = [
     when: (c) => c.day >= 10,
     choices: [
       {
+        stance: 'populist',
         label: 'Match it for two weeks',
         cost: 'About $1,600 in lost margin over the fortnight.',
         effects: { money: -1600, goodwill: { locals: 5 } },
       },
       {
+        stance: 'pragmatic',
         label: 'Run a single discounted Saturday',
         cost: '$500 for one day, to remind people you are here.',
         effects: { money: -500, goodwill: { locals: 2 } },
       },
       {
+        stance: 'defiant',
         label: 'Hold your price',
         cost: 'Free, but Gus says regulars have been asking about "the new place down the road" — goodwill among locals drops 4.',
         effects: { goodwill: { locals: -4 } },

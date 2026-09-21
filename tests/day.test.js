@@ -4,7 +4,7 @@ import { newGame } from '../src/sim/state.js';
 import { runDay, marshalPaceFactor, applyEventChoice } from '../src/sim/day.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import { emptyGoodwill, applyGoodwill } from '../src/sim/goodwill.js';
-import { EVENTS } from '../src/sim/events.js';
+import { EVENTS, STANCES } from '../src/sim/events.js';
 
 test('runDay returns a next state, a report and a timeline', () => {
   const { state, report, timeline } = runDay(newGame(1), 1);
@@ -217,6 +217,10 @@ test('a pending event, when offered, carries a speaker, a prompt and choices wit
   for (const choice of found.choices) {
     assert.ok(choice.label);
     assert.ok(choice.cost);
+    // The stance has to survive the trip onto the report, or the card
+    // renders choices with no labelling and the player is back to
+    // comparing raw numbers.
+    assert.ok(STANCES[choice.stance], `unknown stance "${choice.stance}"`);
   }
 });
 

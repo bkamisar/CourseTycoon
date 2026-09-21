@@ -6,6 +6,7 @@ import {
   EVENTS,
   SPEAKERS,
   effectAxes,
+  STANCES,
   pickEvent,
   rememberEvent,
   EVENT_MEMORY,
@@ -56,6 +57,35 @@ test('every choice has a label and an explicit, concrete cost description', () =
       assert.ok(choice.effects && typeof choice.effects === 'object',
         `${event.id}/${choice.label}: missing effects`);
     }
+  }
+});
+
+test('every choice declares a stance the stance table knows about', () => {
+  for (const event of EVENTS) {
+    for (const choice of event.choices) {
+      assert.ok(choice.stance, `${event.id}/${choice.label}: no stance`);
+      assert.ok(STANCES[choice.stance],
+        `${event.id}/${choice.label}: unknown stance "${choice.stance}"`);
+    }
+  }
+});
+
+test('an event never offers the same stance twice', () => {
+  // Two choices labelled identically are indistinguishable at a glance,
+  // which defeats the whole point of labelling them.
+  for (const event of EVENTS) {
+    const stances = event.choices.map((c) => c.stance);
+    assert.equal(new Set(stances).size, stances.length,
+      `${event.id} repeats a stance: ${stances.join(', ')}`);
+  }
+});
+
+test('every stance in the table is actually used, and reads as a phrase', () => {
+  const used = new Set(EVENTS.flatMap((e) => e.choices.map((c) => c.stance)));
+  for (const [key, stance] of Object.entries(STANCES)) {
+    assert.ok(stance.label && stance.gloss, `${key}: incomplete stance`);
+    assert.ok(stance.gloss.length > 8, `${key}: gloss too thin — "${stance.gloss}"`);
+    assert.ok(used.has(key), `${key} is defined but no choice uses it`);
   }
 });
 

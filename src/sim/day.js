@@ -317,7 +317,14 @@ export function runDay(state, seed) {
         id: picked.id,
         speaker: EVENT_SPEAKERS[picked.speaker],
         prompt: picked.prompt,
-        choices: picked.choices.map((c) => ({ label: c.label, cost: c.cost })),
+        // Label, cost and stance — everything the card needs to be read,
+        // and nothing the card could act on. The effects deliberately stay
+        // behind in the library: applyEventChoice looks them up by id, so
+        // a report that has been round-tripped through a save cannot apply
+        // numbers that no longer match the event as written.
+        choices: picked.choices.map((c) => ({
+          label: c.label, cost: c.cost, stance: c.stance,
+        })),
       };
     }
   }
