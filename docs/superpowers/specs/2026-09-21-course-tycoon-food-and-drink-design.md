@@ -57,6 +57,7 @@ An item is authored data:
   cartable: true,      // can the beverage cart carry it
   appeal: { locals: 1.0, serious: 0.5, destination: 0.2 },
   satisfaction: 2,
+  energy: 12,          // how much of a tiring golfer it gives back - see §7.1
 }
 ```
 
@@ -253,16 +254,17 @@ the three food amenities end up with distinct jobs without a single rule saying
 so: the restaurant is where destination money is spent, and the cart is for the
 people actually out playing golf.
 
-**A hot cart barely beats a dry one, and this needs tuning.** Transfusion,
-draught, Caesar wrap and a hot dog gives 0.94 / 0.77 / 0.59 at `prep 1`.
-Swapping the hot dog for an Arnold Palmer gives 0.91 / 0.79 / 0.64 at `prep 0`.
-The best locals item in the game adds almost nothing, because a cart is already
-locals-saturated before it gets there and `pull` reads the mean. The author
-specifically asked for hot food on the cart, so "putting it there is pointless"
-is not an acceptable resting place. §8 must make a hot cart worth its kitchen
-load — most likely through satisfaction or energy rather than through `pull`,
-since a warm meal at the ninth is worth more to a tiring golfer than one more
-cold drink.
+**A hot cart barely beats a dry one on appeal alone.** Transfusion, draught,
+Caesar wrap and a hot dog gives 0.94 / 0.77 / 0.59 at `prep 1`. Swapping the hot
+dog for an Arnold Palmer gives 0.91 / 0.79 / 0.64 at `prep 0`. The best locals
+item in the game adds almost nothing, because a cart is already locals-saturated
+before it gets there and `pull` reads the mean.
+
+The author asked for hot food on the cart, so "it is pointless there" was not an
+acceptable answer. §7.1 is the fix, and it is a better mechanic than the problem
+deserved: hot food gives a tiring golfer more back than a cold drink does, and
+energy is already what decides pace. So the value of hot food on the cart is not
+that more people buy it — it is that the people who do play faster afterwards.
 
 ## 5. The kitchen, and making `kitchenStaff` mean something
 
@@ -347,9 +349,51 @@ the spine rather than bolting it on the side.
 **The person.** The author asked for a "cart girl". The amenity is
 `beverageCart` in code — the equipment — and the person who runs it is a named
 character who joins the narration cast alongside Gus, the greenkeeper and the
-starter. Working name Dee, subject to the author's preference. She gets narration
-lines and is eligible to speak decision events, which is the cheapest possible
+starter. She is called **Dee** — confirmed by the author. She gets narration lines and
+is eligible to speak decision events, which is the cheapest possible
 way to make a new amenity feel like part of the world.
+
+### 7.1 What is on the board decides how much of a round it gives back
+
+Approved by the author as the fix for §4.3's flat spot, and it turns out to be
+the thing that ties this whole slice to the rest of the game.
+
+Every item carries an `energy` value: how much of a tiring golfer it restores.
+Drinks give back a little, a wrap more, hot food most.
+
+| | typical `energy` |
+|---|---|
+| beer, wine, soft drinks | 3-5 |
+| espresso | 6 |
+| candy, trail mix, wraps, salad | 6-9 |
+| hot dog, chili, burger, breakfast sandwich | 12-15 |
+
+An amenity's refuel is then set by the best thing on its board, not by the fact
+that the amenity exists:
+
+```
+halfway house:  restoreTo = clamp(60 + bestEnergy * 2, 60, 88)   still costs 3.5 min
+beverage cart:  restoreTo = clamp(50 + bestEnergy * 2, 50, 76)   still costs no time
+```
+
+An all-drinks cart restores to 60. Put a hot dog on it and that becomes 74. The
+cart is capped below the halfway house's ceiling on purpose — it must never be
+a sit-down stop you get for free — but the gap between a dry cart and a hot one
+is fourteen points of energy, repeated every third hole.
+
+**Why this is the right fix rather than a patch.** `tiredMinutes = strokes x 0.12
+x (1 - energy/100)`, so fourteen points of energy is worth roughly 0.35 minutes
+per hole for a four-ball, about two minutes over nine holes. Modest on its own —
+and then it compounds, because a group that clears a hole sooner releases it to
+the group behind sooner, and the flow-shop rule in `schedule.js` is the entire
+pace-of-play mechanic. Food stops being a revenue system that happens to sit on
+a golf course and becomes another input to the thing the game is actually about.
+
+It also makes the halfway house's own menu matter for pace, which it did not
+before: today its refuel is a flat 82 regardless of what it serves. A sensible
+menu with a hot item lands at 84, so this is near-neutral for a player who
+chooses well — the same calibration rule as §4.1 — and a real penalty for one
+who stocks nothing but beer.
 
 ## 8. Balance
 
@@ -369,8 +413,12 @@ way to make a new amenity feel like part of the world.
   Neither may dominate. §4.2 flags that the Transfusion makes the cart strong,
   and the cart is pace-neutral on top of that, so this is the likeliest place
   for a dominant option to hide.
-- **hot cart against dry cart** — §4.3's flat spot. A cart carrying food must
-  earn its kitchen load, or the author's hot dogs are decoration.
+- **hot cart against dry cart** — §4.3's flat spot, now answered by §7.1. Run
+  both on the same tight tee interval and confirm the hot cart's round time is
+  measurably shorter. If it is not, the energy values are too small.
+- **pace neutrality of the halfway house** — its refuel is a flat 82 today. A
+  sensible menu must land near that (§7.1 predicts 84) so existing balance is
+  not silently disturbed.
 
 Any tuning gets recorded here, in this file, with the numbers that prompted it.
 
