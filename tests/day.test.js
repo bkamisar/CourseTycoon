@@ -6,7 +6,7 @@ import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import { emptyGoodwill, applyGoodwill } from '../src/sim/goodwill.js';
 import { EVENTS, STANCES } from '../src/sim/events.js';
 import { playHole } from '../src/sim/round.js';
-import { makeGroup } from '../src/sim/golfer.js';
+import { makeGroup, resetGuestIds } from '../src/sim/golfer.js';
 import { makeRng } from '../src/sim/rng.js';
 import { menuPrep } from '../src/sim/menu.js';
 import { BASE_CAPACITY, PER_COOK } from '../src/sim/kitchen.js';
@@ -446,7 +446,9 @@ test('hot food on the cart is worth carrying', () => {
   // putting food on the cart would be pointless.
   const dry = cartRestoreTo(['draught', 'transfusion', 'arnoldPalmer', 'candyBar']);
   const hot = cartRestoreTo(['draught', 'transfusion', 'arnoldPalmer', 'hotDog']);
-  assert.ok(hot - dry >= 10, `a hot dog added only ${hot - dry} points of energy`);
+  // Lower than it was: the cart's ceiling came down when her job became
+  // money rather than refreshment. It still has to be worth carrying.
+  assert.ok(hot - dry >= 8, `a hot dog added only ${hot - dry} points of energy`);
 });
 
 test('a cart costs no time, and a halfway house does', () => {
@@ -503,8 +505,11 @@ test('the cart and the halfway house never catch the same group on the same hole
 });
 
 test('an empty cart still restores something, but barely', () => {
-  assert.equal(cartRestoreTo([]), 50);
+  assert.equal(cartRestoreTo([]), 48);
   assert.ok(cartRestoreTo(['draught']) > cartRestoreTo([]));
+  // And she can never rival sitting down, whatever she carries.
+  assert.ok(cartRestoreTo(['burgerFries']) < halfwayRestoreTo(['burgerFries']) - 15,
+    'the gap to a seated stop should be wide, not marginal');
 });
 
 test('neither the cart nor the halfway house dominates the other', () => {
@@ -545,25 +550,73 @@ test('neither the cart nor the halfway house dominates the other', () => {
   }
 });
 
-test('the cart closes the gap as the course gets congested', () => {
-  // Her whole identity. If congestion does not move the comparison, she is
-  // just a smaller halfway house and the pair is one amenity wearing two
-  // hats.
-  function gap(teeInterval) {
-    const run = (build) => {
-      let state = newGame(404);
-      state.money = 80000;
-      state.resort.pricing.teeInterval = teeInterval;
-      state.resort.amenities.push(build);
-      const load = state.resort.amenities.reduce((t, a) => t + menuPrep(a.menu), 0);
-      const cooks = Math.max(0, Math.ceil((load - BASE_CAPACITY) / PER_COOK));
-      for (let i = 0; i < cooks; i++) state.resort.staff.push({ role: 'kitchenStaff' });
-      for (let d = 0; d < 20; d++) state = runDay(state, 4000 + d).state;
-      return state.money;
-    };
-    return run({ id: 'h', type: 'halfwayHouse', menu: ['burgerFries', 'draught', 'hotDog', 'chiliBowl', 'candyBar'] })
-      - run({ id: 'c', type: 'beverageCart', menu: ['draught', 'transfusion', 'hotDog', 'breakfastSandwich'] });
+test('on a nine the cart is the better buy, and neither is a trap', () => {
+  // The deliberate outcome, not an accident. A nine-hole course does not
+  // tire anybody out - golfers finish one with about 30% left - so the
+  // halfway house's whole proposition is thin here and the cart's money
+  // wins. That flips on an eighteen; see the energy test below.
+  function season(build) {
+    let state = newGame(404);
+    state.money = 80000;
+    state.resort.pricing.teeInterval = 11;
+    if (build) state.resort.amenities.push(build);
+    const load = state.resort.amenities.reduce((t, a) => t + menuPrep(a.menu), 0);
+    const cooks = Math.max(0, Math.ceil((load - BASE_CAPACITY) / PER_COOK));
+    for (let i = 0; i < cooks; i++) state.resort.staff.push({ role: 'kitchenStaff' });
+    for (let d = 0; d < 20; d++) state = runDay(state, 4000 + d).state;
+    return state.money;
   }
-  assert.ok(gap(9) < gap(14),
-    `the cart should close the gap when the course backs up: ${gap(9)} at 9min vs ${gap(14)} at 14min`);
+  const none = season(null);
+  const halfway = season({ id: 'h', type: 'halfwayHouse', menu: ['burgerFries', 'draught', 'hotDog', 'chiliBowl', 'candyBar'] });
+  const cart = season({ id: 'c', type: 'beverageCart', menu: ['draught', 'transfusion', 'hotDog', 'breakfastSandwich'] });
+
+  assert.ok(halfway > none, `the halfway house must still beat nothing (${halfway} vs ${none})`);
+  assert.ok(cart > halfway, `on a nine the cart should out-earn the halfway house (${cart} vs ${halfway})`);
+  assert.ok((cart - halfway) / halfway < 0.12,
+    `but not run away with it: ${((cart - halfway) / halfway * 100).toFixed(1)}% apart`);
+});
+
+test('a halfway house pays for itself on eighteen holes and not on nine', () => {
+  // The mechanism behind the whole halfway-house-versus-cart question, and
+  // the reason the nine-hole answer is allowed to be "not really".
+  //
+  // Golfers finish a nine on about 30% energy: they do not need feeding,
+  // so a stop costs more time than the restore saves. Over eighteen they
+  // are flat by the fourteenth and crawl the rest, so the same stop wins
+  // several minutes back. This is what gives the back nine in a later act
+  // something to change besides the hole count.
+  const built = newGame(1).resort.courses[0].holes
+    .filter((h) => h.corridor && h.corridor.length > 1);
+
+  function walk(holeCount, refuelAt) {
+    resetGuestIds();
+    const group = makeGroup(
+      makeRng(7), { prestige: 40, greenFee: 50, share: { locals: 1, serious: 0, destination: 0 } }, 0
+    );
+    let minutes = 0;
+    for (let i = 0; i < holeCount; i++) {
+      const hole = { ...structuredClone(built[i % built.length]), id: i + 1 };
+      minutes += playHole(makeRng(100 + i), hole, group, {
+        carts: false, refuel: refuelAt === i, refuelTo: 88,
+      }).minutes;
+    }
+    return { minutes, energy: group.guests.reduce((a, g) => a + g.energy, 0) / group.guests.length };
+  }
+
+  const nineAlone = walk(9, null);
+  const nineFed = walk(9, 3);
+  const eighteenAlone = walk(18, null);
+  const eighteenFed = walk(18, 8);
+
+  assert.ok(nineAlone.energy > 20,
+    `golfers should finish a nine with something left, got ${nineAlone.energy.toFixed(0)}`);
+  assert.ok(eighteenAlone.energy < 5,
+    `golfers should be empty by the end of an eighteen, got ${eighteenAlone.energy.toFixed(0)}`);
+
+  const savedOnNine = nineAlone.minutes - nineFed.minutes;
+  const savedOnEighteen = eighteenAlone.minutes - eighteenFed.minutes;
+  assert.ok(savedOnNine < 1,
+    `a stop should not pay on a nine, saved ${savedOnNine.toFixed(1)} minutes`);
+  assert.ok(savedOnEighteen > 4,
+    `a stop should clearly pay on an eighteen, saved only ${savedOnEighteen.toFixed(1)} minutes`);
 });

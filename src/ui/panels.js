@@ -29,13 +29,13 @@ const AMENITY_BLURB = {
   clubhouse: 'The resort’s front desk and hub. Always open.',
   proShop: 'Sells merchandise to guests after their round.',
   snackShack: 'Quick food and drinks out on the course.',
-  halfwayHouse: 'A stop partway round for food and a breather.',
+  halfwayHouse: 'A stop partway round for food and a breather. Worth most on a long course — golfers finish a nine with plenty left, so the stop costs more time than the rest is worth. It comes into its own over eighteen.',
   restaurant: 'Sit-down dining after the round.',
   restrooms: 'Guests notice sharply when there aren’t enough.',
   drivingRange: 'Lets guests warm up before teeing off.',
   practiceGreen: 'Practice putting before the round starts.',
   cartBarn: 'Stores carts and offers them to guests.',
-  beverageCart: 'Dee works the course with a cart. She reaches golfers without stopping them — so she earns without costing pace, where the halfway house trades three and a half minutes for a bigger break.',
+  beverageCart: 'Dee works the course with a cart. She reaches golfers without stopping them, so she earns without costing a minute of pace — and she needs no kitchen if you keep her to drinks. She sells; she does not feed. That is what the snack shack and halfway house are for.',
 };
 
 let stylesInjected = false;

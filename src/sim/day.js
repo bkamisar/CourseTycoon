@@ -63,15 +63,18 @@ export const CART_REACHES_EVERY = 3;
  * What a visit from the cart restores a tiring golfer to, decided by
  * what is on her board.
  *
- * Capped below `halfwayRestoreTo`'s ceiling on purpose. She costs no time
- * at all (round.js's `cartStop`), so if she could also match a sit-down
- * stop for energy she would simply be better than the halfway house and
- * there would be no decision between them. An all-drinks cart restores to
- * 60; put a hot dog on her and it is 74, against the halfway house's 88
- * for the same food and three and a half minutes.
+ * Deliberately well below `halfwayRestoreTo`'s ceiling: 68 against 88.
+ * She hands you a drink through a window; the halfway house sits you
+ * down. Her value is the money she takes and the time she does not cost,
+ * not the break she gives — feeding a tiring golfer is what the snack
+ * shack and the halfway house are for.
+ *
+ * Hot food on her still matters (an all-drinks cart restores to 54, one
+ * with a hot dog to 67), because otherwise there would be no reason to
+ * put any on her. It just cannot rival sitting down.
  */
 export function cartRestoreTo(menu) {
-  return clamp(50 + menuBestEnergy(menu) * 2, 50, 76);
+  return clamp(48 + menuBestEnergy(menu) * 1.6, 48, 68);
 }
 
 export function halfwayRestoreTo(menu) {

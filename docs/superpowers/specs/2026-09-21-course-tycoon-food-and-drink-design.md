@@ -458,52 +458,74 @@ who stocks nothing but beer.
 
 Any tuning gets recorded here, in this file, with the numbers that prompted it.
 
-### 8.1 What the cart pass actually found
+### 8.1 What the cart pass found, and one thing it got wrong
 
-**The halfway house was worse than building nothing.** Measured over twenty
-days with a cook hired, it returned $84,195 against $81,768 for an empty
-resort while the cart returned $87,078. Two causes, both fixed:
+**A correction first.** An earlier draft of this section said the halfway
+house was "worse than building nothing at all". That came from a botched
+measurement — an unstaffed kitchen throttling a prep-5 board while the
+cart's prep-3 board ran clean. Under fair staffing the halfway house was
+always ahead of an empty resort, by about $2,400 over twenty days. It was
+a weaker buy than the cart, which is a different and much smaller claim.
 
-*A stop costs far more than its own length.* `REFUEL_MINUTES` was 3.5,
+**A stop costs far more than its own length.** `REFUEL_MINUTES` was 3.5,
 chosen as "how long a stop takes". But the group behind cannot start the
 hole until this one clears it, so `scheduleRounds` turned 3.5 minutes into
 **fourteen** — a round went from 125 to 139 minutes at a nine-minute tee
-interval. Now 2.2.
+interval. Now 2.2. This one was a real modelling error and the fix stands.
 
-*A seated stop sold no more than a passing cart.* Both were on
-`MENU_RATE` 1.3. A group that has sat down buys a burger and a beer where
-a cart sells one drink, so the halfway house is now 1.7 and the cart 0.9.
-This keeps §4.1's calibration: a matched halfway house board lands at
-about $11 a guest, which is what the flat `spendPerGuest` it replaced
-earned.
+**The rate spread was not.** For a while `MENU_RATE` read halfwayHouse 1.7
+against beverageCart 0.9, on the reasoning that a seated group buys more
+than one flagged down in passing. The reasoning is sound; the numbers were
+reverse-engineered to force the halfway house to win, and it should not.
+Both are back to 1.3.
 
-**After the fix, over twenty days, cooks hired only as each board needs:**
+### 8.2 Why the halfway house is allowed to be a poor buy in Act I
 
-| tee interval | nothing | halfway house | cart with hot food | gap |
+The author's observation, and it is correct: **a halfway house belongs at
+the turn of an eighteen.** A nine has no turn — you finish. Measured:
+
+```
+Energy left after each hole, no halfway house
+   9 holes: 95 86 77 72 63 53 49 40 30        finishes on 30
+  18 holes: 95 86 77 72 63 53 49 40 30 26 17 7 3 0 0 0 0 0
+
+What a stop at the turn is worth
+   9 holes: 149m without, 150m with   net -1.0 minutes
+  18 holes: 305m without, 298m with   net +7.0 minutes
+```
+
+Golfers finish a nine with a third of the tank; they do not need feeding,
+so the stop costs more time than the rest saves. Over eighteen they are
+flat by the fourteenth and crawl home, and the same stop wins seven
+minutes back. Nothing was added to make this true — it falls out of the
+energy drain that was already there.
+
+So Act I's answer is "not really, yet", and that is the design rather than
+a bug. It gives the back nine something to change besides the hole count.
+**The obligation this creates is signposting**, not tuning: the Amenities
+screen now says the halfway house comes into its own over eighteen, so
+the player is making a choice rather than walking into a trap.
+
+### 8.3 The three food amenities, as they finally divide
+
+| | earns | feeds | costs pace | needs a kitchen |
 |---|---|---|---|---|
-| 9 min (congested) | $81,768 | $88,268 | $87,078 | 1.4% |
-| 11 min | $83,176 | $89,662 | $88,238 | 1.6% |
-| 14 min (clear) | $87,752 | $96,255 | $94,594 | 1.8% |
+| beverage cart | most, on a nine | barely (restores to 68) | nothing | only if she carries hot food |
+| halfway house | same rate, fewer heads | most (restores to 88) | 2.2 min, amplified | yes, for a board worth having |
+| snack shack | least | middling | none | rarely |
 
-Both clearly beat building nothing, neither runs away, and the gap
-narrows as the course congests — which is the cart's identity doing its
-job. Both facts are now pinned by tests.
+The cart sells; she does not feed. Feeding a tiring golfer is what the
+other two are for. On a nine that makes her the better buy by about 4.5%
+at every tee interval tested — deliberately, and pinned by a test — and
+on an eighteen the halfway house's seven minutes change the answer.
 
-**Where this lands differently from §7's prediction.** The spec expected
-the cart to *win* on a congested course and lose on a clear one. She does
-not win; she closes the gap. The real distinction turned out to be
-staffing: a drinks-only cart is `prep 0`, so she runs on $90 a day and
-**no cooks at all**, where a halfway house worth building needs one at
-$180. She is the amenity you can afford before you can afford a kitchen.
-That is a better distinction than the one that was designed, and it is
-recorded rather than tuned away.
-
-**A caution for anyone re-running this.** The first three attempts at this
-comparison were all wrong, in ways that each looked like a design failure:
-comparing revenue without wages, comparing an overloaded kitchen against a
-staffed one, and charging a drinks-only cart for a cook it does not need.
-Hire cooks per board, or the number you get back is about staffing and not
-about the amenity.
+**A caution for anyone re-running any of this.** Four attempts at the
+cart-versus-halfway-house comparison were wrong before one was right, and
+each wrong one looked like a design failure: comparing revenue without
+wages, comparing an overloaded kitchen against a staffed one, charging a
+drinks-only cart for a cook it does not need, and finally cloning unbuilt
+holes to fake an eighteen. Hire cooks per board, and check the course you
+built is actually playable.
 
 ## 9. Tests that must hold
 
