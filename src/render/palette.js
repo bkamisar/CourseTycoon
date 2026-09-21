@@ -37,4 +37,16 @@ export const PALETTE = Object.freeze({
 
   // Highlight
   ACCENT: '#FFC93C', // money, highlights, calls to action
+
+  // Food and drink. Grass, sand and water do not make a hot dog, so the
+  // menu art needs a few colours of its own — but only a few. Bread
+  // borrows SAND (a bun really is the colour of a bunker), lettuce and
+  // lime borrow FAIRWAY, foam and ice borrow WHITE, glass and shell
+  // borrow UI_LIGHT. Minting a FOOD_BREAD that duplicates SAND is how a
+  // palette starts drifting into two names for one colour.
+  FOOD_MEAT: '#B5543A',      // sausage, patty, bacon, steak
+  FOOD_MEAT_PALE: '#E08878', // ham, cooked chicken
+  FOOD_RED: '#C0392B',       // tomato, wine, lobster, a wrapper
+  FOOD_DRINK: '#E8A020',     // beer and anything amber in a glass
+  FOOD_BERRY: '#8E44AD',     // the Transfusion's grape
 });
