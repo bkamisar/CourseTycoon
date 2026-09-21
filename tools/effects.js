@@ -137,17 +137,88 @@ console.log(`\nWHAT EVERYTHING DOES — a finished nine, ${DAYS} days, ${SEEDS} 
 console.log(`Baseline: $${Math.round(base.perDay).toLocaleString()}/day, happy ${base.happy.toFixed(0)}, `
   + `round ${base.round.toFixed(0)}m, ${base.groups.toFixed(0)} groups, rating ${base.rating.toFixed(0)}\n`);
 
-console.log('AMENITIES                 cost   upkeep    $/day   happy   round  groups  rating');
+/**
+ * The staff an amenity needs before it can do its job.
+ *
+ * Measured both ways on purpose. Bare says what a player gets if they
+ * build it and think no further, which is the mistake the game should
+ * warn about rather than the number it should be balanced on. Staffed is
+ * the real value, and payback is computed from it.
+ */
+/**
+ * Amenities that are deliberately poor buys in Act I, so a long payback
+ * here is the design rather than a mispricing.
+ *
+ * Both are about a nine having no turn and nowhere to linger: a halfway
+ * house pays off at the turn of an eighteen (golfers finish a nine with a
+ * third of the tank), and a restaurant pays off when there is a hotel
+ * giving people a reason to stay for dinner. Without this list the tool
+ * reports them as broken every run, and a tool that cries wolf gets
+ * ignored the one time it is right.
+ */
+const LATER_ACT = {
+  halfwayHouse: 'pays off at the turn of an eighteen, not on a nine',
+  restaurant: 'pays off when a hotel gives guests a reason to stay for dinner',
+};
+
+const AMENITY_STAFF = {
+  proShop: ['shopStaff'],
+  snackShack: ['kitchenStaff'],
+  halfwayHouse: ['kitchenStaff'],
+  restaurant: ['kitchenStaff', 'kitchenStaff', 'kitchenStaff'],
+  beverageCart: ['kitchenStaff'],
+};
+
+console.log('AMENITIES            build  upkeep     bare   staffed   payback   happy   round');
 console.log('-'.repeat(82));
+const rows = [];
 for (const type of Object.keys(AMENITIES)) {
   if (type === 'clubhouse') continue; // you always have one
   const spec = AMENITIES[type];
-  const d = delta(measure((s) => s.resort.amenities.push(amenity(type))));
+  const bare = delta(measure((s) => s.resort.amenities.push(amenity(type))));
+  const hires = AMENITY_STAFF[type] ?? [];
+  const staffed = hires.length
+    ? delta(measure((s) => {
+      s.resort.amenities.push(amenity(type));
+      for (const role of hires) s.resort.staff.push({ role });
+    }))
+    : bare;
+  // Days to earn back what it cost to build, at its staffed rate.
+  const payback = staffed.money > 0 ? spec.build / staffed.money : Infinity;
+  rows.push({ type, spec, bare, staffed, payback });
   console.log(
-    `  ${type.padEnd(22)}${cell('$' + (spec.build / 1000).toFixed(0) + 'k', 6)}`
-    + `${cell('$' + spec.upkeep, 9)}${cell(money(d.money), 9)}`
-    + `${cell(num(d.happy), 8)}${cell(num(d.round), 8)}${cell(num(d.groups), 8)}${cell(num(d.rating), 8)}`
+    `  ${type.padEnd(17)}${cell('$' + (spec.build / 1000).toFixed(0) + 'k', 6)}`
+    + `${cell('$' + spec.upkeep, 8)}${cell(money(bare.money), 9)}${cell(money(staffed.money), 10)}`
+    + `${cell(Number.isFinite(payback) ? payback.toFixed(0) + 'd' : 'never', 10)}`
+    + `${cell(num(staffed.happy), 8)}${cell(num(staffed.round), 8)}`
   );
+}
+
+// A purchase that pays for itself in a couple of days is not a decision.
+const sane = rows.filter((r) => Number.isFinite(r.payback)).map((r) => r.payback);
+if (sane.length) {
+  const median = sane.slice().sort((a, b) => a - b)[Math.floor(sane.length / 2)];
+  console.log(`
+  Median payback ${median.toFixed(0)} days. Anything far under that is priced too cheap:`);
+  let flagged = 0;
+  for (const r of rows) {
+    if (LATER_ACT[r.type]) continue;
+    if (Number.isFinite(r.payback) && r.payback < median * 0.5) {
+      console.log(`    ${r.type}: pays back in ${r.payback.toFixed(0)} days — less than half the median.`);
+      flagged += 1;
+    }
+    if (!Number.isFinite(r.payback) || r.payback > median * 4) {
+      console.log(`    ${r.type}: ${Number.isFinite(r.payback) ? r.payback.toFixed(0) + ' days' : 'never'} — nobody would build this.`);
+      flagged += 1;
+    }
+  }
+  if (flagged === 0) console.log('    Nothing. Every purchase is inside a sane band.');
+  console.log('');
+  console.log('  Deliberately poor in Act I, so a long payback here is the design:');
+  for (const [type, why] of Object.entries(LATER_ACT)) {
+    const r = rows.find((x) => x.type === type);
+    console.log(`    ${type} (${r ? (Number.isFinite(r.payback) ? r.payback.toFixed(0) + 'd' : 'never') : '?'}): ${why}.`);
+  }
 }
 
 console.log('\nSTAFF                     wage             $/day   happy   round  groups    turf');

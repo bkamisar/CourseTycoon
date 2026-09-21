@@ -21,7 +21,19 @@ export const AMENITIES = {
   restrooms:    { upkeep: 30,  build: 1800,  satisfaction: 4 },
   drivingRange: { upkeep: 80,  build: 7000,  satisfaction: 4 },
   practiceGreen:{ upkeep: 45,  build: 3000,  satisfaction: 3 },
-  cartBarn:     { upkeep: 110, build: 9000,  satisfaction: 3 },
+  /**
+   * The most transformative thing on this list and priced accordingly.
+   *
+   * A fleet of carts takes about 32 minutes off a round and moves
+   * satisfaction nearly ten points - nothing else comes close. At $9,000
+   * and $110 a day it paid for itself in four days against a median of
+   * fourteen, which made it less a decision than a checkbox: there was no
+   * point in a course that had not bought one immediately.
+   *
+   * It is now a capital item. You have to be doing well to afford it, and
+   * it still transforms the course when you do.
+   */
+  cartBarn:     { upkeep: 380, build: 26000, satisfaction: 3 },
   // Reaches golfers without stopping them, which is what separates her
   // from the halfway house — see round.js's cartStop and spec §7. Cheaper
   // to build than the halfway house because she carries less, and cheaper

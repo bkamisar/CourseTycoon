@@ -32,11 +32,11 @@ const AMENITY_BLURB = {
   proShop: 'Sells merchandise to guests after their round.',
   snackShack: 'Quick food and drinks near the clubhouse. Golfers grab something early in the round — a smaller lift than the halfway house, but it costs them no time at all.',
   halfwayHouse: 'A stop partway round for food and a breather. Worth most on a long course — golfers finish a nine with plenty left, so the stop costs more time than the rest is worth. It comes into its own over eighteen.',
-  restaurant: 'Sit-down dining after the round.',
+  restaurant: 'Sit-down dining after the round. Needs a full kitchen behind it, and on a nine-hole course most golfers leave rather than stay to eat — it earns its keep once there is a reason to linger.',
   restrooms: 'Guests notice sharply when there aren’t enough.',
   drivingRange: 'Lets guests warm up before teeing off.',
   practiceGreen: 'Practice putting before the round starts.',
-  cartBarn: 'Stores carts and offers them to guests.',
+  cartBarn: 'A fleet of carts. Takes about half an hour off a round and lifts satisfaction more than anything else you can build — and costs more to run than everything else combined. Buy it when you can carry it.',
 };
 
 /**
