@@ -1,8 +1,52 @@
 import { newGame } from '../src/sim/state.js';
-import { runDay } from '../src/sim/day.js';
+import { runDay, applyEventChoice } from '../src/sim/day.js';
+import { EVENTS, STANCES } from '../src/sim/events.js';
 
 const SEEDS = 60;
 const DAYS = 60;
+
+/**
+ * How an operator answers decision events.
+ *
+ * The passive floor below never answers at all, which is the honest
+ * baseline but also means the entire events slice is invisible to it.
+ * These are the policies that make it visible, and they answer the one
+ * question a unit test cannot: the dominated-choice-set test proves no
+ * single option beats its siblings on every axis, but a stance could
+ * still quietly win over sixty days by being right slightly more often
+ * than it is wrong. If one of these comes out clearly ahead of the rest,
+ * that stance is the autopilot the whole slice exists to remove.
+ *
+ * Each returns the index of the choice to take.
+ */
+const moneyOf = (choice) => choice.effects?.money ?? 0;
+
+const POLICIES = {
+  // Never answers. The existing baseline, kept so its numbers stay
+  // comparable with every balance run before events existed.
+  ignore: null,
+  // Spends the least (often the do-nothing option).
+  cheapest: (event) => indexOfBest(event, (c) => moneyOf(c)),
+  // Spends the most, which is usually also the most thorough.
+  dearest: (event) => indexOfBest(event, (c) => -moneyOf(c)),
+};
+for (const key of Object.keys(STANCES)) {
+  // Prefer this stance wherever the event offers it; where it does not,
+  // fall back to spending the least, so the fallback is the same for
+  // every stance policy and cannot flatter one of them.
+  POLICIES[key] = (event) => {
+    const i = event.choices.findIndex((c) => c.stance === key);
+    return i >= 0 ? i : indexOfBest(event, (c) => moneyOf(c));
+  };
+}
+
+function indexOfBest(event, score) {
+  let best = 0;
+  for (let i = 1; i < event.choices.length; i++) {
+    if (score(event.choices[i]) > score(event.choices[best])) best = i;
+  }
+  return best;
+}
 
 /**
  * Runs many resorts through many days and reports whether the economy is
@@ -14,15 +58,28 @@ const DAYS = 60;
  * That is the floor. A thinking player should do better than this, so if
  * the passive operator is already rich, the economy is too generous.
  */
-function runSeason(seed) {
+function runSeason(seed, policy = null) {
   let state = newGame(seed);
   let bankrupt = false;
   let gateDay = null;
   let peakMoney = state.money;
+  let answered = 0;
+  let onStance = 0;
 
   for (let day = 0; day < DAYS; day++) {
     const result = runDay(state, seed * 1000 + day);
     state = result.state;
+    const pending = result.report.pendingEvent;
+    if (policy && pending) {
+      // The report carries only what the card needs to render. The
+      // effects live in the library, so look the event up there — the
+      // same route applyEventChoice takes.
+      const event = EVENTS.find((e) => e.id === pending.id);
+      const index = policy(event);
+      state = applyEventChoice(state, pending.id, index);
+      answered += 1;
+      if (event.choices[index].stance === policy.stanceKey) onStance += 1;
+    }
     peakMoney = Math.max(peakMoney, state.money);
     if (state.money < 0 && !bankrupt) bankrupt = true;
     if (result.report.gate.passed && gateDay === null) gateDay = day + 1;
@@ -31,6 +88,8 @@ function runSeason(seed) {
   const last = state.history[state.history.length - 1];
   return {
     bankrupt,
+    answered,
+    onStance,
     gateDay,
     peakMoney,
     finalMoney: state.money,
@@ -63,4 +122,49 @@ console.log(`  Mean final turf         ${mean((r) => r.finalTurf).toFixed(1)}`);
 console.log(`  Mean groups per day     ${mean((r) => r.groupsPlayed).toFixed(1)}`);
 console.log(`  Mean satisfaction       ${mean((r) => r.averageSatisfaction).toFixed(1)}`);
 console.log(`  Mean round time         ${mean((r) => r.averageRoundMinutes).toFixed(0)} min`);
+console.log('');
+
+// ---------------------------------------------------------------------
+// Decision policies. Same passive operator in every other respect — no
+// building, no pricing, no hiring — so the only thing separating these
+// rows is how the events were answered.
+// ---------------------------------------------------------------------
+
+const policyRows = [];
+for (const [name, policy] of Object.entries(POLICIES)) {
+  if (policy) policy.stanceKey = STANCES[name] ? name : null;
+  const rows = [];
+  for (let seed = 1; seed <= SEEDS; seed++) rows.push(runSeason(seed, policy));
+  const avg = (fn) => rows.reduce((s, r) => s + fn(r), 0) / rows.length;
+  policyRows.push({
+    name,
+    money: avg((r) => r.finalMoney),
+    prestige: avg((r) => r.finalPrestige),
+    turf: avg((r) => r.finalTurf),
+    sat: avg((r) => r.averageSatisfaction),
+    answered: avg((r) => r.answered),
+    onStance: avg((r) => r.onStance),
+    bankrupt: (rows.filter((r) => r.bankrupt).length / rows.length) * 100,
+  });
+}
+
+const baseline = policyRows.find((r) => r.name === 'ignore');
+console.log(`How the events are answered — ${SEEDS} seeds x ${DAYS} days, otherwise the same passive operator
+`);
+console.log('  policy        money    vs base  prestige   turf    happy   answered  on-stance');
+for (const r of policyRows) {
+  const delta = r.name === 'ignore' ? '' :
+    `${r.money - baseline.money >= 0 ? '+' : '-'}$${Math.abs(Math.round(r.money - baseline.money)).toLocaleString()}`;
+  console.log(
+    `  ${r.name.padEnd(12)}$${Math.round(r.money).toLocaleString().padStart(8)}` +
+    `${delta.padStart(10)}  ${r.prestige.toFixed(1).padStart(6)}  ${r.turf.toFixed(1).padStart(5)}` +
+    `  ${r.sat.toFixed(1).padStart(6)}  ${r.answered.toFixed(1).padStart(8)}  ${
+      r.name === 'ignore' || r.name === 'cheapest' || r.name === 'dearest'
+        ? '     —' : `${((r.onStance / Math.max(1, r.answered)) * 100).toFixed(0)}%`.padStart(6)}`
+  );
+}
+
+const spread = Math.max(...policyRows.map((r) => r.money)) - Math.min(...policyRows.map((r) => r.money));
+console.log(`
+  Spread between best and worst policy: $${Math.round(spread).toLocaleString()}`);
 console.log('');

@@ -639,6 +639,41 @@ felt.
 can be waved away becomes a notification rather than a choice, and the player
 starts clicking through without reading.
 
+**Each choice is labelled with a stance** — Populist, Ambitious, Commercial,
+Thorough, Pragmatic, Principled, Thrifty, Defiant — plus half a sentence of
+gloss. The cost line says what a choice does; the stance says what kind of
+answer it is, so the shape of a decision is legible before any number is read.
+Nothing in the simulation reads a stance; it is purely a reading aid.
+
+#### 15a.4a What the first balance sweep said
+
+`tools/balance.js` now answers events as well as playing days, under eleven
+policies over 60 seeds x 60 days. Three findings, measured, not guessed:
+
+**No stance is a free win.** Among the eight stance policies the spread in
+final money is $69.7k (Ambitious) to $77.6k (Pragmatic) — about 11% — and they
+separate on different axes: Thorough is the only policy that ends above the
+passive turf baseline, Ambitious and always-spend-the-most buy prestige at a
+real cost, Thrifty and Defiant hold cash and pay for it in goodwill. That is a
+tradeoff surface rather than a right answer.
+
+**Prestige bought at an event mostly evaporates.** A +10 bump is half gone in
+8 days and negligible by day 30, because prestige mean-reverts toward a level
+set by satisfaction. That is not a bug to tune out — it means prestige-buying
+events only pay for an operator who *acts on* the bump by raising the green fee
+while it lasts, and are a straight loss for one who does not. It is exactly the
+anti-autopilot property this slice wants, but it is currently invisible: a
+player reading the glossary would assume a bought +10 is permanent. The
+glossary should say prestige reverts.
+
+**The safe middle is the real autopilot risk, not any single event.**
+"Pragmatic" is on offer in 11 of the 16 events and is the best-performing money
+policy. No individual event has a dominated choice set — that is tested — but
+"always take the middle" is a policy that needs no thought and does not lose.
+The fix is fewer middles, not a weaker middle: some events should offer only
+two real positions. Deferred, with the count recorded here so the next pass has
+a number to beat.
+
 ### 15a.5 Staff morale
 
 Not a constituency to please for its own sake — the **hidden multiplier**.
