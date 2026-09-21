@@ -96,3 +96,75 @@ export function itemsFor(type) {
   });
 }
 
+/** Every item on `menu` that the catalogue actually knows about. A saved
+ * game can name an item a later catalogue removed, and a menu board that
+ * throws is worse than one that quietly serves less. */
+function resolve(menu) {
+  return (menu ?? []).map((id) => ITEMS[id]).filter(Boolean);
+}
+
+/**
+ * How much of this board a crowd actually wants, 0..1.
+ *
+ * The mean decides it, lifted halfway toward the best thing on the menu.
+ * Reading only the best item - which an earlier draft did - let a single
+ * burger on a board of oysters and steak score 1.00 with locals, and 87%
+ * of five-slot menus then pleased all three crowds at once. A golfer
+ * looking at a board where one item in five is for them is not being
+ * catered to, and the mean is what says so.
+ */
+export function menuPull(menu, segment) {
+  const items = resolve(menu);
+  if (items.length === 0) return 0;
+  const appeals = items.map((i) => i.appeal[segment] ?? 0);
+  const best = Math.max(...appeals);
+  const mean = appeals.reduce((s, a) => s + a, 0) / appeals.length;
+  return clamp(mean + 0.5 * (best - mean), 0, 1);
+}
+
+/** Weighted by appetite rather than by menu position: what they would pick
+ * decides the average, not what happens to be listed. */
+function weightedAverage(menu, segment, field) {
+  const items = resolve(menu);
+  let numerator = 0;
+  let weight = 0;
+  for (const item of items) {
+    const a = item.appeal[segment] ?? 0;
+    numerator += item[field] * a;
+    weight += a;
+  }
+  return weight > 0 ? numerator / weight : 0;
+}
+
+/** The average price of what this crowd would actually buy. */
+export function menuBasket(menu, segment) {
+  return weightedAverage(menu, segment, 'price');
+}
+
+/** The same average over what those items cost the resort to serve. */
+export function menuCogs(menu, segment) {
+  return weightedAverage(menu, segment, 'cost');
+}
+
+/** Kitchen-line load, summed. See kitchen.js for what it is measured against. */
+export function menuPrep(menu) {
+  return resolve(menu).reduce((s, i) => s + i.prep, 0);
+}
+
+/** What the most restorative thing on the board gives a tiring golfer back. */
+export function menuBestEnergy(menu) {
+  const items = resolve(menu);
+  return items.length ? Math.max(...items.map((i) => i.energy)) : 0;
+}
+
+/** What having this board at all is worth to a guest of `segment`, as a
+ * satisfaction contribution: a board they want counts, one they do not
+ * barely registers. Used by day.js's satisfaction pass (Task 6). */
+export function menuSatisfaction(menu, segment) {
+  const items = resolve(menu);
+  if (!items.length) return 0;
+  return items.reduce(
+    (s, i) => Math.max(s, i.satisfaction * (i.appeal[segment] ?? 0)), 0
+  );
+}
+
