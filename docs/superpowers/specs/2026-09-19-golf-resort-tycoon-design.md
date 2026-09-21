@@ -718,6 +718,41 @@ stopping*, so she earns revenue without costing pace, where the halfway house
 trades a fixed time cost for its refuel. That makes them a real choice against
 each other rather than two sizes of the same thing.
 
+### 15a.10 Presentation ideas, from the reference game
+
+The author plays an MLB lockout simulator that solves several of the same
+problems, and sent screenshots. Four things worth taking, in rough order of
+value per unit of work.
+
+**Choices carry a stance as well as a cost.** Its options are labelled
+"Diplomatic - unite all parties", "Aggressive - set a deadline". A stance says
+what kind of operator the player is being, which reads faster than a number and
+gives the choice character. Ours would be "Populist - keeps the locals onside"
+against "Ambitious - chases the serious players". Pure data, no machinery.
+
+**The constituencies are always on screen.** Three labelled bars - Players,
+Owners, Public - sit permanently in its header, so the impossibility of
+pleasing everyone is present at every moment rather than discovered at the end
+of the day. Our three segments currently appear only in the evening report.
+Moving them into the HUD as bars is probably the highest-value idea here.
+
+**Information arrives in varied media.** A rendered tweet, a scrolling news
+ticker, a press clipping - not only "a person says a thing". For golf: a
+magazine review as a clipping, a local paper headline, a scorecard with a note
+on it, a text from a regular. This is a rendering variation over the event and
+narration data that already exists, not new machinery.
+
+**Speakers have faces.** Its portraits are illustrated and would clash with our
+pixel art, but a small pixel portrait per character - Gus, the greenkeeper, the
+starter - would give the cast presence at a bounded art cost.
+
+**Deliberately not taken: free-text answers.** It offers "write your own opening
+statement", which requires a model to read and judge the player's prose at
+runtime. That means the page calling Claude on every custom answer, billed to
+whoever is playing, with a pause while it thinks. It suits a game built around
+rhetoric; it does not suit one whose interesting decisions are spatial and
+economic.
+
 ## 16. Deferred decisions
 
 Recorded so they are not silently forgotten, and deliberately excluded from Act
