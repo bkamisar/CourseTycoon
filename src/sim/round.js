@@ -46,6 +46,7 @@ export function playHole(
     carts, handicapAdjust = 0, puttAdjust = 0,
     refuel = false, refuelTo = REFUEL_TO,
     cartStop = false, cartStopTo = 0,
+    spread = 1,
   }
 ) {
   const stats = holeStats(hole);
@@ -86,7 +87,7 @@ export function playHole(
     while (strokes < MAX_STROKES) {
       if (lie === LIE.GREEN) break;
 
-      const shot = resolveShot(rng, hole, position, lie, swingHandicap);
+      const shot = resolveShot(rng, hole, position, lie, swingHandicap, spread);
       strokes++;
       events.push({
         type: 'shot',

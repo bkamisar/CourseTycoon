@@ -46,6 +46,10 @@ export function newGame(seed) {
     // separate from and layered on top of whether the course itself suits
     // a crowd. Fades on its own; see day.js's decay each morning.
     goodwill: emptyGoodwill(),
+    // Weather is a pure function of this and the day number, which is
+    // what lets a forecast be the same thing as the weather rather than a
+    // prediction that can drift from it. See weather.js.
+    weatherSeed: seed,
     // Which decision events have been offered lately, so the same one does
     // not come up twice while the library still has something unseen.
     eventsSeen: [],
@@ -120,6 +124,11 @@ export function deserialize(text) {
     if (!Array.isArray(a.menu)) a.menu = defaultMenuFor(a.type);
     if (!a.id) a.id = `${a.type}-legacy${index}`;
   });
+  // Saves made before weather existed get one, derived from something
+  // stable about the resort so the same save always has the same climate.
+  if (typeof parsed.weatherSeed !== 'number') {
+    parsed.weatherSeed = (parsed.seed ?? parsed.day ?? 1) * 31 + 7;
+  }
   return parsed;
 }
 

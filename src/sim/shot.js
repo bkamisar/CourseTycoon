@@ -37,12 +37,13 @@ export function fullRange(handicap, lie = LIE.TEE) {
  * The ball is aimed along the corridor toward the green, so a dogleg is
  * played round rather than through - golfers are not suicidal.
  */
-export function resolveShot(rng, hole, from, lie, handicap) {
+export function resolveShot(rng, hole, from, lie, handicap, weatherSpread = 1) {
   const range = fullRange(handicap, lie);
   const toPin = distanceRemaining(hole, from);
   const intended = Math.min(range, toPin);
 
-  const spread = LIE_SPREAD[lie] ?? 1.0;
+  // The lie makes a shot harder; the wind makes it wilder still.
+  const spread = (LIE_SPREAD[lie] ?? 1.0) * weatherSpread;
   const distanceSd = intended * (0.05 + handicap * 0.003) * spread;
   const lateralSd = intended * (0.035 + handicap * 0.0035) * spread;
 

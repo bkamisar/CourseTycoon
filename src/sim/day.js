@@ -15,6 +15,7 @@ import { SEGMENT_KEYS } from './segments.js';
 import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
 import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEvent } from './events.js';
 import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
+import { weatherOn, forecast, effectsOf } from './weather.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -143,6 +144,12 @@ export function runDay(state, seed) {
   const snackEnergy = snackShack ? snackRestoreTo(snackShack.menu) : 0;
   const snackHoleIndex = Math.min(1, Math.max(0, holes.length - 1));
 
+  // The sky, decided once. A pure function of the resort's weather seed
+  // and the day number, so the forecast the player saw two days ago is
+  // this exact value rather than a prediction of it (see weather.js).
+  const weatherKey = weatherOn(next.weatherSeed ?? 1, next.day);
+  const sky = effectsOf(weatherKey);
+
   const beverageCart = next.resort.amenities.find((a) => a.type === 'beverageCart');
   const cartEnergy = beverageCart ? cartRestoreTo(beverageCart.menu) : 0;
   const halfwayHouse = next.resort.amenities.find((a) => a.type === 'halfwayHouse');
@@ -184,6 +191,7 @@ export function runDay(state, seed) {
   // below.
   const demand = holes.length
     ? demandGroups({
+        weather: sky.demand,
         courseRating: rating,
         prestige: next.prestige,
         amenities: next.resort.amenities,
@@ -219,6 +227,7 @@ export function runDay(state, seed) {
         carts,
         handicapAdjust: warming && hasRange ? RANGE_WARMUP : 0,
         puttAdjust: warming && hasPracticeGreen ? PRACTICE_GREEN_WARMUP : 0,
+        spread: sky.spread,
         refuel: hasHalfwayHouse && holeIndex === turnHoleIndex(holes.length),
         refuelTo: halfwayEnergy,
         // Every third hole, and never on the same hole as the turn — a
@@ -375,7 +384,10 @@ export function runDay(state, seed) {
   const keepers = next.resort.staff.filter((m) => m.role === 'groundskeeper').length;
   const wear = holes.length * 1.4 + groupCount * 0.12;
   const care = keepers * 6.8;
-  next.turfQuality = clamp(next.turfQuality - wear + care, 0, 100);
+  // Rain waters the course for free; a run of clear days bakes it. A wet
+  // week costs money and leaves the turf better than it found it, which
+  // is a trade rather than a punishment.
+  next.turfQuality = clamp(next.turfQuality - wear + care + sky.turf, 0, 100);
 
   next.prestige = nextPrestige(next.prestige, rating, averageSatisfaction);
   next.money += profit;
@@ -415,6 +427,16 @@ export function runDay(state, seed) {
     crowd,
     kitchen,
     shop,
+    weather: {
+      key: weatherKey,
+      label: sky.label,
+      note: sky.note,
+      // Tomorrow onward. Two to three days is what spec §15a.6 asked for:
+      // long enough to schedule around, short enough to still be a
+      // forecast. It is `weatherOn` asked early, not a prediction, so it
+      // cannot disagree with the days when they arrive.
+      forecast: forecast(next.weatherSeed ?? 1, next.day + 1, 3),
+    },
     complaints,
     gate,
   };

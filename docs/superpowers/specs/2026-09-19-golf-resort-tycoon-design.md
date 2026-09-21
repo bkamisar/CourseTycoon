@@ -340,12 +340,25 @@ wallet.
 **What did not converge: bankruptcy sits at 0%, against a 15–45% target.** This
 looks like a structural limit rather than a tuning failure. With a passive
 operator and no random shocks, every seed has near-identical economics — demand
-is a smooth function of state with no variance source — so bankruptcy is
-effectively deterministic and lands at 0% or 100%, never in between. Reaching
-the target band needs either random events (weather, equipment failure — both
-deferred in §16) or a starting position balanced on a knife edge, which would
-make the opening feel arbitrary. Recommend accepting 0% for now and revisiting
-if weather is ever built.
+is a smooth function of state with no variance source, so bankruptcy is
+effectively deterministic and lands at 0% or 100%, never in between.
+Recommend accepting 0% for now and revisiting if weather is ever built.
+
+**Revisited, and the diagnosis was wrong.** Weather is built, it adds real
+variance — money fell from $75k to $67k, turf rose as rain watered the
+course, gate days moved back by six — and bankruptcy stayed at exactly
+0%. It was never a variance problem.
+
+A passive operator never builds anything, so it has almost no costs. Its
+income always exceeds them regardless of the weather. It cannot go
+bankrupt and it arguably should not: doing nothing is not a way to lose
+money in this game, it is just a way not to make much.
+
+The meaningful figure is whether a *competent* operator can go broke, and
+it can. Two of the six strategies in the competent-operator sweep bankrupt
+in 8 runs out of 8 — "premium" at $95 and "luxury" at $110, both by
+overreaching on price until demand collapses. That was already true before
+weather and is the number that should have been watched all along.
 
 ---
 

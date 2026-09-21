@@ -15,6 +15,13 @@
  * `src/ui/hud.js` already uses.
  */
 import { PALETTE } from '../render/palette.js';
+import { CONDITIONS } from '../sim/weather.js';
+
+/** Short labels for the forecast strip, read from the simulation so the
+ * report can never name a condition the game does not have. */
+const WEATHER_SHORT = Object.fromEntries(
+  Object.entries(CONDITIONS).map(([key, c]) => [key, c.short])
+);
 import { ordinal } from '../sim/satisfaction.js';
 import { openHoles } from '../sim/state.js';
 import { TARGET_MINUTES_PER_HOLE } from '../sim/schedule.js';
@@ -151,6 +158,7 @@ export function computeReportData(state, report) {
     groupsPlayed: report.groupsPlayed,
     averageSatisfaction: report.averageSatisfaction,
     complaints: report.complaints,
+    weather: report.weather,
     gate: {
       passed: report.gate.passed,
       nearGate: report.gate.nearGate,
@@ -461,6 +469,30 @@ export function mountReport(root, { state, report, onContinue } = {}) {
   profit.className = 'report-profit';
   profit.textContent = money(data.profit);
   screen.append(dayLabel, profitLabel, profit);
+
+  // What the sky did, and what is coming. The forecast is the reason
+  // weather is a mechanic rather than a tax: it lets the player widen the
+  // tee sheet before the storm rather than after it. It is not a
+  // prediction (see src/sim/weather.js) so it cannot be wrong.
+  if (data.weather) {
+    const sky = document.createElement('div');
+    sky.className = 'report-weather';
+    const today = document.createElement('div');
+    today.className = 'report-weather-today';
+    today.textContent = data.weather.label;
+    const note = document.createElement('div');
+    note.className = 'report-weather-note';
+    note.textContent = data.weather.note;
+    sky.append(today, note);
+    if (data.weather.forecast?.length) {
+      const ahead = document.createElement('div');
+      ahead.className = 'report-weather-ahead';
+      ahead.textContent = 'Next few days: '
+        + data.weather.forecast.map((f) => WEATHER_SHORT[f.key] ?? f.key).join('  ·  ');
+      sky.appendChild(ahead);
+    }
+    screen.appendChild(sky);
+  }
 
   // --- Revenue / cost breakdown -----------------------------------------
   const breakdown = document.createElement('div');

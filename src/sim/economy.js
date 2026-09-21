@@ -154,7 +154,7 @@ function allocateByWeight(total, weights) {
  */
 export function demandGroups({
   courseRating, prestige, amenities, greenFee, teeInterval,
-  recentSatisfaction = 50, holesOpen = FULL_COURSE_HOLES,
+  recentSatisfaction = 50, holesOpen = FULL_COURSE_HOLES, weather = 1,
   courseDifficulty = 50, scenery = 50, turfQuality = 50, amenityScore,
   hasRooms = false,
 }) {
@@ -192,7 +192,10 @@ export function demandGroups({
    * never running the miserable strategy in the first place.
    */
   const wordOfMouth = clamp((recentSatisfaction / 55) ** 2.5, 0.05, 1.25);
-  const pull = reputationPull * wordOfMouth;
+  // Weather is the only thing here the player cannot influence at all,
+  // which is exactly why it belongs: without a variance source every seed
+  // plays out near-identically and bankruptcy sits at 0% forever.
+  const pull = reputationPull * wordOfMouth * weather;
 
   const capacity = maxGroupsForDay(teeInterval);
 
