@@ -18,10 +18,11 @@ function entries() {
       term: 'Course Rating (CR)',
       range: '0–100',
       body:
-        'Design quality: how varied your holes are, how good they look, ' +
-        'how fair they play for a mid-handicap golfer, and how well-kept ' +
-        'the turf is. A back nine of the same hole copied nine times rates ' +
-        'worse than a mixed set, even if every hole is individually good.',
+        'How good the course is: variety across your holes, scenery, how well ' +
+        'it suits the crowd actually playing it, and turf condition. Not the ' +
+        'same as Happy - Course Rating judges the architecture, Happy judges ' +
+        'the day they had on it. A fine course that is backed up rates well ' +
+        'and makes nobody happy.',
     },
     {
       term: 'Prestige',
@@ -41,7 +42,7 @@ function entries() {
         'slowest hole actually plays and groups start backing up behind each other.',
     },
     {
-      term: 'Satisfaction',
+      term: 'Happy (satisfaction)',
       range: '0–100',
       body:
         'How guests felt about their round. Waiting hurts it most, then how ' +

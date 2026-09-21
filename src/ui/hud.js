@@ -104,7 +104,9 @@ export function mountHud(root) {
     money.textContent = `$${Math.round(data.money).toLocaleString()}`;
     day.textContent = `Day ${data.day}`;
     const satText = data.satisfaction === null ? '—' : data.satisfaction;
-    ratings.textContent = `Sat ${satText} · CR ${data.courseRating} · Prestige ${data.prestige} · Turf ${data.turfQuality}`;
+    // "Happy" rather than "Sat": the author read the abbreviation and had to
+    // ask what it meant, which is the whole test a HUD label has to pass.
+    ratings.textContent = `Happy ${satText} · CR ${data.courseRating} · Prestige ${data.prestige} · Turf ${data.turfQuality}`;
     return data;
   }
 
