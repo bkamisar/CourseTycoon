@@ -37,6 +37,9 @@ export function newGame(seed) {
     properties: [{ id: 1, name: 'Pinehollow' }],       // Act IV
     history: [],
     satisfactionHistory: [],
+    // Which narration lines have been shown lately, so the world does not
+    // repeat itself while it still has something new to say.
+    narrationSeen: [],
   };
 }
 

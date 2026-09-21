@@ -8,6 +8,7 @@ import { guestSatisfaction, buildComplaints } from './satisfaction.js';
 import { courseRating, nextPrestige } from './ratings.js';
 import { actOneGate } from './acts.js';
 import { openHoles } from './state.js';
+import { narrationContext, pickNarration, rememberNarration } from './narration.js';
 import { SEGMENT_KEYS } from './segments.js';
 
 const DAY_START = 420;  // 7:00am
@@ -268,6 +269,19 @@ export function runDay(state, seed) {
     complaints,
     gate,
   };
+
+  // What the world says about all this. Positioning here is emergent - the
+  // course decides who turns up, the player never declares a market - and an
+  // emergent system nobody can read feels arbitrary rather than earned. This
+  // is how the resort tells its owner what it has become.
+  const seen = next.narrationSeen ?? [];
+  const narration = pickNarration(
+    narrationContext({ report, previousReport: next.history.at(-1), state: next }),
+    rng,
+    seen
+  );
+  report.narration = narration;
+  next.narrationSeen = rememberNarration(seen, narration?.id);
 
   next.history.push(report);
   next.satisfactionHistory.push(averageSatisfaction);
