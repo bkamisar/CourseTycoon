@@ -68,8 +68,11 @@ charging". The green fee is already that lever and does not need a twin.
 
 ### 3.1 The catalogue
 
-Eighteen items, first pass. Prices and appeals are starting values; §8 says how
-they get tuned.
+Twenty-one items, first pass. Prices and appeals are starting values; §8 says
+how they get tuned.
+
+Three of them - the Transfusion, the breakfast sandwich and the chicken Caesar
+wrap - are the author's own additions, asked for by name. They are marked below.
 
 | id | name | kind | price | cost | prep | cartable | locals | serious | guests | sat |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -80,9 +83,12 @@ they get tuned.
 | `bottledWater` | Bottled water | drink | 3 | 0.50 | 0 | yes | 0.60 | 0.90 | 0.50 | 1 |
 | `espresso` | Espresso | drink | 4 | 1 | 1 | no | 0.30 | 0.60 | 0.90 | 2 |
 | `wineByGlass` | Wine by the glass | drink | 14 | 5 | 0 | no | 0.10 | 0.30 | 1.00 | 3 |
+| `transfusion` * | Transfusion | drink | 12 | 5 | 0 | yes | 0.90 | 0.80 | 0.70 | 4 |
 | `candyBar` | Candy bar | food | 3 | 1 | 0 | yes | 0.80 | 0.50 | 0.20 | 1 |
 | `trailMix` | Trail mix | food | 5 | 2 | 0 | yes | 0.40 | 0.80 | 0.40 | 2 |
-| `turkeyWrap` | Turkey wrap | food | 12 | 4 | 1 | yes | 0.50 | 0.80 | 0.60 | 3 |
+| `turkeyWrap` | Turkey wrap | food | 12 | 4 | 0 | yes | 0.50 | 0.80 | 0.60 | 3 |
+| `chickenCaesarWrap` * | Chicken Caesar wrap | food | 14 | 5 | 0 | yes | 0.60 | 0.85 | 0.60 | 3 |
+| `breakfastSandwich` * | Breakfast sandwich | food | 8 | 2.50 | 2 | no | 0.90 | 0.80 | 0.40 | 3 |
 | `hotDog` | Hot dog | food | 9 | 3 | 1 | no | 1.00 | 0.50 | 0.20 | 2 |
 | `chiliBowl` | Bowl of chili | food | 10 | 3 | 2 | no | 0.90 | 0.50 | 0.30 | 3 |
 | `burgerFries` | Burger and fries | food | 15 | 5 | 2 | no | 0.90 | 0.60 | 0.40 | 4 |
@@ -92,10 +98,19 @@ they get tuned.
 | `lobsterRoll` | Lobster roll | food | 28 | 11 | 3 | no | 0.10 | 0.40 | 1.00 | 6 |
 | `steakFrites` | Steak frites | food | 42 | 16 | 4 | no | 0.05 | 0.30 | 1.00 | 7 |
 
-Note the shape of the table: **no item is good for everybody**. `draught` comes
-closest and is deliberately the cheapest thing with broad appeal, so the
-generalist play exists but earns little per head. That is the same structure
-segments already use, and the same test applies — see §9.
+`*` marks an item the author asked for by name.
+
+Note the shape of the table: **no item is good for everybody**, verified against
+all twenty-one. The Transfusion comes closest — it is the drink everyone on a
+golf course orders — and is deliberately the broadest thing on the list at
+0.90 / 0.80 / 0.70, which still clears the bar in §9. Its $5 serving cost is
+what stops it being a free win: the margin is comparable to a draught's, so
+leaning on it is a choice rather than an answer.
+
+**Pre-made cold items are `prep 0`.** A wrap assembled in the morning does not
+load the kitchen line during service; a breakfast sandwich cooked to order does.
+That is the rule the table follows, and it is what lets the beverage cart carry
+real food rather than only drinks.
 
 ## 4. Menus, and what they earn
 
@@ -131,7 +146,8 @@ not hold, and it failed silently — every individual number looked reasonable.
 Reading the mean fixes it because it makes a mostly-wrong menu read as wrong. A
 golfer looking at a board where one item in five is for them is not being
 catered to, and the formula now says so. Measured against the same sweep: **0 of
-8,568 five-slot menus** please all three crowds.
+20,349 five-slot menus** please all three crowds, and 0 of the 2- and 3-slot
+combinations either.
 
 **Basket** — the average price of what they would actually buy, weighted by
 appetite rather than by menu position:
@@ -171,19 +187,36 @@ The balance harness checks this directly: see §8.
 Targets for the implementation to reproduce, from the sweep run during this
 spec's review:
 
-| menu | pull L / S / G | basket | prep | kitchen staff needed |
+| menu | pull L / S / G | basket (their own) | prep | kitchen staff |
 |---|---|---|---|---|
-| locals, 3 slots (hot dog, draught, candy bar) | 0.97 / 0.57 / 0.33 | $7 | 1 | 0 |
-| serious, 3 slots (water, trail mix, turkey wrap) | 0.55 / 0.87 / 0.55 | $7 | 1 | 0 |
-| destination, 5 slots (oysters, lobster, steak, wine, salad) | 0.15 / 0.42 / 0.98 | $25 | 12 | 3 ($540/day) |
-| generalist, 5 slots (draught, club, craft ale, wrap, burger) | 0.85 / 0.76 / 0.63 | $12 | 5 | 1 ($180/day) |
-| cart, 3 slots (draught, Arnold Palmer, candy bar) | 0.93 / 0.65 / 0.50 | $5 | 0 | 0 |
+| locals, 3 (hot dog, draught, candy bar) | 0.97 / 0.57 / 0.33 | $7 | 1 | 0 |
+| serious, 3 (water, trail mix, Caesar wrap) | 0.57 / 0.88 / 0.55 | $7 | 0 | 0 |
+| destination, 5 (oysters, lobster, steak, wine, salad) | 0.15 / 0.42 / 0.98 | $25 | 12 | 3 ($540/day) |
+| generalist, 5 (draught, club, craft ale, wrap, burger) | 0.85 / 0.76 / 0.63 | $12 | 4 | 1 ($180/day) |
+| cart, 3 (Transfusion, draught, Caesar wrap) | 0.92 / 0.80 / 0.63 | $11 | 0 | 0 |
+| early tee sheet, 3 (breakfast sandwich, espresso, Arnold Palmer) | 0.78 / 0.75 / 0.77 | $6 | 3 | 0 |
 
 The destination menu earns three and a half times the basket of the locals menu
 and costs $540 a day in kitchen wages to serve — and is worth nothing at all on
 a course that does not draw destination guests. The generalist is good at
 nothing and adequate everywhere, for $180 a day. That is the shape this slice is
-trying to produce, and these five rows are how the implementation knows it did.
+trying to produce, and these rows are how the implementation knows it did.
+
+Two of these rows were not designed, and both are worth keeping:
+
+**The cart is strong.** With the Transfusion on it, a three-slot cart pulls
+0.92 / 0.80 / 0.63 at an $11 basket with no kitchen at all. That is a lot of
+revenue for $90 a day of upkeep, and §8 must check it does not simply dominate
+the halfway house. It is *meant* to be good — it is the pace-friendly option and
+pace is the game's spine — but "good" and "the only correct answer" are
+different things.
+
+**The most even menu in the catalogue is the breakfast one.** Breakfast
+sandwich, espresso and an Arnold Palmer come out at 0.78 / 0.75 / 0.77 — the
+closest any menu gets to pleasing all three crowds — on a $6 basket. The
+generalist penalty arrived on its own, from three items chosen for flavour
+rather than balance, which is the strongest evidence available that the formula
+is shaped right.
 
 ## 5. The kitchen, and making `kitchenStaff` mean something
 
@@ -218,7 +251,7 @@ Breadth is a purchase, not a free hedge.
 The author's note is the reason this section exists, and vague intent here would
 produce another wall of text with a few icons on it. So:
 
-**6.1 Every item has a 12×12 pixel sprite.** Eighteen of them, authored as grid
+**6.1 Every item has a 12×12 pixel sprite.** Twenty-one of them, authored as grid
 data in a new `src/render/food.js`, in the same style as `sprites.js`. Drawn at
 2× on the menu board (24px), which is the size the mockup's "shelf" used and the
 author approved.
@@ -295,12 +328,15 @@ Any tuning gets recorded here, in this file, with the numbers that prompted it.
 - `src/sim/` stays pure — `tests/purity.test.js` already enforces it, and the
   item catalogue lives in `src/sim/`, not the UI.
 - **No item is good for every crowd.** No item may have `appeal ≥ 0.8` for all
-  three segments. Same guarantee segments already has, one level down.
+  three segments. The Transfusion sits closest to this line at 0.90/0.80/0.70. Same guarantee segments already has, one level down.
 - **No menu pleases every crowd.** Sweep every legal slot combination and
   confirm no menu puts `pull` at or above 0.85 for all three segments at once.
-  Currently 0 of 8,568 five-slot menus do. This test is the reason §4's formula
+  Currently 0 of 20,349 five-slot menus do, and 0 of the 2- and 3-slot ones. This test is the reason §4's formula
   is what it is — it caught the first draft failing at 87%, and it is the single
   most important assertion in this slice.
+- **Every `cartable` item has `prep` 0**, by test — §3.1's rule, which the
+  beverage cart's whole viability rests on, and which the first draft of the
+  catalogue broke twice.
 - **Every item has a sprite**, by test — a catalogue entry with no art is a blank
   square on the board, and that is exactly the failure that shipped once already
   when `SPRITES.tee` was defined but never registered.
