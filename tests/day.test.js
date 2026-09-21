@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
-import { runDay, marshalPaceFactor, applyEventChoice } from '../src/sim/day.js';
+import { runDay, marshalPaceFactor, applyEventChoice, halfwayRestoreTo } from '../src/sim/day.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import { emptyGoodwill, applyGoodwill } from '../src/sim/goodwill.js';
 import { EVENTS, STANCES } from '../src/sim/events.js';
@@ -331,4 +331,93 @@ test('ten consecutive days run coherently with goodwill and events wired in', ()
   assert.ok(Number.isFinite(state.money));
   assert.ok(state.prestige >= 0 && state.prestige <= 100);
   assert.ok(state.turfQuality >= 0 && state.turfQuality <= 100);
+});
+
+test('what the halfway house serves decides how much of a round it gives back', () => {
+  assert.ok(halfwayRestoreTo(['draught', 'bottledWater']) < halfwayRestoreTo(['burgerFries', 'draught']),
+    'a board of beer should restore less than one with a hot meal on it');
+});
+
+test('a sensible halfway house menu lands near the old flat refuel', () => {
+  // It was a flat 82 regardless of what was served. Near-neutral for a
+  // player who stocks something hot; a real penalty for one who does not.
+  const sensible = halfwayRestoreTo(['hotDog', 'draught', 'candyBar', 'chiliBowl', 'burgerFries']);
+  assert.ok(Math.abs(sensible - 82) <= 6, `sensible menu restores to ${sensible}, expected near 82`);
+});
+
+test('the halfway house restore is bounded at both ends', () => {
+  assert.ok(halfwayRestoreTo([]) >= 60);
+  assert.ok(halfwayRestoreTo(['steakFrites']) <= 88);
+});
+
+test('a day reports what food earned and what it cost to serve', () => {
+  const { report } = runDay(newGame(11), 3);
+  assert.equal(typeof report.revenue.food, 'number');
+  assert.ok(report.costs.foodCost >= 0, 'the cost of goods belongs on the report');
+  assert.ok(report.kitchen && typeof report.kitchen.load === 'number');
+  assert.ok(typeof report.kitchen.capacity === 'number');
+  assert.ok(report.kitchen.serviceFactor > 0 && report.kitchen.serviceFactor <= 1);
+});
+
+test('an overloaded kitchen makes guests unhappier, not just poorer', () => {
+  // Spec §5: service slowing down is felt, not only accounted for. Without
+  // this the kitchen is a pure revenue tax and hiring a cook is a spreadsheet
+  // decision rather than something the player sees in the complaints.
+  function run(staffCooks) {
+    let state = newGame(21);
+    state.resort.amenities.push({
+      type: 'restaurant',
+      menu: ['steakFrites', 'oysters', 'lobsterRoll', 'seasonalSalad', 'clubSandwich', 'burgerFries', 'chiliBowl'],
+    });
+    state.resort.staff = [
+      ...state.resort.staff.filter((m) => m.role !== 'kitchenStaff'),
+      ...Array.from({ length: staffCooks }, () => ({ role: 'kitchenStaff' })),
+    ];
+    return runDay(state, 6).report;
+  }
+  // This board's prep sums to 18 (steakFrites 4 + oysters 3 + lobsterRoll 3
+  // + seasonalSalad 2 + clubSandwich 2 + burgerFries 2 + chiliBowl 2).
+  // kitchen.js's already-committed capacity is BASE_CAPACITY(3) + cooks x
+  // PER_COOK(4), so three cooks only reach 15 and still leave the kitchen
+  // overloaded (serviceFactor 0.83, not 1 as the plan's comment assumed) —
+  // four cooks are needed to reach 19 >= 18 and actually cover it.
+  const starved = run(0);
+  const staffed = run(4);
+  assert.ok(starved.kitchen.serviceFactor < 1, 'an unstaffed kitchen should be overloaded by that board');
+  assert.equal(staffed.kitchen.serviceFactor, 1, 'four cooks should cover it');
+  assert.ok(starved.averageSatisfaction < staffed.averageSatisfaction,
+    `queueing for food should hurt: ${starved.averageSatisfaction} vs ${staffed.averageSatisfaction}`);
+});
+
+test('a kitchen that cannot keep up says so, in words the player gets', () => {
+  let state = newGame(22);
+  state.resort.amenities.push({
+    type: 'restaurant',
+    menu: ['steakFrites', 'oysters', 'lobsterRoll', 'seasonalSalad', 'clubSandwich', 'burgerFries', 'chiliBowl'],
+  });
+  state.resort.staff = state.resort.staff.filter((m) => m.role !== 'kitchenStaff');
+  const { report } = runDay(state, 7);
+  assert.ok(report.complaints.some((c) => /wait|kitchen|food|order/i.test(c)),
+    `no complaint mentioned the kitchen: ${JSON.stringify(report.complaints)}`);
+});
+
+test('an overloaded kitchen shows up on the report', () => {
+  let state = newGame(12);
+  state.resort.amenities.push({ type: 'restaurant', menu: ['steakFrites', 'oysters', 'lobsterRoll', 'seasonalSalad', 'clubSandwich', 'burgerFries', 'chiliBowl'] });
+  state.resort.staff = state.resort.staff.filter((m) => m.role !== 'kitchenStaff');
+  const { report } = runDay(state, 4);
+  assert.ok(report.kitchen.load > report.kitchen.capacity, 'that board should overload an unstaffed kitchen');
+  assert.ok(report.kitchen.serviceFactor < 1, 'and it should slow service down');
+});
+
+test('changing nothing but the menu changes the day', () => {
+  // The whole slice in one assertion.
+  const a = newGame(13);
+  const halfway = { type: 'halfwayHouse', menu: ['hotDog', 'draught', 'candyBar', 'chiliBowl', 'burgerFries'] };
+  a.resort.amenities.push(halfway);
+  const b = structuredClone(a);
+  b.resort.amenities.at(-1).menu = ['oysters', 'lobsterRoll', 'steakFrites', 'wineByGlass', 'seasonalSalad'];
+  const ra = runDay(a, 5).report;
+  const rb = runDay(b, 5).report;
+  assert.notEqual(ra.revenue.food, rb.revenue.food, 'the same course with a different board must earn differently');
 });

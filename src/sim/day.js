@@ -3,11 +3,13 @@ import { holeStats, clamp } from './hole.js';
 import { makeGroup, resetGuestIds } from './golfer.js';
 import { playHole } from './round.js';
 import { scheduleRounds } from './schedule.js';
-import { demandGroups, dailyRevenue, dailyCosts, perceivedValue } from './economy.js';
+import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, menuRevenue } from './economy.js';
 import { guestSatisfaction, buildComplaints } from './satisfaction.js';
 import { courseRating, nextPrestige } from './ratings.js';
 import { actOneGate } from './acts.js';
 import { openHoles } from './state.js';
+import { menuBestEnergy } from './menu.js';
+import { kitchenCapacity, kitchenLoad, serviceFactor } from './kitchen.js';
 import { narrationContext, pickNarration, rememberNarration } from './narration.js';
 import { SEGMENT_KEYS } from './segments.js';
 import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
@@ -33,6 +35,21 @@ const WARMUP_HOLES = 2;
  */
 function turnHoleIndex(holeCount) {
   return Math.floor(holeCount / 2);
+}
+
+/**
+ * How much of a tiring golfer a stop at the halfway house gives back,
+ * decided by the best thing on its board.
+ *
+ * This was a flat 82 whatever it served. Menu-driven, it is what stops
+ * food being a revenue system that happens to sit on a golf course:
+ * energy feeds `tiredMinutes` in round.js, which feeds round time, which
+ * feeds the flow-shop rule in schedule.js that is the entire pace-of-play
+ * mechanic. A board with a hot meal on it lands near the old 82; a board
+ * of nothing but beer does not.
+ */
+export function halfwayRestoreTo(menu) {
+  return clamp(60 + menuBestEnergy(menu) * 2, 60, 88);
 }
 
 /** Each marshal shaves this fraction off hole times, capped in total. */
@@ -73,7 +90,9 @@ export function runDay(state, seed) {
   const carts = amenityTypes.includes('cartBarn');
   const hasRange = amenityTypes.includes('drivingRange');
   const hasPracticeGreen = amenityTypes.includes('practiceGreen');
-  const hasHalfwayHouse = amenityTypes.includes('halfwayHouse');
+  const halfwayHouse = next.resort.amenities.find((a) => a.type === 'halfwayHouse');
+  const hasHalfwayHouse = Boolean(halfwayHouse);
+  const halfwayEnergy = halfwayRestoreTo(halfwayHouse?.menu);
 
   // Rated against yesterday's crowd: rating feeds demand and demand decides
   // today's crowd, so today's is not knowable yet. The lag is the point -
@@ -146,6 +165,7 @@ export function runDay(state, seed) {
         handicapAdjust: warming && hasRange ? RANGE_WARMUP : 0,
         puttAdjust: warming && hasPracticeGreen ? PRACTICE_GREEN_WARMUP : 0,
         refuel: hasHalfwayHouse && holeIndex === turnHoleIndex(holes.length),
+        refuelTo: halfwayEnergy,
       });
       minutes.push(played.minutes);
       scores.push(played.scores);
@@ -186,6 +206,16 @@ export function runDay(state, seed) {
   });
   const amenityBonus = amenityTypes.length * 1.5;
 
+  // The kitchen, once per day: how much prep every board on the resort
+  // demands, against what the staff can actually turn around. Computed
+  // before satisfaction and revenue because both read it — a slow
+  // kitchen is felt in the wait AND in what actually gets sold.
+  const kitchen = {
+    load: kitchenLoad(next.resort.amenities),
+    capacity: kitchenCapacity(next.resort.staff),
+  };
+  kitchen.serviceFactor = serviceFactor(kitchen.load, kitchen.capacity);
+
   const satisfactions = [];
   const crowdCount = Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0]));
   const crowdSatisfactionSum = Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0]));
@@ -206,6 +236,7 @@ export function runDay(state, seed) {
         amenityBonus,
         segment: guest.segment,
         courseDifficulty,
+        kitchenServiceFactor: kitchen.serviceFactor,
       });
       satisfactions.push(guestSat);
       crowdCount[guest.segment] += 1;
@@ -239,6 +270,24 @@ export function runDay(state, seed) {
   const costs = dailyCosts({
     holeUpkeep, staff: next.resort.staff, amenities: next.resort.amenities,
   });
+
+  // Food revenue replaces dailyRevenue's old flat contribution: it reads
+  // the actual board per segment (crowdCount, in golfers — the guests who
+  // actually turned up, already tallied above) rather than a flat
+  // spendPerGuest applied to whoever the amenity happens to be. A day with
+  // nobody on the tee sheet earns nothing here either.
+  const food = groupCount
+    ? menuRevenue({
+        amenities: next.resort.amenities,
+        crowd: crowdCount,
+        serviceFactor: kitchen.serviceFactor,
+      })
+    : { revenue: 0, foodCost: 0 };
+  revenue.food = food.revenue;
+  revenue.total = revenue.greenFees + revenue.merchandise + revenue.food;
+  costs.foodCost = food.foodCost;
+  costs.total += food.foodCost;
+
   const profit = revenue.total - costs.total;
 
   // Turf: one groundskeeper holds roughly three holes steady.
@@ -264,6 +313,7 @@ export function runDay(state, seed) {
     amenityTypes,
     averageSatisfaction,
     nearActGate: gate.nearGate,
+    kitchenServiceFactor: kitchen.serviceFactor,
   });
 
   const report = {
@@ -281,6 +331,7 @@ export function runDay(state, seed) {
     prestige: next.prestige,
     turfQuality: next.turfQuality,
     crowd,
+    kitchen,
     complaints,
     gate,
   };

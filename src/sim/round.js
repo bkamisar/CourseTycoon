@@ -29,7 +29,7 @@ export function playHole(
   rng,
   hole,
   group,
-  { carts, handicapAdjust = 0, puttAdjust = 0, refuel = false }
+  { carts, handicapAdjust = 0, puttAdjust = 0, refuel = false, refuelTo = REFUEL_TO }
 ) {
   const stats = holeStats(hole);
   const greenDifficulty = GREEN_DIFFICULTY[hole.greenPreset];
@@ -39,7 +39,7 @@ export function playHole(
 
   if (refuel) {
     for (const guest of group.guests) {
-      guest.energy = Math.max(guest.energy, REFUEL_TO);
+      guest.energy = Math.max(guest.energy, refuelTo);
     }
     events.push({ type: 'refuel', holeId: hole.id });
   }

@@ -167,20 +167,22 @@ export function dailyRevenue({ groupsPlayed, greenFee, amenities, averageSatisfa
   // Satisfied guests open their wallets; unhappy ones leave straight away.
   const spendMultiplier = 0.4 + (averageSatisfaction / 100) * 1.2;
 
+  // Food no longer comes from a flat spendPerGuest here — menuRevenue (see
+  // above) replaces it, reading the actual board rather than the amenity's
+  // mere presence. Left at 0 rather than removed from the shape, so every
+  // caller that reads revenue.food still gets a number.
   let merchandise = 0;
-  let food = 0;
+  const food = 0;
   for (const a of amenities) {
     const spec = AMENITIES[a.type];
-    if (!spec?.spendPerGuest) continue;
-    const spend = golfers * spec.spendPerGuest * spendMultiplier;
-    if (a.type === 'proShop') merchandise += spend;
-    else food += spend;
+    if (a.type !== 'proShop' || !spec?.spendPerGuest) continue;
+    merchandise += golfers * spec.spendPerGuest * spendMultiplier;
   }
 
   return {
     greenFees: Math.round(greenFees),
     merchandise: Math.round(merchandise),
-    food: Math.round(food),
+    food,
     total: Math.round(greenFees + merchandise + food),
   };
 }

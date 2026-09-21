@@ -45,6 +45,7 @@ export function guestSatisfaction({
   amenityBonus,
   segment = 'locals',
   courseDifficulty,
+  kitchenServiceFactor = 1,
 }) {
   const seg = SEGMENTS[segment] ?? SEGMENTS.locals;
 
@@ -64,9 +65,14 @@ export function guestSatisfaction({
     ? 0
     : (difficultyFit(courseDifficulty, seg) - 0.5) * 30;
 
+  // Queueing for food you were promised. Proportional to how far past
+  // capacity the kitchen is, so one item over is a shrug and a full
+  // restaurant with no cooks is a bad afternoon.
+  const kitchenPenalty = (1 - kitchenServiceFactor) * 18;
+
   return clamp(
     55 + scoreDelta - waitPenalty + priceDelta + sceneryBonus + turfBonus +
-      amenityBonusWeighted + difficultyBonus,
+      amenityBonusWeighted + difficultyBonus - kitchenPenalty,
     0,
     100
   );
@@ -83,6 +89,7 @@ export function buildComplaints({
   amenityTypes,
   averageSatisfaction,
   nearActGate,
+  kitchenServiceFactor = 1,
 }) {
   const complaints = [];
   const groups = Math.max(1, groupsPlayed);
@@ -118,6 +125,9 @@ export function buildComplaints({
   }
   if (!amenityTypes.includes('snackShack') && !amenityTypes.includes('halfwayHouse')) {
     complaints.push('Nowhere to get a drink at the turn.');
+  }
+  if (kitchenServiceFactor < 0.9) {
+    complaints.push('Waited twenty minutes for food that never really arrived.');
   }
 
   // General mood.
