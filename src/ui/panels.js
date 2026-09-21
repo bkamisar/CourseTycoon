@@ -12,6 +12,9 @@
  * bookkeeping on figures the sim already produced.
  */
 import { PALETTE } from '../render/palette.js';
+import { ITEMS, MENU_SLOTS } from '../sim/menu.js';
+import { defaultMenuFor } from '../sim/state.js';
+import { openMenuBoard } from './menuBoard.js';
 import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
 import { holeStats } from '../sim/hole.js';
@@ -73,6 +76,12 @@ function injectStyles() {
     .panel-shortfall {
       color: ${PALETTE.ACCENT};
       font-size: 11px;
+    }
+    .panel-row-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 0 0 auto;
     }
     .panel-btn {
       min-width: 44px;
@@ -208,6 +217,18 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
           if (owned) {
             action.textContent = 'Built';
             action.disabled = true;
+            if (MENU_SLOTS[type]) {
+              // What this board is currently worth per guest, quoted from
+              // the simulation rather than recomputed here - the same
+              // anti-drift rule the perceived-value line above follows.
+              const menu = current.resort.amenities.find((a) => a.type === type)?.menu ?? [];
+              const board = document.createElement('div');
+              board.className = 'panel-row-blurb';
+              board.textContent = menu.length
+                ? `Serving ${menu.length} of ${MENU_SLOTS[type]}: ${menu.map((id) => ITEMS[id]?.name).filter(Boolean).join(', ')}`
+                : 'Nothing on the board.';
+              info.appendChild(board);
+            }
           } else {
             action.textContent = 'Build';
             const affordable = current.money >= spec.build;
@@ -221,14 +242,38 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
             action.addEventListener('click', () => {
               const next = structuredClone(current);
               next.money -= spec.build;
-              next.resort.amenities.push({ type });
+              // A newly built food amenity opens with a sensible board.
+              // Without this it would be built and serving nothing, which
+              // reads as broken rather than as an invitation.
+              next.resort.amenities.push({ type, menu: defaultMenuFor(type) });
               current = next;
               onChange(current);
               rerender();
             });
           }
 
-          row.append(info, action);
+          if (owned && MENU_SLOTS[type]) {
+            // Stacked under "Built" rather than beside it: two 44px
+            // targets side by side do not fit a 375px row next to the
+            // amenity's name and blurb.
+            const actions = document.createElement('div');
+            actions.className = 'panel-row-actions';
+            const menuBtn = document.createElement('button');
+            menuBtn.type = 'button';
+            menuBtn.className = 'panel-btn';
+            menuBtn.textContent = 'Menu';
+            menuBtn.addEventListener('click', () => {
+              openMenuBoard(sheetHost, {
+                state: current,
+                amenityType: type,
+                onChange: (next) => { current = next; onChange(current); },
+              });
+            });
+            actions.append(action, menuBtn);
+            row.append(info, actions);
+          } else {
+            row.append(info, action);
+          }
           body.appendChild(row);
         }
       }
@@ -242,8 +287,21 @@ export function openBuildSheet(sheetHost, { state, onChange }) {
 // Staff sheet
 // ---------------------------------------------------------------------
 
-const STAFF_ROLES = ['groundskeeper', 'marshal'];
-const ROLE_LABEL = { groundskeeper: 'Groundskeeper', marshal: 'Marshal' };
+/**
+ * Hireable roles.
+ *
+ * `kitchenStaff` joined this list when menus arrived. It had existed in
+ * economy.js as a wage that nothing read; now it is what decides how much
+ * food actually reaches guests (kitchen.js), and leaving it off this list
+ * would make the entire cost-of-breadth mechanic unreachable — the player
+ * could overload a kitchen and have no way to fix it.
+ */
+const STAFF_ROLES = ['groundskeeper', 'marshal', 'kitchenStaff'];
+const ROLE_LABEL = {
+  groundskeeper: 'Groundskeeper',
+  marshal: 'Marshal',
+  kitchenStaff: 'Cook',
+};
 
 /** Opens the staff sheet. `onChange(nextState)` fires on every hire/fire. */
 export function openStaffSheet(sheetHost, { state, onChange }) {
