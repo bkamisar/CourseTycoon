@@ -1,0 +1,342 @@
+# Course Tycoon — Food and Drink Design
+
+**Status:** approved, not yet planned
+**Supersedes:** §15a.9 of the main design spec, which recorded this as deferred
+**Preceding work:** segments, narration, decision events — all shipped. 417 tests green.
+
+---
+
+## 1. Why this slice, and what it is really for
+
+Two things arrived together and both are load-bearing.
+
+The author asked for menus at the halfway house and restaurant, plus a beverage
+cart with its own menu — twice, across two sessions, which is the strongest
+signal a feature gets on this project.
+
+The author also said, approving this design: *"Just like a little visual pop
+here since everything's getting kinda text heavy."* That is a fair reading of
+where the game has drifted. The last three slices — segments, narration,
+decision events — were all words on cards. The HUD is numbers, the report is
+numbers, the glossary is prose about numbers. A game whose reference point is an
+8-bit tycoon has spent three slices becoming a reading app.
+
+So **visual pop is a requirement of this slice, not a finishing touch.** Food is
+the right place to pay that debt down: it is the most drawable subject in the
+game. A hot dog, a draught beer, a lobster roll are instantly legible at 12×12
+in a way that "course rating" never will be. Section 6 makes this concrete and
+testable rather than aspirational.
+
+## 2. The decision this adds
+
+The same push-pull the course already has, applied to a second surface.
+
+Locals want a cheap beer and something hot for under ten dollars. Destination
+guests want a proper lunch and will pay four times as much for it. Serious
+golfers want something fast that does not slow them down. A menu pitched at one
+reads as wrong to the others, and **the crowd is decided by the course the
+player built** — so the menu has to answer to a decision made hours earlier, on
+a different screen, about corridor widths and bunkers.
+
+That is the property worth protecting. Food must not become a second,
+independent optimisation problem sitting beside the golf. It is the golf
+decision, asked again in a different accent.
+
+## 3. Items
+
+An item is authored data:
+
+```js
+{
+  id: 'hotDog',
+  name: 'Hot dog',
+  kind: 'food' | 'drink',
+  price: 9,            // what the guest pays
+  cost: 3,             // what it costs the resort to serve
+  prep: 1,             // kitchen load — see §5
+  cartable: true,      // can the beverage cart carry it
+  appeal: { locals: 1.0, serious: 0.5, destination: 0.2 },
+  satisfaction: 2,
+}
+```
+
+**Item prices are fixed and not player-tunable.** This is a deliberate
+exclusion. The player chooses *what to serve*, not the markup on it. A markup
+slider would make food a second green fee, and the interesting question stops
+being "who am I feeding" the moment it becomes "what can I get away with
+charging". The green fee is already that lever and does not need a twin.
+
+### 3.1 The catalogue
+
+Eighteen items, first pass. Prices and appeals are starting values; §8 says how
+they get tuned.
+
+| id | name | kind | price | cost | prep | cartable | locals | serious | guests | sat |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `domesticCan` | Can of domestic | drink | 5 | 1.50 | 0 | yes | 1.00 | 0.40 | 0.15 | 1 |
+| `draught` | Cold draught | drink | 7 | 2 | 0 | yes | 1.00 | 0.60 | 0.40 | 2 |
+| `craftAle` | Craft ale | drink | 11 | 4 | 0 | yes | 0.50 | 0.80 | 0.70 | 3 |
+| `arnoldPalmer` | Arnold Palmer | drink | 5 | 1 | 0 | yes | 0.80 | 0.70 | 0.60 | 2 |
+| `bottledWater` | Bottled water | drink | 3 | 0.50 | 0 | yes | 0.60 | 0.90 | 0.50 | 1 |
+| `espresso` | Espresso | drink | 4 | 1 | 1 | no | 0.30 | 0.60 | 0.90 | 2 |
+| `wineByGlass` | Wine by the glass | drink | 14 | 5 | 0 | no | 0.10 | 0.30 | 1.00 | 3 |
+| `candyBar` | Candy bar | food | 3 | 1 | 0 | yes | 0.80 | 0.50 | 0.20 | 1 |
+| `trailMix` | Trail mix | food | 5 | 2 | 0 | yes | 0.40 | 0.80 | 0.40 | 2 |
+| `turkeyWrap` | Turkey wrap | food | 12 | 4 | 1 | yes | 0.50 | 0.80 | 0.60 | 3 |
+| `hotDog` | Hot dog | food | 9 | 3 | 1 | no | 1.00 | 0.50 | 0.20 | 2 |
+| `chiliBowl` | Bowl of chili | food | 10 | 3 | 2 | no | 0.90 | 0.50 | 0.30 | 3 |
+| `burgerFries` | Burger and fries | food | 15 | 5 | 2 | no | 0.90 | 0.60 | 0.40 | 4 |
+| `clubSandwich` | Club sandwich | food | 16 | 5 | 2 | no | 0.60 | 0.80 | 0.70 | 4 |
+| `seasonalSalad` | Seasonal salad | food | 14 | 4 | 2 | no | 0.20 | 0.50 | 0.80 | 3 |
+| `oysters` | Half dozen oysters | food | 24 | 9 | 3 | no | 0.05 | 0.25 | 1.00 | 5 |
+| `lobsterRoll` | Lobster roll | food | 28 | 11 | 3 | no | 0.10 | 0.40 | 1.00 | 6 |
+| `steakFrites` | Steak frites | food | 42 | 16 | 4 | no | 0.05 | 0.30 | 1.00 | 7 |
+
+Note the shape of the table: **no item is good for everybody**. `draught` comes
+closest and is deliberately the cheapest thing with broad appeal, so the
+generalist play exists but earns little per head. That is the same structure
+segments already use, and the same test applies — see §9.
+
+## 4. Menus, and what they earn
+
+A menu is a list of item ids on an amenity. Slots by amenity:
+
+| amenity | slots | accepts |
+|---|---|---|
+| `snackShack` | 2 | anything with `prep ≤ 1` |
+| `halfwayHouse` | 3 | anything |
+| `restaurant` | 5 | anything |
+| `beverageCart` | 3 | `cartable` only |
+
+For each segment `s`, a menu yields two numbers:
+
+**Pull** — how much of this board they actually want. The mean decides it,
+lifted halfway toward the best thing on the menu:
+
+```
+pull(s) = clamp(mean + 0.5 * (best - mean), 0, 1)
+  where best = max  over items of appeal[s]
+        mean = mean over items of appeal[s]
+  an empty menu has pull 0
+```
+
+**This formula was rewritten during the spec's own review, and the reason is
+worth keeping.** The first draft read `best + 0.15 * (total - best)` — the best
+item sets the score, breadth adds a little. Swept against the catalogue, that
+let **87% of five-slot menus please all three crowds at once**: a single burger
+on a board of oysters, lobster and steak carried the locals score to 1.00, because
+only the best item was being read. The guarantee this entire design rests on did
+not hold, and it failed silently — every individual number looked reasonable.
+
+Reading the mean fixes it because it makes a mostly-wrong menu read as wrong. A
+golfer looking at a board where one item in five is for them is not being
+catered to, and the formula now says so. Measured against the same sweep: **0 of
+8,568 five-slot menus** please all three crowds.
+
+**Basket** — the average price of what they would actually buy, weighted by
+appetite rather than by menu position:
+
+```
+basket(s) = Σ(price × appeal[s]) / Σ(appeal[s])
+cogs(s)   = Σ(cost  × appeal[s]) / Σ(appeal[s])
+```
+
+Then per guest of that segment, at that amenity:
+
+```
+spend(s)    = pull(s) × basket(s) × RATE[amenity] × serviceFactor
+foodCost(s) = pull(s) × cogs(s)   × RATE[amenity] × serviceFactor
+```
+
+`RATE` is how much custom an amenity generates per guest: `snackShack` 1.0,
+`halfwayHouse` 1.6, `restaurant` 1.3, `beverageCart` 1.4. First-pass values.
+
+### 4.1 The calibration rule
+
+**A well-matched menu should earn roughly what today's flat `spendPerGuest`
+already earns.** Not more.
+
+This matters more than any individual number. Food currently contributes a flat
+`spendPerGuest` per amenity, and the whole economy — build costs, wages, the Act
+I gate — is balanced against that. If menus are a revenue *increase*, every cost
+in the game is now too cheap and the gate arrives early. So the change is
+deliberately neutral for a player who chooses well, and a **penalty** for one
+who serves a crowd food they do not want. Menus add a way to be wrong, not a way
+to earn more.
+
+The balance harness checks this directly: see §8.
+
+### 4.2 What the named menus measure
+
+Targets for the implementation to reproduce, from the sweep run during this
+spec's review:
+
+| menu | pull L / S / G | basket | prep | kitchen staff needed |
+|---|---|---|---|---|
+| locals, 3 slots (hot dog, draught, candy bar) | 0.97 / 0.57 / 0.33 | $7 | 1 | 0 |
+| serious, 3 slots (water, trail mix, turkey wrap) | 0.55 / 0.87 / 0.55 | $7 | 1 | 0 |
+| destination, 5 slots (oysters, lobster, steak, wine, salad) | 0.15 / 0.42 / 0.98 | $25 | 12 | 3 ($540/day) |
+| generalist, 5 slots (draught, club, craft ale, wrap, burger) | 0.85 / 0.76 / 0.63 | $12 | 5 | 1 ($180/day) |
+| cart, 3 slots (draught, Arnold Palmer, candy bar) | 0.93 / 0.65 / 0.50 | $5 | 0 | 0 |
+
+The destination menu earns three and a half times the basket of the locals menu
+and costs $540 a day in kitchen wages to serve — and is worth nothing at all on
+a course that does not draw destination guests. The generalist is good at
+nothing and adequate everywhere, for $180 a day. That is the shape this slice is
+trying to produce, and these five rows are how the implementation knows it did.
+
+## 5. The kitchen, and making `kitchenStaff` mean something
+
+`kitchenStaff` already exists in `economy.js` as a $180/day wage and **nothing
+in the game reads it.** That is a loose end this slice ties.
+
+Every item has a `prep` cost. They sum across every menu in the resort:
+
+```
+load     = Σ prep over all items on all menus
+capacity = 3 + (kitchen staff) × 4
+```
+
+When `load > capacity`, service slows:
+
+```
+serviceFactor = clamp(capacity / load, 0.45, 1)
+```
+
+`serviceFactor` scales spend (fewer guests get served) and drives a satisfaction
+penalty. **Every `cartable` item is `prep 0`** — that is the rule, not a
+coincidence of the table — which is exactly what lets the beverage cart run with
+no kitchen at all. Espresso is the one drink with a prep cost, and it is
+therefore not cartable: a machine lives somewhere.
+
+The decision this creates: a wide menu pleases every crowd a little and carries
+a wage bill; a narrow one aimed at the crowd you actually have is cheap to run.
+Breadth is a purchase, not a free hedge.
+
+## 6. Visual pop — the requirement, stated testably
+
+The author's note is the reason this section exists, and vague intent here would
+produce another wall of text with a few icons on it. So:
+
+**6.1 Every item has a 12×12 pixel sprite.** Eighteen of them, authored as grid
+data in a new `src/render/food.js`, in the same style as `sprites.js`. Drawn at
+2× on the menu board (24px), which is the size the mockup's "shelf" used and the
+author approved.
+
+**6.2 The board reads as a board**, not as a list of rows — a slate field, a
+chalk-style heading, items written on it. The player should recognise it as the
+thing a golfer reads at the turn.
+
+**6.3 Appeal is shown as three bars per item, never as words.** Locals, serious,
+guests. A dark bar means that crowd will not buy it. This is the one piece of
+information that decides every choice on the screen, so it is the one thing that
+must be readable without a tap.
+
+**6.4 The beverage cart is visible on the course during playback.** She moves
+along the holes as the day plays out. This is the highest-value item in this
+section: it is the only one that puts new motion on the canvas, where the game
+currently shows static holes and moving dots. The timeline machinery to do it
+already exists.
+
+**6.5 The refuel event gets a sprite.** `{ type: 'refuel' }` is already emitted
+into the timeline by `round.js` and currently renders as nothing.
+
+**6.6 Six palette additions**, named by role like every other entry:
+`FOOD_BREAD`, `FOOD_MEAT`, `FOOD_GREEN`, `FOOD_RED`, `FOOD_DRINK`, `FOOD_FOAM`.
+Food does not exist in a palette built for grass, sand and water. No raw hex
+outside `palette.js`, as ever.
+
+## 7. The beverage cart
+
+A new amenity: build $5,000, upkeep $90/day, satisfaction 3, three slots,
+cartable items only.
+
+Its mechanical identity is already sitting in the code and needs no invention.
+`round.js` has a refuel stop that restores golfers to 82 energy **and costs 3.5
+minutes at the turn**; tired golfers play slower. So:
+
+| | reaches them | energy | time cost |
+|---|---|---|---|
+| halfway house | once, at the turn | to 82 | 3.5 min |
+| beverage cart | every third hole | to 68 | none |
+
+That is a real choice rather than two sizes of the same thing. On a course that
+is already backing up, the cart's pace-neutrality is worth more than the bigger
+refuel. On a fast course with a generous tee interval, the halfway house wins.
+And since pace-of-play is the game's central mechanic, this ties food back into
+the spine rather than bolting it on the side.
+
+**The person.** The author asked for a "cart girl". The amenity is
+`beverageCart` in code — the equipment — and the person who runs it is a named
+character who joins the narration cast alongside Gus, the greenkeeper and the
+starter. Working name Dee, subject to the author's preference. She gets narration
+lines and is eligible to speak decision events, which is the cheapest possible
+way to make a new amenity feel like part of the world.
+
+## 8. Balance
+
+`tools/balance.js` gains menu policies, the way it gained decision policies:
+
+- **no menu** — amenities built but nothing on the board. Should earn near zero
+  from food, and should be visibly worse than today. If it is not, menus do not
+  matter.
+- **matched** — a menu chosen for the crowd the course actually draws. This is
+  the calibration target: within roughly 10% of today's flat-`spendPerGuest`
+  numbers (§4.1).
+- **mismatched** — a destination menu on a locals course. Must be clearly worse
+  than matched, or the segment structure is decorative.
+- **everything** — the widest menu the slots allow, with no kitchen staff hired.
+  Should lose money to the `serviceFactor` and prove breadth is a purchase.
+
+Any tuning gets recorded here, in this file, with the numbers that prompted it.
+
+## 9. Tests that must hold
+
+- `src/sim/` stays pure — `tests/purity.test.js` already enforces it, and the
+  item catalogue lives in `src/sim/`, not the UI.
+- **No item is good for every crowd.** No item may have `appeal ≥ 0.8` for all
+  three segments. Same guarantee segments already has, one level down.
+- **No menu pleases every crowd.** Sweep every legal slot combination and
+  confirm no menu puts `pull` at or above 0.85 for all three segments at once.
+  Currently 0 of 8,568 five-slot menus do. This test is the reason §4's formula
+  is what it is — it caught the first draft failing at 87%, and it is the single
+  most important assertion in this slice.
+- **Every item has a sprite**, by test — a catalogue entry with no art is a blank
+  square on the board, and that is exactly the failure that shipped once already
+  when `SPRITES.tee` was defined but never registered.
+- Prices quoted in the UI come from the simulation, never retyped. The recurring
+  bug on this project is the interface disagreeing with the simulation, and a
+  menu is a screen made entirely of prices.
+- The economy is neutral for a matched menu (§4.1), by balance run.
+
+## 10. Deliberately not building
+
+- **Per-item pricing or markup.** See §3.
+- **Ingredient supply, spoilage, or stock.** A second resource to manage, with
+  no decision in it that menu choice does not already contain.
+- **Menu unlocks by act.** The catalogue is open from the start; the constraint
+  is slots and kitchen capacity, which are already two constraints.
+- **Staff cooking skill.** Morale is a planned slice of its own and would
+  collide with it.
+- **Dietary or seasonal menus.** Flavour without a decision.
+
+## 11. Suggested build order
+
+Each stage is playable on its own, so this can ship in pieces rather than as one
+drop:
+
+**Stages 1-4 are the first implementation plan; stages 5-7 are the second.**
+Splitting there is deliberate: stage 4 leaves the game fully playable with menus
+on the three existing food amenities, and the beverage cart is a self-contained
+addition on top rather than a dependency of it.
+
+1. Item catalogue, pull/basket/spend maths, tests. No UI — the sim can be
+   exercised by the balance harness before any screen exists.
+2. The kitchen: `prep`, capacity, `serviceFactor`, and `kitchenStaff` finally
+   doing something.
+3. Sprites and palette additions. Look at them before building the screen
+   around them.
+4. The menu board, wired to the snack shack, halfway house and restaurant.
+5. The beverage cart: amenity, refuel behaviour, Dee joining the cast.
+6. The cart on the canvas during playback (§6.4).
+7. Balance pass, tuning recorded here.
