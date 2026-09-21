@@ -1,0 +1,176 @@
+/**
+ * A competent operator: someone who actually plays the game.
+ *
+ * The balance harness has always measured a *passive* operator — one who
+ * never builds, never prices, never hires. That was the right floor while
+ * the only thing to get wrong was the green fee, and it has quietly
+ * stopped measuring the game: it never builds a food amenity, so menus
+ * are invisible to it; never hires a cook or a shop hand, so the whole
+ * staffing layer is invisible; never buys anything, so every price
+ * changed today is invisible. It reports on a world that no longer
+ * exists, and it has reported the same six numbers through four slices of
+ * work that should have moved them.
+ *
+ * So this is the other end: a plausible, *stated* strategy, with its
+ * decisions written down rather than tuned until the output looks nice.
+ * It is not optimal and is not meant to be. It is meant to be the sort of
+ * thing a real player does, so that "can a reasonable player reach Act
+ * II, and how long does it take" has an answer that is checked rather
+ * than assumed.
+ *
+ * The policy, in order of priority each morning:
+ *
+ *   1. Keep the turf alive. One groundskeeper per three open holes.
+ *   2. Staff what is already built, before building more. An amenity with
+ *      nobody in it only half works, and an unstaffed kitchen is the
+ *      single most expensive mistake available.
+ *   3. Finish the course. Nine holes is the gate's first condition and
+ *      every other number improves with more golf to sell.
+ *   4. Buy amenities in payback order, cheapest first, and only with a
+ *      comfortable cash buffer left over.
+ *   5. Answer decision events pragmatically.
+ *
+ * Deliberately NOT modelled: menu tuning per crowd, rebuilding holes for
+ * variety, adjusting price as prestige grows. A player who does those
+ * things should beat this operator, which is the point — this is a floor
+ * for a thinking player, not a ceiling.
+ */
+import { amenity } from '../src/sim/state.js';
+import { runDay, applyEventChoice } from '../src/sim/day.js';
+import { makeHole } from '../src/sim/hole.js';
+import { TEMPLATE_NAMES } from '../src/sim/templates.js';
+import { AMENITIES, BUILD_COSTS } from '../src/sim/economy.js';
+import { EVENTS } from '../src/sim/events.js';
+import { menuPrep } from '../src/sim/menu.js';
+import { kitchenCapacity, kitchenLoad } from '../src/sim/kitchen.js';
+import { shopCapacity } from '../src/sim/shop.js';
+
+/**
+ * Cash kept in hand at all times. Without a buffer the operator spends
+ * itself to the floor on day one and then cannot make payroll, which
+ * measures impatience rather than the economy.
+ */
+const BUFFER = 12000;
+
+/**
+ * Amenities in the order a sensible player would buy them: the near
+ * necessities first, then earners, then the expensive transformative one.
+ * The halfway house and restaurant are last because both are measurably
+ * poor on a nine (see spec §8.2) — an operator that bought them early
+ * would be measuring a known mistake.
+ */
+const SHOPPING_LIST = [
+  'restrooms', 'proShop', 'snackShack', 'beverageCart',
+  'practiceGreen', 'drivingRange', 'cartBarn', 'halfwayHouse', 'restaurant',
+];
+
+const countRole = (state, role) => state.resort.staff.filter((m) => m.role === role).length;
+const openCount = (state) => state.resort.courses[0].holes
+  .filter((h) => h.open && h.corridor && h.corridor.length > 1).length;
+
+/** One morning's decisions, applied in priority order. Mutates `state`. */
+function spendTheMorning(state, { greenFee, teeInterval }) {
+  state.resort.pricing.greenFee = greenFee;
+  state.resort.pricing.teeInterval = teeInterval;
+
+  // 1. Turf first. A course that falls apart takes every other number
+  //    down with it, and groundskeepers are the cheapest insurance.
+  const holes = openCount(state);
+  if (countRole(state, 'groundskeeper') < Math.ceil(holes / 3)
+    && state.money > BUFFER) {
+    state.resort.staff.push({ role: 'groundskeeper' });
+    return;
+  }
+
+  // 2. Staff what exists before buying more of it.
+  const load = kitchenLoad(state.resort.amenities);
+  if (load > kitchenCapacity(state.resort.staff) && state.money > BUFFER) {
+    state.resort.staff.push({ role: 'kitchenStaff' });
+    return;
+  }
+  const golfers = (state.history.at(-1)?.groupsPlayed ?? 0) * 4;
+  const hasShop = state.resort.amenities.some((a) => a.type === 'proShop');
+  if (hasShop && golfers > shopCapacity(state.resort.staff) && state.money > BUFFER) {
+    state.resort.staff.push({ role: 'shopStaff' });
+    return;
+  }
+
+  // 3. Finish the course.
+  const stubs = state.resort.courses[0].holes;
+  const nextStub = stubs.findIndex((h) => !h.corridor || h.corridor.length < 2);
+  if (nextStub >= 0 && state.money > BUILD_COSTS.hole + BUFFER) {
+    state.money -= BUILD_COSTS.hole;
+    stubs[nextStub] = {
+      ...makeHole(TEMPLATE_NAMES[nextStub % TEMPLATE_NAMES.length], stubs[nextStub].id),
+      open: true,
+    };
+    return;
+  }
+
+  // 4. Then buy, one thing a day, with the buffer intact.
+  for (const type of SHOPPING_LIST) {
+    if (state.resort.amenities.some((a) => a.type === type)) continue;
+    if (state.money > AMENITIES[type].build + BUFFER) {
+      state.money -= AMENITIES[type].build;
+      state.resort.amenities.push(amenity(type));
+      return;
+    }
+  }
+}
+
+/**
+ * Plays a prepared resort under this policy until the Act I gate opens or
+ * `days` runs out.
+ *
+ * `greenFee` and `teeInterval` are arguments rather than constants
+ * because the whole question about Act I is whether more than one setting
+ * works — a game with a single viable price is a game with one answer.
+ */
+export function play(startState, { greenFee, teeInterval, days = 150, seed = 1 }) {
+  let state = startState;
+  let gateDay = null;
+  let bankrupt = false;
+  let answered = 0;
+  let last = null;
+
+  for (let day = 0; day < days && gateDay === null; day++) {
+    spendTheMorning(state, { greenFee, teeInterval });
+    const result = runDay(state, seed * 7919 + day);
+    state = result.state;
+    last = result.report;
+
+    // 5. Answer events. Pragmatic: the middle option where there is one,
+    //    otherwise whatever costs least. A real player picks by taste;
+    //    this at least picks consistently.
+    const pending = result.report.pendingEvent;
+    if (pending) {
+      const event = EVENTS.find((e) => e.id === pending.id);
+      const middle = event.choices.findIndex((c) => c.stance === 'pragmatic');
+      const index = middle >= 0 ? middle
+        : event.choices.reduce(
+          (best, c, i, all) => ((c.effects?.money ?? 0) > (all[best].effects?.money ?? 0) ? i : best), 0
+        );
+      state = applyEventChoice(state, pending.id, index);
+      answered += 1;
+    }
+
+    if (state.money < 0) bankrupt = true;
+    if (result.report.gate.passed) gateDay = day + 1;
+  }
+
+  return {
+    gateDay,
+    bankrupt,
+    days: state.day - 1,
+    money: state.money,
+    prestige: state.prestige,
+    turf: state.turfQuality,
+    satisfaction: last?.averageSatisfaction ?? 0,
+    round: last?.averageRoundMinutes ?? 0,
+    holes: openCount(state),
+    amenities: state.resort.amenities.length - 1,
+    staff: state.resort.staff.length,
+    answered,
+    outstanding: last?.gate.outstanding ?? [],
+  };
+}
