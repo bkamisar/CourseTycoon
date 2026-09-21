@@ -66,6 +66,82 @@ const SEGMENT_ACCENT = {
  * -- rendering that as 0 would claim a crowd that never showed up left
  * unhappy, which is a lie the report must not tell.
  */
+/**
+ * What each line of the day's money is called.
+ *
+ * The recap used to name three revenue lines and three cost lines by
+ * hand. The simulation reports six and five. Rooms, the indoor range and
+ * the food stock bill were all computed, all folded into the totals, and
+ * none of them appeared — so on the first Act II playthrough the recap
+ * quietly withheld $1,176 of room revenue and $1,387 of cost, and the
+ * rows on screen did not add up to the total printed beneath them. The
+ * player could not tell whether the hotel made money, which is the only
+ * feedback the nightly rate has.
+ *
+ * So `breakdownSection` below is driven by the report rather than by a
+ * list: anything the simulation reports gets a row, and a key with no
+ * label here still renders under a humanized version of its own name.
+ * A new revenue line can be added to `day.js` and be wrong on screen, but
+ * it can no longer be *absent* from it.
+ */
+const REVENUE_LABELS = {
+  greenFees: 'Green fees',
+  merchandise: 'Merchandise',
+  food: 'Food & drink',
+  rooms: 'Rooms',
+  indoors: 'Indoor range',
+};
+
+const COST_LABELS = {
+  holeUpkeep: 'Hole upkeep',
+  payroll: 'Payroll',
+  amenityUpkeep: 'Amenity upkeep',
+  foodCost: 'Food & drink stock',
+  rooms: 'Hotel upkeep',
+};
+
+/**
+ * Lines that show even when they are zero, because their absence would
+ * read as a change in the shape of the resort rather than a quiet day.
+ * Everything else appears once it earns or costs something, which keeps
+ * an Act I recap as short as it has always been.
+ */
+const ALWAYS_SHOWN = new Set([
+  'greenFees', 'merchandise', 'food', 'holeUpkeep', 'payroll', 'amenityUpkeep',
+]);
+
+/** `someKeyName` -> `Some key name`, for a line this file has not been
+ * told about yet. */
+function humanize(key) {
+  const spaced = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** One half of the breakdown: every line the simulation reported, then
+ * the total it has to add up to. */
+function breakdownSection(parent, heading, figures, labels, totalLabel) {
+  const head = document.createElement('div');
+  head.className = 'report-breakdown-heading';
+  head.textContent = heading;
+  parent.appendChild(head);
+
+  const shown = new Set();
+  for (const [key, label] of Object.entries(labels)) {
+    const value = figures[key] ?? 0;
+    if (value === 0 && !ALWAYS_SHOWN.has(key)) continue;
+    breakdownRow(parent, label, value);
+    shown.add(key);
+  }
+  // Anything reported that this file has no name for. This is the part
+  // that makes a missing line impossible rather than merely fixed.
+  for (const [key, value] of Object.entries(figures)) {
+    if (key === 'total' || shown.has(key) || value === 0) continue;
+    breakdownRow(parent, humanize(key), value);
+  }
+
+  breakdownRow(parent, totalLabel, figures.total, { total: true });
+}
+
 export function crowdRows(report, previous) {
   const total = SEGMENT_KEYS.reduce((s, key) => s + report.crowd[key].count, 0);
   const prevTotal = previous
@@ -171,6 +247,8 @@ export function computeReportData(state, report) {
     weather: report.weather,
     hotel: report.hotel,
     investors: report.investors,
+    act: state.act ?? 1,
+    investorsArrived: report.investorsArrived ?? false,
     gate: {
       passed: report.gate.passed,
       nearGate: report.gate.nearGate,
@@ -581,23 +659,8 @@ export function mountReport(root, { state, report, onContinue } = {}) {
   const breakdown = document.createElement('div');
   breakdown.className = 'report-breakdown';
 
-  const revHeading = document.createElement('div');
-  revHeading.className = 'report-breakdown-heading';
-  revHeading.textContent = 'Revenue';
-  breakdown.appendChild(revHeading);
-  breakdownRow(breakdown, 'Green fees', data.revenue.greenFees);
-  breakdownRow(breakdown, 'Merchandise', data.revenue.merchandise);
-  breakdownRow(breakdown, 'Food', data.revenue.food);
-  breakdownRow(breakdown, 'Total revenue', data.revenue.total, { total: true });
-
-  const costHeading = document.createElement('div');
-  costHeading.className = 'report-breakdown-heading';
-  costHeading.textContent = 'Costs';
-  breakdown.appendChild(costHeading);
-  breakdownRow(breakdown, 'Hole upkeep', data.costs.holeUpkeep);
-  breakdownRow(breakdown, 'Payroll', data.costs.payroll);
-  breakdownRow(breakdown, 'Amenity upkeep', data.costs.amenityUpkeep);
-  breakdownRow(breakdown, 'Total costs', data.costs.total, { total: true });
+  breakdownSection(breakdown, 'Revenue', data.revenue, REVENUE_LABELS, 'Total revenue');
+  breakdownSection(breakdown, 'Costs', data.costs, COST_LABELS, 'Total costs');
 
   screen.appendChild(breakdown);
 
@@ -754,41 +817,55 @@ export function mountReport(root, { state, report, onContinue } = {}) {
   screen.appendChild(complaintsWrap);
 
   // --- Gate progress -----------------------------------------------------
-  const gateTitle = document.createElement('p');
-  gateTitle.className = 'report-section-title';
-  gateTitle.textContent = data.gate.passed ? 'Act I -- Complete' : 'Working Toward Act II';
-  screen.appendChild(gateTitle);
+  //
+  // Act I only. Once the investors have arrived, the four gate conditions
+  // are finished business and cannot be un-met, while the thing the
+  // player is now playing to -- the standing investor target and the
+  // confidence behind it -- is already on screen further up. Showing both
+  // left an Act II recap listing Act I's goals, which is the first thing
+  // the first Act II playthrough complained about.
+  //
+  // The day it is passed is the exception: `runDay` sets `act` to 2 in
+  // the same tick that the investors arrive, so testing the act alone
+  // would hide the "Act I -- Complete" screen on the one day it is worth
+  // showing.
+  if (data.act < 2 || data.investorsArrived) {
+    const gateTitle = document.createElement('p');
+    gateTitle.className = 'report-section-title';
+    gateTitle.textContent = data.gate.passed ? 'Act I -- Complete' : 'Working Toward Act II';
+    screen.appendChild(gateTitle);
 
-  const gate = document.createElement('div');
-  gate.className = 'report-gate';
-  for (const item of data.gate.items) {
-    const row = document.createElement('div');
-    row.className = `report-gate-item ${item.met ? 'report-gate-item--met' : 'report-gate-item--unmet'}`;
-    const check = document.createElement('span');
-    check.className = `report-gate-check ${item.met ? 'report-gate-check--met' : 'report-gate-check--unmet'}`;
-    check.textContent = item.met ? '✓' : '○';
-    const text = document.createElement('span');
-    const label = document.createElement('span');
-    label.textContent = item.label;
-    text.appendChild(label);
-    if (item.now) {
-      const now = document.createElement('span');
-      now.className = 'report-gate-now';
-      now.textContent = `  ${item.now}`;
-      text.appendChild(now);
+    const gate = document.createElement('div');
+    gate.className = 'report-gate';
+    for (const item of data.gate.items) {
+      const row = document.createElement('div');
+      row.className = `report-gate-item ${item.met ? 'report-gate-item--met' : 'report-gate-item--unmet'}`;
+      const check = document.createElement('span');
+      check.className = `report-gate-check ${item.met ? 'report-gate-check--met' : 'report-gate-check--unmet'}`;
+      check.textContent = item.met ? '✓' : '○';
+      const text = document.createElement('span');
+      const label = document.createElement('span');
+      label.textContent = item.label;
+      text.appendChild(label);
+      if (item.now) {
+        const now = document.createElement('span');
+        now.className = 'report-gate-now';
+        now.textContent = `  ${item.now}`;
+        text.appendChild(now);
+      }
+      // Only the unmet ones get told how to move. A hint under something
+      // already done is noise, and the list is long enough already.
+      if (!item.met && item.hint) {
+        const hint = document.createElement('div');
+        hint.className = 'report-gate-hint';
+        hint.textContent = item.hint;
+        text.appendChild(hint);
+      }
+      row.append(check, text);
+      gate.appendChild(row);
     }
-    // Only the unmet ones get told how to move. A hint under something
-    // already done is noise, and the list is long enough already.
-    if (!item.met && item.hint) {
-      const hint = document.createElement('div');
-      hint.className = 'report-gate-hint';
-      hint.textContent = item.hint;
-      text.appendChild(hint);
-    }
-    row.append(check, text);
-    gate.appendChild(row);
+    screen.appendChild(gate);
   }
-  screen.appendChild(gate);
 
   // --- Continue ------------------------------------------------------
   const continueBtn = document.createElement('button');
