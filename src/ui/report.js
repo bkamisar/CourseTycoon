@@ -289,21 +289,20 @@ function injectStyles() {
     }
     .report-crowd-row {
       display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 4px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1px;
       font-size: 11px;
       color: ${PALETTE.UI_LIGHT};
-      margin-top: 4px;
-      white-space: nowrap;
+      margin-top: 5px;
     }
     .report-crowd-row--absent {
       color: ${PALETTE.UI_LIGHT};
       font-style: italic;
-      margin-top: 4px;
+      margin-top: 5px;
       font-size: 11px;
     }
-    .report-crowd-delta { font-size: 10px; flex: none; }
+    .report-crowd-delta { font-size: 10px; }
     .report-crowd-delta--up { color: ${PALETTE.FAIRWAY}; }
     .report-crowd-delta--down { color: ${PALETTE.SAND}; }
     .report-crowd-delta--flat { color: ${PALETTE.UI_LIGHT}; }
