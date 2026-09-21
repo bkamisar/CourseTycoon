@@ -293,6 +293,42 @@ The decision this creates: a wide menu pleases every crowd a little and carries
 a wage bill; a narrow one aimed at the crowd you actually have is cheap to run.
 Breadth is a purchase, not a free hedge.
 
+### 5.1 The kitchen is not a side-constraint. It is the decision.
+
+Found while building, and it corrects a misreading of this spec's own §4.1
+that survived into the first implementation plan.
+
+Measured on the crowd a real forty-day Act I game actually settles at
+— 55% locals, 17% serious, 27% destination — a luxury board beats a locals
+board on revenue, comfortably:
+
+| board | prep | cooks | wages/day | revenue | food cost | **net** |
+|---|---|---|---|---|---|---|
+| locals (hot dog, draught, candy, chili, burger) | 5 | 1 | $180 | $840 | $267 | **$393** |
+| luxury (oysters, lobster, steak, wine, salad) | 12 | 3 | $540 | $1,295 | $475 | **$280** |
+
+The luxury board takes $455 more across the counter and keeps $113 less,
+because three cooks cost $540 where one costs $180. That gap is the whole
+decision, and it lives entirely in the wage bill.
+
+**Two consequences, both important.**
+
+First: any comparison of menus that looks at revenue alone measures half a
+decision and will report a design failure that is not there. The first
+implementation plan contained exactly such a test, asserting that a
+mismatched board must earn less revenue on a mixed crowd. It does not, it
+should not, and the test was wrong — an upmarket board is *supposed* to be
+tempting at the counter. It is the kitchen that makes it a mistake.
+
+Second, and more load-bearing: **without the kitchen, going upmarket would
+be the dominant strategy at any destination share above about 12%**, and a
+real Act I runs at 27%. The `prep` system was specified in §5 as the cost of
+breadth. It turns out to be doing something larger: it is the only thing
+standing between this feature and "always stock the expensive food", which
+is precisely the autopilot the whole variety layer exists to prevent. Any
+future retune of `prep` values or of `PER_COOK` is therefore a balance
+change to the central decision, not a tweak to a staffing rule.
+
 ## 6. Visual pop — the requirement, stated testably
 
 The author's note is the reason this section exists, and vague intent here would

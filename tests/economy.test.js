@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, WAGES, menuRevenue, MENU_RATE, AMENITIES } from '../src/sim/economy.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
+import { menuPrep } from '../src/sim/menu.js';
+import { BASE_CAPACITY, PER_COOK } from '../src/sim/kitchen.js';
 
 const amenities = [{ type: 'clubhouse' }, { type: 'proShop' }];
 const staff = [{ role: 'groundskeeper' }, { role: 'marshal' }];
@@ -127,28 +129,60 @@ test('a matched menu earns about what the old flat rate did', () => {
     `matched menu earned ${revenue.toFixed(0)} against the old flat ${oldFlat} — calibration drifted`);
 });
 
-test('a mismatched menu earns far less', () => {
-  // A LOCALS crowd, per the test's own premise — no destination golfers at
-  // all, not the plan's original 60/25/15 mix. With any real destination
-  // presence in `crowd`, the destination segment's own numbers (pull 0.98,
-  // $24.83 basket vs the matched menu's $8.89-9.47) make the mismatched
-  // board earn MORE overall, not less: at 60/25/15 the matched menu scores
-  // 896 and the "mismatched" one scores 1039 — RATE cancels out of this
-  // ratio entirely (same amenity type on both sides), so no MENU_RATE
-  // tuning can fix it, and sweeping the pull exponent from 1 to 20 never
-  // gets the ratio below ~0.76. A crowd is not "a locals crowd" if 15% of
-  // it is destination guests who love the board being tested against them.
-  const localsCrowd = { locals: 100, serious: 0, destination: 0 };
+test('an upmarket board earns more and keeps less, on a real crowd', () => {
+  // The decision this whole slice exists to create, tested the way the
+  // player actually faces it.
+  //
+  // This test has been wrong twice. It first compared REVENUE alone on a
+  // mixed crowd, and on that measure the luxury board wins easily — which
+  // looked like a design failure and is not one. It is not one because a
+  // luxury board is prep 12 and needs three cooks at $540/day where the
+  // locals board is prep 5 and needs one at $180. The kitchen is not a
+  // side-constraint on menu choice; it is the entire reason menu choice
+  // has a wrong answer. Comparing revenue without wages measures half a
+  // decision.
+  //
+  // The crowd below is measured, not invented: a real forty-day Act I game
+  // settles around 55% locals / 17% serious / 27% destination.
+  const crowd = { locals: 55, serious: 17, destination: 27 };
+  const cooksFor = (menu) =>
+    Math.max(0, Math.ceil((menuPrep(menu) - BASE_CAPACITY) / PER_COOK));
+  const net = (menu) => {
+    const { revenue, foodCost } = menuRevenue({
+      amenities: [{ type: 'halfwayHouse', menu }], crowd, serviceFactor: 1,
+    });
+    return revenue - foodCost - cooksFor(menu) * WAGES.kitchenStaff;
+  };
+  const locals = ['hotDog', 'draught', 'candyBar', 'chiliBowl', 'burgerFries'];
+  const luxury = ['oysters', 'lobsterRoll', 'steakFrites', 'wineByGlass', 'seasonalSalad'];
+
+  const luxuryRevenue = menuRevenue({
+    amenities: [{ type: 'halfwayHouse', menu: luxury }], crowd, serviceFactor: 1,
+  }).revenue;
+  const localsRevenue = menuRevenue({
+    amenities: [{ type: 'halfwayHouse', menu: locals }], crowd, serviceFactor: 1,
+  }).revenue;
+  assert.ok(luxuryRevenue > localsRevenue,
+    'the luxury board should take more across the counter — that is what makes it tempting');
+  assert.ok(net(locals) > net(luxury),
+    `and keep less once the kitchen is paid: locals net ${net(locals)}, luxury net ${net(luxury)}`);
+});
+
+test('a board nobody on the course wants earns almost nothing', () => {
+  // The simpler half of the promise, and the one that holds without any
+  // reference to wages: serve destination food to a crowd with no
+  // destination guests in it and the counter stays quiet.
+  const localsOnly = { locals: 100, serious: 0, destination: 0 };
   const matched = menuRevenue({
     amenities: [{ type: 'halfwayHouse', menu: ['hotDog', 'draught', 'candyBar', 'chiliBowl', 'burgerFries'] }],
-    crowd: localsCrowd, serviceFactor: 1,
+    crowd: localsOnly, serviceFactor: 1,
   }).revenue;
   const mismatched = menuRevenue({
     amenities: [{ type: 'halfwayHouse', menu: ['oysters', 'lobsterRoll', 'steakFrites', 'wineByGlass', 'seasonalSalad'] }],
-    crowd: localsCrowd, serviceFactor: 1,
+    crowd: localsOnly, serviceFactor: 1,
   }).revenue;
-  assert.ok(mismatched < matched * 0.7,
-    `a destination board on a locals crowd earned ${mismatched.toFixed(0)} against ${matched.toFixed(0)}`);
+  assert.ok(mismatched < matched * 0.5,
+    `a destination board on a pure locals crowd took ${mismatched} against ${matched}`);
 });
 
 test('an empty board earns nothing', () => {
