@@ -265,6 +265,38 @@ occupancy and a prestige threshold. Act III adds a second course and the
   rooms it can fill should trend toward a buyout it cannot pay.
 - Confidence should be recoverable from one bad review and not from three.
 
+### 8.1 What the hotel measures at, before investors exist
+
+Taken at prestige 75 with a $70 nightly rate, ten days, once rooms were
+wired into the day:
+
+| rooms | occupancy | room revenue | room upkeep | net/night |
+|---|---|---|---|---|
+| 8 | 100% | $896 | $485 | **+$411** |
+| 60 | 100% | $6,440 | $3,500 | **+$2,940** |
+| 120 | 63% | $9,730 | $7,000 | **+$2,730** |
+| 240 | 31% | $10,962 | $14,000 | **-$3,038** |
+| 480 | 16% | $10,962 | $28,000 | **-$17,038** |
+
+**Overbuilding is punished, and the cliff is between 120 and 240 rooms.**
+Demand tops out near 75 room-nights for this crowd, so every room past
+that bills and never sells — exactly the behaviour occupancy targets need
+in order to mean anything.
+
+Two things this changes for §2.3. Occupancy stays comfortably above 60%
+up to about 120 rooms, so **an occupancy target must scale with the hotel
+or it is free to meet** while the resort is small. And a hotel is
+profitable well past the point it stops being full, so a target set on
+occupancy alone rewards a *smaller* hotel than the one that makes the
+most money — which is the tension worth having, but it should be a
+deliberate one rather than an accident.
+
+A caution recorded because it cost a test. The first version of the
+overbuilding test asserted that a 120-room hotel "nobody fills" should
+lose to having no hotel at all. It sells 75 nights, which is not nobody,
+and it nets +$2,730. The assertion was written from an assumption about
+the curve rather than from the curve.
+
 ## 9. Tests that must hold
 
 - `src/sim/` stays pure.

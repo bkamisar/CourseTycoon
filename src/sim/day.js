@@ -379,6 +379,25 @@ export function runDay(state, seed) {
   costs.foodCost = food.foodCost;
   costs.total += food.foodCost;
 
+  // The hotel. Fed the same per-segment golfer counts the menus are, so
+  // the two can never disagree about how many people are on the property
+  // — and so locals, who never book a room, cannot accidentally fill one.
+  const hotel = occupancyFor({
+    rooms: next.resort.rooms,
+    crowd: crowdCount,
+    roomRate: next.resort.pricing.roomRate,
+    valuePerRound: value,
+  });
+  revenue.rooms = roomRevenue({ occupancy: hotel, roomRate: next.resort.pricing.roomRate });
+  revenue.total += revenue.rooms;
+
+  // Charged on every room built, every night, whether anybody slept in it
+  // or not. This is the only thing that makes occupancy a real number
+  // rather than a vanity one, and the only thing that makes "build more
+  // rooms" a decision rather than a ratchet.
+  costs.rooms = nightlyUpkeep(next.resort.rooms);
+  costs.total += costs.rooms;
+
   const profit = revenue.total - costs.total;
 
   // Turf: one groundskeeper holds roughly three holes steady.
@@ -428,6 +447,7 @@ export function runDay(state, seed) {
     crowd,
     kitchen,
     shop,
+    hotel,
     weather: {
       key: weatherKey,
       label: sky.label,

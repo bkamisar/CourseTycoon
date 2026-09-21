@@ -700,3 +700,106 @@ test('a resort with no pro shop is never penalised for having no shop staff', ()
   assert.equal(report.shop.open, false);
   assert.equal(report.shop.serviceFactor, 1, 'no counter, no queue');
 });
+
+// --- The hotel --------------------------------------------------------
+
+test('a hotel sells rooms and the day reports it', () => {
+  const state = newGame(31);
+  state.resort.rooms = { standard: 8, suite: 4 };
+  state.resort.pricing.roomRate = 90;
+  state.prestige = 70;
+  const { report } = runDay(state, 3);
+  assert.ok(report.hotel, 'the report should describe the hotel');
+  assert.equal(report.hotel.capacity, 12);
+  assert.ok(report.hotel.sold >= 0 && report.hotel.sold <= 12);
+  assert.ok(Number.isFinite(report.revenue.rooms));
+  assert.ok(Number.isFinite(report.costs.rooms));
+});
+
+test('AN EMPTY HOTEL STILL COSTS ITS UPKEEP', () => {
+  // The load-bearing rule of Act II. Without it occupancy is a vanity
+  // figure and building more rooms is a ratchet rather than a decision.
+  function nightlyCost(rooms) {
+    const state = newGame(32);
+    state.resort.rooms = rooms;
+    state.resort.pricing.roomRate = 900; // nobody on earth will pay this
+    return runDay(state, 4).report.costs.rooms;
+  }
+  const many = nightlyCost({ standard: 20, suite: 10 });
+  const none = nightlyCost({ standard: 0, suite: 0 });
+  assert.equal(none, 0);
+  assert.ok(many > 1000, `thirty empty rooms should cost real money, got ${many}`);
+});
+
+test('a resort with no hotel is not in the hotel business', () => {
+  const { report } = runDay(newGame(33), 5);
+  assert.equal(report.hotel.capacity, 0);
+  assert.equal(report.revenue.rooms, 0);
+  assert.equal(report.costs.rooms, 0);
+  // Not 0% occupancy — an investor target must never read "no hotel built"
+  // as "a hotel that failed".
+  assert.equal(report.hotel.rate, 0);
+});
+
+test('locals cannot fill a hotel, end to end through the day', () => {
+  // Act II's central squeeze, tested through the real loop rather than
+  // through rooms.js alone: the course that wins Act I is not the course
+  // that fills a hotel.
+  const state = newGame(34);
+  state.resort.rooms = { standard: 20, suite: 10 };
+  state.resort.pricing.roomRate = 5;   // practically free
+  const { report } = runDay(state, 6);
+  const stayers = (report.crowd.serious?.count ?? 0) + (report.crowd.destination?.count ?? 0);
+  if (stayers === 0) {
+    assert.equal(report.hotel.sold, 0,
+      'a locals-only crowd booked rooms, which they never do');
+  }
+});
+
+test('room money reaches the bank, and overbuilding bleeds it', () => {
+  // Measured before this was written, because the first version of this
+  // test asserted that a 120-room hotel "nobody fills" must lose to no
+  // hotel at all — and 120 rooms sells 75 nights, which is not nobody.
+  // The real curve, at prestige 75 and a $70 rate:
+  //
+  //     8 rooms  100% full   +$411/night
+  //    60 rooms  100% full  +$2,940
+  //   120 rooms   63% full  +$2,730
+  //   240 rooms   31% full  -$3,038
+  //   480 rooms   16% full  -$17,038
+  //
+  // Demand tops out near 75 room-nights for this crowd, so everything
+  // past that is a room that bills and never sells.
+  function nightly(rooms) {
+    let state = newGame(35);
+    state.prestige = 75;
+    state.money = 100000;
+    state.resort.rooms = rooms;
+    state.resort.pricing.roomRate = 70;
+    let last = null;
+    for (let d = 0; d < 10; d++) { const r = runDay(state, 3500 + d); state = r.state; last = r.report; }
+    return { net: last.revenue.rooms - last.costs.rooms, rate: last.hotel.rate };
+  }
+  const rightSized = nightly({ standard: 40, suite: 20 });
+  const bloated = nightly({ standard: 160, suite: 80 });
+
+  assert.ok(rightSized.net > 0, 'a hotel you can fill must pay');
+  assert.ok(rightSized.rate > 0.9, 'and it should actually be full');
+  assert.ok(bloated.net < 0, 'a hotel four times too big must bleed');
+  assert.ok(bloated.rate < 0.5, 'and it should visibly stand empty');
+});
+
+test('demand caps out, so rooms are not an infinite ratchet', () => {
+  function sold(rooms) {
+    let state = newGame(36);
+    state.prestige = 75;
+    state.resort.rooms = rooms;
+    state.resort.pricing.roomRate = 70;
+    for (let d = 0; d < 8; d++) state = runDay(state, 3600 + d).state;
+    return runDay(state, 3699).report.hotel.sold;
+  }
+  const big = sold({ standard: 160, suite: 80 });
+  const enormous = sold({ standard: 320, suite: 160 });
+  assert.equal(big, enormous,
+    'past the crowd, another room sells nothing — it only costs');
+});
