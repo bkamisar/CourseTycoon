@@ -79,7 +79,12 @@ export function makeGuest(rng, { prestige, greenFee, share = DEFAULT_SHARE }) {
     patience: 100,
     energy: 100,
     satisfaction: 50,
-    stayNights: 1,        // Act II varies this
+    // Derived from the crowd this guest belongs to, not assumed. It was
+    // hardcoded to 1 and read by nothing, which meant every local carried
+    // a field saying they would stay the night while the hotel model said
+    // locals never do. A dead field is survivable; a dead field that
+    // contradicts the simulation is how this project's worst bugs start.
+    stayNights: seg.stays?.chance > 0 ? Math.round(seg.stays.nights) : 0,
     nightsRemaining: 1,
     zonePreference: 'near', // Act III uses this
   };

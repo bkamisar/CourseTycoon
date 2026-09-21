@@ -21,6 +21,10 @@ export const SEGMENTS = {
     amenityWeight: 0.2,
     waitWeight: 1.5,         // multiplier on the wait penalty in satisfaction
     spendMultiplier: 0.8,    // relative wallet
+    // Act II: a regular does not book a hotel bed in his own town.
+    // Zero, permanently — see src/sim/rooms.js for why this is structural
+    // rather than a balance figure.
+    stays: { chance: 0, nights: 0, prefersSuite: 0 },
   },
   serious: {
     label: 'Serious golfers',
@@ -33,6 +37,8 @@ export const SEGMENTS = {
     amenityWeight: 0.3,
     waitWeight: 1.3,
     spendMultiplier: 1.5,
+    // Stays when there is a reason to be here at dawn.
+    stays: { chance: 0.30, nights: 1.4, prefersSuite: 0.15 },
   },
   destination: {
     label: 'Destination guests',
@@ -45,6 +51,8 @@ export const SEGMENTS = {
     amenityWeight: 1.4,
     waitWeight: 0.8,
     spendMultiplier: 2.1,
+    // Came for a trip and behaves like it.
+    stays: { chance: 0.72, nights: 2.6, prefersSuite: 0.70 },
   },
 };
 

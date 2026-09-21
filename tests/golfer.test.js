@@ -11,10 +11,33 @@ test('a guest has every field the spec requires', () => {
   }
 });
 
-test('stayNights is always 1 in Act I', () => {
+test('a guest stays as long as their crowd actually would', () => {
+  // This was `stayNights is always 1 in Act I` and asserted a hardcoded 1
+  // on every guest — including locals, who never book a room in their own
+  // town. Nothing read the field, so the contradiction sat there until
+  // somebody reading the spec noticed it.
+  //
+  // Now it comes from the segment, which is the one place stay behaviour
+  // lives. A field that cannot disagree with the model is worth more than
+  // a field nobody reads.
   const rng = makeRng(2);
-  for (let i = 0; i < 50; i++) {
-    assert.equal(makeGuest(rng, { prestige: 60, greenFee: 80 }).stayNights, 1);
+  for (let i = 0; i < 80; i++) {
+    const guest = makeGuest(rng, { prestige: 60, greenFee: 80 });
+    const expected = SEGMENTS[guest.segment].stays;
+    if (expected.chance === 0) {
+      assert.equal(guest.stayNights, 0,
+        `a ${guest.segment} guest should never stay the night`);
+    } else {
+      assert.equal(guest.stayNights, Math.round(expected.nights));
+    }
+  }
+});
+
+test('locals carry no stay at all', () => {
+  const rng = makeRng(5);
+  for (let i = 0; i < 200; i++) {
+    const guest = makeGuest(rng, { prestige: 60, greenFee: 80 });
+    if (guest.segment === 'locals') assert.equal(guest.stayNights, 0);
   }
 });
 

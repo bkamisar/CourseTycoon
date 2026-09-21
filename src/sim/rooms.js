@@ -22,7 +22,7 @@
  * Pure, like everything in `src/sim/`.
  */
 import { clamp } from './hole.js';
-import { SEGMENT_KEYS } from './segments.js';
+import { SEGMENTS, SEGMENT_KEYS } from './segments.js';
 
 /**
  * The two things you can build, and what they cost.
@@ -51,17 +51,19 @@ export const ROOM_TYPES = Object.freeze({
 export const ROOM_KINDS = Object.freeze(Object.keys(ROOM_TYPES));
 
 /**
- * How likely each crowd is to stay at all, and for how many nights.
+ * How likely each crowd is to stay, and for how long.
  *
- * Locals are zero on both counts, permanently. Serious golfers stay when
- * there is a reason to be here at dawn. Destination guests are the ones
- * who came for a trip and behave like it.
+ * Read from `segments.js` rather than kept here, because how long a crowd
+ * stays is a property of the crowd — the same kind of fact as
+ * `idealDifficulty` or `waitWeight`. A second copy here would be a
+ * duplicate that can drift, and a golfer carrying `stayNights: 1` while
+ * this module said locals never stay is exactly how that goes wrong: the
+ * field sat there unread, contradicting the model, for as long as it took
+ * somebody to notice.
  */
-export const STAY_BEHAVIOUR = Object.freeze({
-  locals: { chance: 0, nights: 0, prefersSuite: 0 },
-  serious: { chance: 0.30, nights: 1.4, prefersSuite: 0.15 },
-  destination: { chance: 0.72, nights: 2.6, prefersSuite: 0.70 },
-});
+export const STAY_BEHAVIOUR = Object.freeze(
+  Object.fromEntries(SEGMENT_KEYS.map((key) => [key, SEGMENTS[key].stays]))
+);
 
 /** Rooms of each kind currently built. Tolerates a missing hotel. */
 export function roomCounts(rooms) {

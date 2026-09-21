@@ -144,6 +144,37 @@ It also creates the act's central squeeze: **the course that wins Act I is
 not the course that fills a hotel.** A locals' course at a friendly
 difficulty draws people who go home at six.
 
+## 4a. The back nine
+
+**Act II builds holes 10 to 18. Act III adds a second course.** The split
+was asked about directly and the economy had already answered it.
+
+`economy.js` has carried `FULL_COURSE_HOLES = 18` since Act I, with a
+comment reading *"Act I's nine is half a golf course, priced accordingly,
+and completing the eighteen is what doubles what a round is worth."*
+Measured on the same course, the back nine is worth **62% more per round**
+{D} $53 against $86. That is the engine that pays for a hotel.
+
+Three more reasons, in ascending order of how much they matter:
+
+The **halfway house is already an Act II amenity that shipped in Act I.**
+It was measured as a loss on a nine, signposted as "pays off at the turn
+of an eighteen", and left in. It has been waiting for this.
+
+**Pace changes shape.** An eighteen-hole round is twice as long, so the
+tee sheet holds fewer groups and every pace decision {D} marshals, carts,
+the halfway house {D} is worth roughly double. Act I's central mechanic
+gets harder rather than being replaced.
+
+And the one that settles it: **why would anybody stay three nights to
+play the same nine holes?** A destination resort needs eighteen. The hotel
+and the back nine are not two features, they are the same feature seen
+from two sides.
+
+A *second nine-hole course* is a different proposition {D} two courses, a
+choice of which to play, shuttles between them {D} and `zones` and
+`shuttles` already sit in the state marked Act III for exactly that.
+
 ## 5. Hotel amenities
 
 The second axis, and the answer to locals having no rooms: **every hotel
@@ -151,21 +182,50 @@ amenity serves overnight guests, day visitors, or both.** A pool sells
 memberships to the neighbourhood as well as entertaining a family staying
 four nights.
 
-First pass, to be workshopped:
+Fourteen, five of them the author's own additions, and every one serves
+overnight guests, day visitors, or both.
 
-| amenity | serves | drawn to |
-|---|---|---|
-| Pool | both | destination, and local memberships |
-| Kids' club | overnight | destination families — raises their `stayNights` |
-| Spa | both | destination, some locals |
-| Gym | both | serious, locals |
-| Function room | **day** | locals — weddings, societies, wakes |
-| Club storage and cleaning | overnight | serious |
-| Dawn tee times | overnight | serious — the reason to stay the night before |
-| Caddie programme | both | serious, destination |
-| Fine dining | both | destination, and locals who drive out for it |
+| amenity | serves | drawn to | the perk |
+|---|---|---|---|
+| Pool | both | destination, local memberships | |
+| Kids' club | overnight | destination families | raises `stayNights` |
+| Spa | both | destination, some locals | raises `stayNights` |
+| Gym | both | serious, locals | |
+| Function room | **day** | locals | weddings and societies: revenue with no golfer attached |
+| Club storage and cleaning | overnight | serious | |
+| Dawn tee times | overnight | serious | the reason to pay for a bed at a course you could drive to |
+| Caddie programme | both | serious, destination | |
+| Fine dining | both | destination, locals who drive out | |
+| **Brew pub** | both | locals, serious | a reason for locals to be here in the evening |
+| **Cocktail bar** | both | destination, serious | |
+| **Short course** | both | destination families, locals | **takes beginners off the main course** |
+| **Indoor range (Trackman)** | both | serious | **earns in weather that closes the course** |
+| Conference facility | **day** | corporate | fills rooms midweek |
 
-The structure to protect: **no amenity pleases everyone**, the same
+Three of the additions are doing real mechanical work rather than adding
+flavour, and they are the strongest things on this list.
+
+**The indoor range earns in weather that closes the course.** Weather now
+swings demand from 1.12 down to 0.10 in a storm, and every other building
+on the property is idle on a washout. A range under a roof is the one
+thing that takes money on the worst day of the month, so it does not
+merely add revenue {D} it *smooths* the variance weather introduced. That
+is a different verb from anything else the player can buy.
+
+**The short course takes beginners off the main course.** Families and
+casual players absorbed onto three par-threes are groups not queueing on
+the first tee, so it relieves congestion rather than adding to it. Every
+other amenity in this game draws a crowd onto a course that then has to
+flow; this one does the opposite, which makes it the first thing that
+helps pace by *diverting* rather than by speeding up.
+
+**The brew pub and cocktail bar are the answer to locals having no
+rooms.** A hotel that only serves people staying in it wastes the crowd
+Act I spent sixty days building. A bar locals drive out to on a Friday is
+revenue from people who will never book a bed, and it keeps the segment
+that defined Act I relevant in an act that otherwise has no use for them.
+
+The structure to protect:The structure to protect: **no amenity pleases everyone**, the same
 guarantee items and menus already carry and are tested for.
 
 Two are doing specific jobs. **Dawn tee times** is the answer to "why
@@ -230,6 +290,10 @@ occupancy and a prestige threshold. Act III adds a second course and the
 
 ## 11. Build order
 
+0. The back nine: holes 10-18 buildable, `FULL_COURSE_HOLES` finally
+   honest, the halfway house coming good. Done first because it is the
+   economic engine the rest of the act runs on, and because it needs no
+   new mechanics — the hole editor already builds holes.
 1. Rooms and suites on the state, built and priced, with upkeep per night.
 2. Who stays and for how long: `stayNights` by segment, occupancy computed.
 3. Hotel amenities, with the no-universal-amenity guarantee tested.
