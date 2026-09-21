@@ -69,21 +69,21 @@ And one rule from the spec worth repeating because it is easy to violate by acci
 
 A per-segment modifier in roughly −25..+25 that shifts how appealing the resort is to that crowd, and fades back toward zero.
 
-- [ ] **Step 1: Tests.** Applying a change moves that segment and leaves the others alone. Values clamp at the bounds. Decay moves every segment toward zero and never overshoots past it. A segment at zero stays at zero. Decay from +25 takes somewhere between one and three weeks to become negligible — assert the shape, not a magic number.
+- [x] **Step 1: Tests.** Applying a change moves that segment and leaves the others alone. Values clamp at the bounds. Decay moves every segment toward zero and never overshoots past it. A segment at zero stays at zero. Decay from +25 takes somewhere between one and three weeks to become negligible — assert the shape, not a magic number.
 
-- [ ] **Step 2: Fail, then implement.** Export `emptyGoodwill()`, `applyGoodwill(goodwill, changes)`, `decayGoodwill(goodwill)`, and a `goodwillFactor(goodwill, key)` returning a multiplier for appeal.
+- [x] **Step 2: Fail, then implement.** Export `emptyGoodwill()`, `applyGoodwill(goodwill, changes)`, `decayGoodwill(goodwill)`, and a `goodwillFactor(goodwill, key)` returning a multiplier for appeal.
 
-- [ ] **Step 3: Commit.**
+- [x] **Step 3: Commit.**
 
 ## Task 2: Appeal reads goodwill — TEST FIRST
 
 **Files:** Modify `src/sim/segments.js`; extend `tests/segments.test.js`
 
-- [ ] **Step 1: Tests.** Positive goodwill raises a segment's appeal, negative lowers it, absent goodwill changes nothing (so every existing caller behaves as before). **The no-universal-course guarantee must still hold** — re-run the grid sweep with goodwill at its maximum for all three segments and confirm no configuration puts every segment above 0.8. Goodwill must not become a way to buy your way out of the central tension.
+- [x] **Step 1: Tests.** Positive goodwill raises a segment's appeal, negative lowers it, absent goodwill changes nothing (so every existing caller behaves as before). **The no-universal-course guarantee must still hold** — re-run the grid sweep with goodwill at its maximum for all three segments and confirm no configuration puts every segment above 0.8. Goodwill must not become a way to buy your way out of the central tension.
 
-- [ ] **Step 2: Fail, then implement.** `segmentAppeal` takes an optional `goodwill` and multiplies by `goodwillFactor`.
+- [x] **Step 2: Fail, then implement.** `segmentAppeal` takes an optional `goodwill` and multiplies by `goodwillFactor`.
 
-- [ ] **Step 3: Commit.**
+- [x] **Step 3: Commit.**
 
 ## Task 3: The event library — TEST FIRST
 
@@ -91,9 +91,9 @@ A per-segment modifier in roughly −25..+25 that shifts how appealing the resor
 
 The heart of the slice, and mostly writing.
 
-- [ ] **Step 1: Tests.** Every event has an id, a speaker, a prompt and **at least two** choices. Every choice has a label, an explicit cost description, and effects. **No event has a choice whose effects dominate every alternative** — write a test that checks each event has no single option that is at least as good as all others on every axis. That test is the point: a dominated set is not a decision. Selection is deterministic for a state and seed, and an event does not recur while unseen ones remain.
+- [x] **Step 1: Tests.** Every event has an id, a speaker, a prompt and **at least two** choices. Every choice has a label, an explicit cost description, and effects. **No event has a choice whose effects dominate every alternative** — write a test that checks each event has no single option that is at least as good as all others on every axis. That test is the point: a dominated set is not a decision. Selection is deterministic for a state and seed, and an event does not recur while unseen ones remain.
 
-- [ ] **Step 2: Fail, then implement.**
+- [x] **Step 2: Fail, then implement.**
 
 Shape: `{ id, speaker, prompt, when(context), choices: [{ label, cost, effects }] }` where `effects` is `{ money, prestige, turf, goodwill: { locals, serious, destination } }`, all optional.
 
@@ -112,48 +112,48 @@ Write **at least fourteen** events. Reuse the narration cast — Gus, the starte
 
 The costs must be **concrete and stated**: "$4,000 and the greens take a beating" reads as a decision; "may affect your reputation" does not.
 
-- [ ] **Step 3: Commit.**
+- [x] **Step 3: Commit.**
 
 ## Task 4: Wire into the day — TEST FIRST
 
 **Files:** Modify `src/sim/day.js`, `src/sim/state.js`; extend `tests/day.test.js`
 
-- [ ] **Step 1: Tests.** Goodwill decays every day. An event is offered roughly weekly and not more than once a day. The report carries the pending event. Determinism holds. Applying an outcome moves money, prestige, turf and goodwill as that choice specified. Ten consecutive days run coherently.
+- [x] **Step 1: Tests.** Goodwill decays every day. An event is offered roughly weekly and not more than once a day. The report carries the pending event. Determinism holds. Applying an outcome moves money, prestige, turf and goodwill as that choice specified. Ten consecutive days run coherently.
 
-- [ ] **Step 2: Fail, then implement.** Add `goodwill` and `eventsSeen` to `newGame`, defaulting safely for saves that predate them. Decay in `runDay`. Offer an event on the cadence. Export `applyEventChoice(state, eventId, choiceIndex)` returning a new state — pure, like everything else here.
+- [x] **Step 2: Fail, then implement.** Add `goodwill` and `eventsSeen` to `newGame`, defaulting safely for saves that predate them. Decay in `runDay`. Offer an event on the cadence. Export `applyEventChoice(state, eventId, choiceIndex)` returning a new state — pure, like everything else here.
 
-- [ ] **Step 3: Commit.**
+- [x] **Step 3: Commit.**
 
 ## Task 5: The decision card — visual checkpoint
 
 **Files:** Create `src/ui/event.js`; modify `src/main.js`
 
-- [ ] **Step 1: Implement.** A card showing the speaker, the prompt, and the choices — **each with its cost printed on it**. Appears after the evening report, before returning to the overview.
+- [x] **Step 1: Implement.** A card showing the speaker, the prompt, and the choices — **each with its cost printed on it**. Appears after the evening report, before returning to the overview.
 
 **It must not be dismissable.** No close button, no tapping outside, no Continue that skips it. The only way forward is choosing. That is the one thing separating this from a notification.
 
-- [ ] **Step 2: Look at it** at 375×812 and 390×664, in a fresh tab. Every choice's cost must be readable without scrolling past it. **It is wrong if** a choice's consequence is hidden below the fold, since an unread cost is the same as no cost at all.
+- [x] **Step 2: Look at it** at 375×812 and 390×664, in a fresh tab. Every choice's cost must be readable without scrolling past it. **It is wrong if** a choice's consequence is hidden below the fold, since an unread cost is the same as no cost at all.
 
-- [ ] **Step 3: Commit.**
+- [x] **Step 3: Commit.**
 
 ## Task 6: Balance and play
 
-- [ ] **Step 1: Run `npm run balance`** and report it verbatim. Events move money and prestige, so the economy needs re-checking.
+- [x] **Step 1: Run `npm run balance`** and report it verbatim. Events move money and prestige, so the economy needs re-checking.
 
-- [ ] **Step 2: Play twenty days** at 375×812. Report **how many events fired, which ones, and whether any choice felt obvious.** An obvious choice is a bug in this slice, and it is the specific thing a test cannot catch.
+- [x] **Step 2: Play twenty days** at 375×812. Report **how many events fired, which ones, and whether any choice felt obvious.** An obvious choice is a bug in this slice, and it is the specific thing a test cannot catch.
 
-- [ ] **Step 3: Record any tuning in the spec and commit.**
+- [x] **Step 3: Record any tuning in the spec and commit.**
 
 ---
 
 ## Definition of done
 
-- [ ] All 358 prior tests green, plus the new suites
-- [ ] `tests/purity.test.js` passes — `src/sim/` stayed pure
-- [ ] The no-universal-course guarantee still holds with goodwill maxed
-- [ ] No event has a dominated choice set, by test
-- [ ] Twenty days playable, with a report on whether any choice felt obvious
-- [ ] Nothing pushed
+- [x] All 358 prior tests green, plus the new suites
+- [x] `tests/purity.test.js` passes — `src/sim/` stayed pure
+- [x] The no-universal-course guarantee still holds with goodwill maxed
+- [x] No event has a dominated choice set, by test
+- [x] Twenty days playable, with a report on whether any choice felt obvious
+- [x] Nothing pushed
 
 ## Out of scope
 
