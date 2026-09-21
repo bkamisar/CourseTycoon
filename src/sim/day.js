@@ -10,9 +10,15 @@ import { actOneGate } from './acts.js';
 import { openHoles } from './state.js';
 import { narrationContext, pickNarration, rememberNarration } from './narration.js';
 import { SEGMENT_KEYS } from './segments.js';
+import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
+import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEvent } from './events.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
+
+/** Roughly one decision event per week: a 1-in-7 chance each day, checked
+ * once, so an event is never offered more than once on the same day. */
+const EVENT_CHANCE_PER_DAY = 1 / 7;
 
 /** Warm-up benefit, in effective handicap strokes, on the first two holes. */
 const RANGE_WARMUP = -4;
@@ -56,6 +62,11 @@ export function runDay(state, seed) {
   const rng = makeRng(seed);
   const next = structuredClone(state);
   const holes = openHoles(next);
+
+  // A day's fade back toward neutral, for whichever segments a past
+  // decision event has coloured. Runs every day regardless of whether one
+  // fires today, and copes with a save from before goodwill existed.
+  next.goodwill = decayGoodwill(next.goodwill ?? emptyGoodwill());
 
   const { greenFee, teeInterval } = next.resort.pricing;
   const amenityTypes = next.resort.amenities.map((a) => a.type);
@@ -283,6 +294,32 @@ export function runDay(state, seed) {
   report.narration = narration;
   next.narrationSeen = rememberNarration(seen, narration?.id);
 
+  // A decision event, roughly once a week. Checked with one more draw off
+  // the same day's rng, after everything narration needed it for, so this
+  // addition cannot change any number the rest of the day already computed.
+  // A decision event must never be dismissable with a default — the choice
+  // sits in report.pendingEvent until the player answers it; nothing here
+  // applies it automatically.
+  const seenEvents = next.eventsSeen ?? [];
+  let pendingEvent = null;
+  if (rng.chance(EVENT_CHANCE_PER_DAY)) {
+    const picked = pickEvent(
+      eventContext({ report, previousReport: next.history.at(-1), state: next }),
+      rng,
+      seenEvents
+    );
+    if (picked) {
+      pendingEvent = {
+        id: picked.id,
+        speaker: EVENT_SPEAKERS[picked.speaker],
+        prompt: picked.prompt,
+        choices: picked.choices.map((c) => ({ label: c.label, cost: c.cost })),
+      };
+    }
+  }
+  report.pendingEvent = pendingEvent;
+  next.eventsSeen = rememberEvent(seenEvents, pendingEvent?.id);
+
   next.history.push(report);
   next.satisfactionHistory.push(averageSatisfaction);
   next.day += 1;
@@ -293,6 +330,30 @@ export function runDay(state, seed) {
     report,
     timeline: buildTimeline(schedule, rawEvents, pacedHoleMinutes),
   };
+}
+
+/**
+ * Applies a decision event's outcome: the player answered `report.
+ * pendingEvent` and picked `choiceIndex`. Pure, like everything else here —
+ * returns a new state, and the one passed in is never mutated.
+ *
+ * Looked up from the full event library rather than trusting whatever the
+ * report carried, so a stale or tampered id/index cannot silently apply
+ * the wrong numbers.
+ */
+export function applyEventChoice(state, eventId, choiceIndex) {
+  const event = EVENTS.find((e) => e.id === eventId);
+  if (!event) throw new Error(`applyEventChoice: unknown event "${eventId}"`);
+  const choice = event.choices[choiceIndex];
+  if (!choice) throw new Error(`applyEventChoice: "${eventId}" has no choice at index ${choiceIndex}`);
+
+  const next = structuredClone(state);
+  const effects = choice.effects ?? {};
+  next.money = (next.money ?? 0) + (effects.money ?? 0);
+  next.prestige = clamp((next.prestige ?? 0) + (effects.prestige ?? 0), 0, 100);
+  next.turfQuality = clamp((next.turfQuality ?? 0) + (effects.turf ?? 0), 0, 100);
+  next.goodwill = applyGoodwill(next.goodwill ?? emptyGoodwill(), effects.goodwill ?? {});
+  return next;
 }
 
 /**

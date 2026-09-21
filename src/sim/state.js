@@ -1,4 +1,5 @@
 import { makeHole } from './hole.js';
+import { emptyGoodwill } from './goodwill.js';
 
 const SAVE_VERSION = 1;
 
@@ -40,6 +41,13 @@ export function newGame(seed) {
     // Which narration lines have been shown lately, so the world does not
     // repeat itself while it still has something new to say.
     narrationSeen: [],
+    // Per-segment goodwill (goodwill.js) — a decision event's consequence,
+    // separate from and layered on top of whether the course itself suits
+    // a crowd. Fades on its own; see day.js's decay each morning.
+    goodwill: emptyGoodwill(),
+    // Which decision events have been offered lately, so the same one does
+    // not come up twice while the library still has something unseen.
+    eventsSeen: [],
   };
 }
 
@@ -57,6 +65,11 @@ export function deserialize(text) {
   if (!parsed || parsed.version !== SAVE_VERSION || !parsed.resort) {
     throw new Error('save is missing required fields or is from another version');
   }
+  // Saves from before goodwill and decision events existed have neither
+  // field. Default them safely rather than let every later reader guard
+  // against a missing key.
+  if (!parsed.goodwill) parsed.goodwill = emptyGoodwill();
+  if (!parsed.eventsSeen) parsed.eventsSeen = [];
   return parsed;
 }
 

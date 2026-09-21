@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
-import { runDay, marshalPaceFactor } from '../src/sim/day.js';
+import { runDay, marshalPaceFactor, applyEventChoice } from '../src/sim/day.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
+import { emptyGoodwill, applyGoodwill } from '../src/sim/goodwill.js';
+import { EVENTS } from '../src/sim/events.js';
 
 test('runDay returns a next state, a report and a timeline', () => {
   const { state, report, timeline } = runDay(newGame(1), 1);
@@ -164,4 +166,155 @@ test('marshals shorten hole times on a capped curve', () => {
   // undo a badly designed course.
   assert.equal(marshalPaceFactor(4), marshalPaceFactor(3));
   assert.equal(marshalPaceFactor(50), marshalPaceFactor(3));
+});
+
+// --- Task 4: goodwill decay and decision events wired into the day -------
+
+test('goodwill decays every day', () => {
+  const state = newGame(200);
+  state.goodwill = applyGoodwill(emptyGoodwill(), { locals: 20, serious: -15 });
+  const { state: next } = runDay(state, 1);
+  assert.ok(Math.abs(next.goodwill.locals) < 20, 'locals goodwill should have faded');
+  assert.ok(Math.abs(next.goodwill.serious) < 15, 'serious goodwill should have faded');
+  // Sign preserved — decay fades toward zero, it does not flip sides.
+  assert.ok(next.goodwill.locals > 0);
+  assert.ok(next.goodwill.serious < 0);
+});
+
+test('a segment with no goodwill stays at zero after decay', () => {
+  const { state: next } = runDay(newGame(201), 1);
+  assert.equal(next.goodwill.destination, 0);
+});
+
+test('runDay copes with a save that predates goodwill and eventsSeen', () => {
+  const legacy = newGame(202);
+  delete legacy.goodwill;
+  delete legacy.eventsSeen;
+  const { state: next, report } = runDay(legacy, 1);
+  assert.ok(next.goodwill, 'goodwill should default safely rather than crash');
+  for (const key of SEGMENT_KEYS) assert.equal(typeof next.goodwill[key], 'number');
+  assert.ok(Array.isArray(next.eventsSeen));
+  assert.ok('pendingEvent' in report);
+});
+
+test('the report carries a pending event field, present or explicitly null', () => {
+  const { report } = runDay(newGame(203), 1);
+  assert.ok('pendingEvent' in report);
+  assert.ok(report.pendingEvent === null || typeof report.pendingEvent === 'object');
+});
+
+test('a pending event, when offered, carries a speaker, a prompt and choices with costs', () => {
+  // Sweep enough seeds that at least one day offers an event.
+  let found = null;
+  for (let seed = 0; seed < 60 && !found; seed++) {
+    const { report } = runDay(newGame(300), seed);
+    if (report.pendingEvent) found = report.pendingEvent;
+  }
+  assert.ok(found, 'no seed in the sweep offered an event — cadence may be broken');
+  assert.ok(found.speaker && found.speaker.length > 0);
+  assert.ok(found.prompt && found.prompt.length > 0);
+  assert.ok(Array.isArray(found.choices) && found.choices.length >= 2);
+  for (const choice of found.choices) {
+    assert.ok(choice.label);
+    assert.ok(choice.cost);
+  }
+});
+
+test('an event is offered roughly weekly, over many days, and never more than one on a single day', () => {
+  let state = newGame(9001);
+  let offered = 0;
+  const days = 140; // twenty weeks
+  for (let i = 0; i < days; i++) {
+    const { state: next, report } = runDay(state, 5000 + i);
+    assert.ok(report.pendingEvent === null || typeof report.pendingEvent === 'object',
+      'never more than a single pending event on any one day');
+    if (report.pendingEvent) offered += 1;
+    state = next;
+  }
+  const expected = days / 7;
+  // Loose band around "roughly weekly" — this is a statistical cadence, not
+  // a magic number, so it is checked as a shape rather than an exact count.
+  assert.ok(offered >= expected * 0.3 && offered <= expected * 2.2,
+    `expected roughly ${expected.toFixed(0)} events over ${days} days, got ${offered}`);
+});
+
+test('selection of the pending event is deterministic for the same state and seed', () => {
+  const state = newGame(400);
+  const a = runDay(state, 77).report.pendingEvent;
+  const b = runDay(state, 77).report.pendingEvent;
+  assert.deepEqual(a, b);
+});
+
+test('an offered event does not repeat while other eligible events remain unseen', () => {
+  // Run many days so the cadence fires repeatedly, and collect which event
+  // ids get offered before any id repeats.
+  let state = newGame(500);
+  const offeredIds = [];
+  for (let i = 0; i < 400 && offeredIds.length < 3; i++) {
+    const { state: next, report } = runDay(state, 6000 + i);
+    if (report.pendingEvent) {
+      assert.ok(!offeredIds.includes(report.pendingEvent.id) || offeredIds.length >= EVENTS.length,
+        `repeated ${report.pendingEvent.id} before the pool was exhausted`);
+      offeredIds.push(report.pendingEvent.id);
+    }
+    state = next;
+  }
+  assert.ok(offeredIds.length >= 2, 'expected at least a couple of events over 400 days');
+});
+
+test('applyEventChoice moves money, prestige, turf and goodwill exactly as the choice specifies', () => {
+  const event = EVENTS.find((e) => e.id === 'tournament-invite');
+  const choice = event.choices[0]; // Host it: money -2500, turf -12, prestige +10, goodwill serious +8 locals -6
+  const state = newGame(600);
+  const next = applyEventChoice(state, event.id, 0);
+
+  assert.equal(next.money, state.money + choice.effects.money);
+  assert.equal(next.prestige, state.prestige + choice.effects.prestige);
+  assert.equal(next.turfQuality, state.turfQuality + choice.effects.turf);
+  assert.equal(next.goodwill.serious, choice.effects.goodwill.serious);
+  assert.equal(next.goodwill.locals, choice.effects.goodwill.locals);
+  assert.equal(next.goodwill.destination, 0);
+});
+
+test('applyEventChoice does not mutate the state it was given', () => {
+  const state = newGame(601);
+  const snapshot = JSON.stringify(state);
+  applyEventChoice(state, 'tournament-invite', 0);
+  assert.equal(JSON.stringify(state), snapshot);
+});
+
+test('applyEventChoice clamps prestige and turf to their bounds', () => {
+  const event = EVENTS.find((e) => e.id === 'storm-bunker-damage');
+  const choice = event.choices[0]; // Full rebuild: turf +8
+  const state = newGame(602);
+  state.turfQuality = 98;
+  state.prestige = 97;
+  const next = applyEventChoice(state, event.id, 0);
+  assert.ok(next.turfQuality <= 100, `turf exceeded 100: ${next.turfQuality}`);
+  assert.ok(next.prestige <= 100, `prestige exceeded 100: ${next.prestige}`);
+});
+
+test('applyEventChoice throws on an unknown event id', () => {
+  assert.throws(() => applyEventChoice(newGame(603), 'not-a-real-event', 0));
+});
+
+test('applyEventChoice throws on an out-of-range choice index', () => {
+  assert.throws(() => applyEventChoice(newGame(604), 'tournament-invite', 99));
+});
+
+test('ten consecutive days run coherently with goodwill and events wired in', () => {
+  let state = newGame(700);
+  let eventsOffered = 0;
+  for (let i = 0; i < 10; i++) {
+    const { state: next, report } = runDay(state, 800 + i);
+    state = report.pendingEvent
+      ? applyEventChoice(next, report.pendingEvent.id, 0)
+      : next;
+    if (report.pendingEvent) eventsOffered += 1;
+  }
+  assert.equal(state.day, 11);
+  for (const key of SEGMENT_KEYS) assert.equal(typeof state.goodwill[key], 'number');
+  assert.ok(Number.isFinite(state.money));
+  assert.ok(state.prestige >= 0 && state.prestige <= 100);
+  assert.ok(state.turfQuality >= 0 && state.turfQuality <= 100);
 });
