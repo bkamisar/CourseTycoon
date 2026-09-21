@@ -101,6 +101,30 @@ demand**: repay the outstanding investment within 14 days.
 Painful, survivable, and visible for weeks before it lands. A player
 should never be surprised by it, only unable to stop it.
 
+### 2.5 The other ending, which §2.4 forgot
+
+Building the reviews exposed a hole in §2.4: **the good ending was only
+reachable by failing.**
+
+The buyout triggers at confidence 0. But a resort being run properly beats
+its targets, and confidence climbs to 100 and stays there — measured
+across twelve weeks of a right-sized hotel. So the player who does
+everything right never ends the act at all, while the player who does
+badly gets the one exit.
+
+The fix is symmetry. **At sustained high confidence the investors offer to
+sell you their stake**, delivered on the same decision card everything
+else in this game arrives on:
+
+- **Confidence 0** — they demand their money back. Pay and you own the
+  hotel; cannot, and rooms are sold off at 60%.
+- **Confidence 85 or above, held for two consecutive reviews** — they
+  offer to sell. You are under no pressure, which is exactly why the
+  asking price is higher than the debt.
+
+Both end the act and both leave the player owning the hotel outright. One
+costs less and is a relief; the other costs more and is a graduation.
+
 ## 3. Rooms and suites
 
 `state.resort.rooms` already exists as `{ count, quality }` and is marked

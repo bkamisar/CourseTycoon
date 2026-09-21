@@ -16,6 +16,9 @@ import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
 import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEvent } from './events.js';
 import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
 import { weatherOn, forecast, effectsOf } from './weather.js';
+import {
+  REVIEW_EVERY, MEASURES, assessTarget, confidenceChange, nextTargetFor, measureNow,
+} from './investors.js';
 import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue } from './rooms.js';
 import {
   hotelUpkeep, extraNightsFrom, divertedShare, hasWeatherProofDraw, HOTEL_AMENITIES,
@@ -532,6 +535,44 @@ export function runDay(state, seed) {
   }
   report.pendingEvent = pendingEvent;
   next.eventsSeen = rememberEvent(seenEvents, pendingEvent?.id);
+
+  // The investors. Nothing here touches confidence except a review, and
+  // the target assessed is the object the player was shown a fortnight
+  // ago — not a recomputation of it, which is what makes the promise
+  // structurally impossible to break.
+  if (next.investors && !next.investors.bought) {
+    const target = next.investors.nextTarget;
+    report.investors = { target, reviewed: null, confidence: next.investors.confidence };
+    if (target && next.day >= target.dueDay) {
+      const outcome = assessTarget(target, { report, state: next });
+      const change = confidenceChange(outcome);
+      next.investors.confidence = clamp(next.investors.confidence + change, 0, 100);
+      report.investors.reviewed = {
+        measure: target.measure,
+        threshold: target.threshold,
+        actual: measureNow(target.measure, { report, state: next }),
+        outcome,
+        change,
+      };
+      report.investors.confidence = next.investors.confidence;
+      // The next target is named the moment this one is settled, so the
+      // player is never in a period whose target they have not seen.
+      const recent = [...(next.investors.recentMeasures ?? []), target.measure];
+      // Once all four have been asked, the slate clears and they start
+      // round again — so no measure is ever stale and none is ever
+      // skipped.
+      next.investors.recentMeasures = recent.length >= MEASURES.length ? [] : recent;
+      next.investors.nextTarget = nextTargetFor(next, rng, {
+        recent: next.investors.recentMeasures,
+        reviewIndex: (target.reviewIndex ?? 0) + 1,
+      });
+      report.investors.target = next.investors.nextTarget;
+    }
+  } else {
+    report.investors = next.investors?.bought
+      ? { target: null, reviewed: null, confidence: 100, bought: true }
+      : null;
+  }
 
   next.history.push(report);
   next.satisfactionHistory.push(averageSatisfaction);
