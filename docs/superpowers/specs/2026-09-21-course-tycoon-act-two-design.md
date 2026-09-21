@@ -153,7 +153,7 @@ was asked about directly and the economy had already answered it.
 comment reading *"Act I's nine is half a golf course, priced accordingly,
 and completing the eighteen is what doubles what a round is worth."*
 Measured on the same course, the back nine is worth **62% more per round**
-{D} $53 against $86. That is the engine that pays for a hotel.
+— $53 against $86. That is the engine that pays for a hotel.
 
 Three more reasons, in ascending order of how much they matter:
 
@@ -162,8 +162,8 @@ It was measured as a loss on a nine, signposted as "pays off at the turn
 of an eighteen", and left in. It has been waiting for this.
 
 **Pace changes shape.** An eighteen-hole round is twice as long, so the
-tee sheet holds fewer groups and every pace decision {D} marshals, carts,
-the halfway house {D} is worth roughly double. Act I's central mechanic
+tee sheet holds fewer groups and every pace decision — marshals, carts,
+the halfway house — is worth roughly double. Act I's central mechanic
 gets harder rather than being replaced.
 
 And the one that settles it: **why would anybody stay three nights to
@@ -171,8 +171,8 @@ play the same nine holes?** A destination resort needs eighteen. The hotel
 and the back nine are not two features, they are the same feature seen
 from two sides.
 
-A *second nine-hole course* is a different proposition {D} two courses, a
-choice of which to play, shuttles between them {D} and `zones` and
+A *second nine-hole course* is a different proposition — two courses, a
+choice of which to play, shuttles between them — and `zones` and
 `shuttles` already sit in the state marked Act III for exactly that.
 
 ## 5. Hotel amenities
@@ -209,7 +209,7 @@ flavour, and they are the strongest things on this list.
 swings demand from 1.12 down to 0.10 in a storm, and every other building
 on the property is idle on a washout. A range under a roof is the one
 thing that takes money on the worst day of the month, so it does not
-merely add revenue {D} it *smooths* the variance weather introduced. That
+merely add revenue — it *smooths* the variance weather introduced. That
 is a different verb from anything else the player can buy.
 
 **The short course takes beginners off the main course.** Families and
