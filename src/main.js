@@ -23,6 +23,7 @@ import { mountHoleEditor, openTemplatePicker } from './ui/editor.js';
 import { openBuildSheet, openStaffSheet, openPricingSheet } from './ui/panels.js';
 import { openGlossarySheet } from './ui/glossary.js';
 import { mountReport } from './ui/report.js';
+import { mountNarrationCard } from './ui/narration.js';
 import { mountStartScreen, startNewGame, applySaveCode } from './ui/start.js';
 import { createSaveAdapter } from './save/adapter.js';
 import { createLocalBackend } from './save/local.js';
@@ -98,6 +99,13 @@ const chiptune = createChiptune();
 
 const reportRoot = document.createElement('div');
 document.body.appendChild(reportRoot);
+
+// The narration card floats above whatever the report root is showing
+// rather than living inside it, so dismissing it is a separate act from
+// reading (or skipping) the report itself -- see src/ui/narration.js's
+// doc comment for why that separation is the point.
+const narrationRoot = document.createElement('div');
+document.body.appendChild(narrationRoot);
 
 const startRoot = document.createElement('div');
 document.body.appendChild(startRoot);
@@ -324,6 +332,11 @@ function syncScreenChrome() {
   overviewToolbar.hidden = router.current !== 'overview';
   playbackToolbar.hidden = router.current !== 'playback';
   reportRoot.hidden = router.current !== 'report';
+  // Rides along with the report screen rather than getting its own router
+  // state (a sixth screen would break the "exactly five screens" contract
+  // screens.js documents) -- it is content ON the report screen's moment,
+  // not a screen of its own.
+  narrationRoot.hidden = router.current !== 'report';
   startRoot.hidden = !onStart;
   // The HUD bar and amenity strip have nothing real to show before a game
   // state exists at all -- hide them rather than let them sit empty behind
@@ -450,6 +463,14 @@ function enterReport() {
     state: dayResult.state,
     report: dayResult.report,
     onContinue: onReportContinue,
+  });
+  // The world's line about the day that just happened, floated above the
+  // report rather than gating it -- see src/ui/narration.js. Dismissing it
+  // only clears the card itself; the report underneath (and its own
+  // Continue button) was never blocked by it in the first place.
+  mountNarrationCard(narrationRoot, {
+    narration: dayResult.report.narration,
+    onDismiss: () => narrationRoot.replaceChildren(),
   });
 }
 
