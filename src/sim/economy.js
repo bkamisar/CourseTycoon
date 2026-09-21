@@ -11,16 +11,31 @@ export const WAGES = {
   kitchenStaff: 180,
 };
 
+/**
+ * Daily upkeep by amenity, what it costs to build, and what it contributes.
+ *
+ * Repriced once the effects audit could measure scarcity rather than guess
+ * at it. Every amenity together cost $68,800 to build and $955 a day to
+ * run, against a fully built resort earning $5,222 a day — it bought
+ * itself back in thirteen days, which is to say the player owned
+ * everything before the first act was half over and then had nothing left
+ * to spend money on. The Act I gate asks for $50,000; ten days of profit
+ * cleared it.
+ *
+ * Costs roughly doubled, upkeep more than doubled. Upkeep matters more
+ * than the build price here: a one-off cost is a delay, where a daily one
+ * is a standing decision about whether a thing is still earning its keep.
+ */
 /** Daily upkeep by amenity, and what each contributes. */
 export const AMENITIES = {
   clubhouse:    { upkeep: 400, build: 0,     satisfaction: 2 },
-  proShop:      { upkeep: 70,  build: 6000,  satisfaction: 3, spendPerGuest: 14 },
-  snackShack:   { upkeep: 55,  build: 3500,  satisfaction: 3, spendPerGuest: 9 },
-  halfwayHouse: { upkeep: 65,  build: 4500,  satisfaction: 5, spendPerGuest: 11 },
-  restaurant:   { upkeep: 140, build: 12000, satisfaction: 6, spendPerGuest: 26 },
-  restrooms:    { upkeep: 30,  build: 1800,  satisfaction: 4 },
-  drivingRange: { upkeep: 80,  build: 7000,  satisfaction: 4 },
-  practiceGreen:{ upkeep: 45,  build: 3000,  satisfaction: 3 },
+  proShop:      { upkeep: 130,  build: 11000,  satisfaction: 3, spendPerGuest: 14 },
+  snackShack:   { upkeep: 110,  build: 7000,  satisfaction: 3, spendPerGuest: 9 },
+  halfwayHouse: { upkeep: 105,  build: 8000,  satisfaction: 5, spendPerGuest: 11 },
+  restaurant:   { upkeep: 300, build: 22000, satisfaction: 6, spendPerGuest: 26 },
+  restrooms:    { upkeep: 70,  build: 4000,  satisfaction: 4 },
+  drivingRange: { upkeep: 125,  build: 10000,  satisfaction: 4 },
+  practiceGreen:{ upkeep: 95,  build: 6000,  satisfaction: 3 },
   /**
    * The most transformative thing on this list and priced accordingly.
    *
@@ -33,12 +48,12 @@ export const AMENITIES = {
    * It is now a capital item. You have to be doing well to afford it, and
    * it still transforms the course when you do.
    */
-  cartBarn:     { upkeep: 380, build: 26000, satisfaction: 3 },
+  cartBarn:     { upkeep: 520, build: 34000, satisfaction: 3 },
   // Reaches golfers without stopping them, which is what separates her
   // from the halfway house — see round.js's cartStop and spec §7. Cheaper
   // to build than the halfway house because she carries less, and cheaper
   // to run because she needs no building.
-  beverageCart: { upkeep: 90,  build: 5000,  satisfaction: 3 },
+  beverageCart: { upkeep: 180,  build: 9000,  satisfaction: 3 },
 };
 
 /**

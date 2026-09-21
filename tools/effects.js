@@ -272,6 +272,68 @@ for (const role of Object.keys(WAGES)) {
 }
 if (quiet === 0) console.log('  Nothing measured as inert. Every purchase moves something.');
 
+// ---------------------------------------------------------------------
+// Second order: what is each thing worth when you ALREADY own the rest?
+//
+// Everything above is measured against a bare nine, one purchase at a
+// time, which is the same isolation error that made marshals look
+// worthless on three holes. Amenities do not act independently: they all
+// raise perceived value, which raises demand, which fills the tee sheet,
+// which congests the course and pushes satisfaction back down. The
+// driving range has been caught doing exactly this — it lifts
+// satisfaction at a generous tee interval and lowers it at a tight one,
+// because it draws a crowd onto a sheet that was already full.
+//
+// So each amenity is measured again as the LAST thing bought rather than
+// the first. A big drop means diminishing returns; a negative means the
+// things already built are getting in each other's way.
+// ---------------------------------------------------------------------
+const ALL_AMENITIES = Object.keys(AMENITIES).filter((t) => t !== 'clubhouse');
+
+function fullyBuilt(except) {
+  return (s) => {
+    for (const t of ALL_AMENITIES) {
+      if (t === except) continue;
+      s.resort.amenities.push(amenity(t));
+    }
+    for (let i = 0; i < 3; i++) s.resort.staff.push({ role: 'kitchenStaff' });
+    s.resort.staff.push({ role: 'shopStaff' });
+  };
+}
+
+console.log('');
+console.log('SECOND ORDER — worth as the LAST thing bought, not the first');
+console.log('-'.repeat(82));
+console.log('AMENITY            first      last    change   what that means');
+for (const type of ALL_AMENITIES) {
+  const withoutIt = measure(fullyBuilt(type));
+  const withIt = measure((s) => { fullyBuilt(type)(s); s.resort.amenities.push(amenity(type)); });
+  const last = withIt.perDay - withoutIt.perDay;
+  const first = rows.find((r) => r.type === type)?.staffed.money ?? 0;
+  const ratio = first !== 0 ? last / first : 0;
+  const note = last < 0 ? 'NEGATIVE — fights what is already built'
+    : first <= 0 ? ''
+      : ratio < 0.3 ? 'heavy diminishing returns'
+        : ratio > 1.3 ? 'worth MORE alongside the rest'
+          : 'holds its value';
+  console.log(
+    `  ${type.padEnd(17)}${cell(money(first), 8)}${cell(money(last), 10)}`
+    + `${cell(first !== 0 ? (ratio * 100).toFixed(0) + '%' : '-', 10)}   ${note}`
+  );
+}
+
+// How long before a player owns the lot? If it is quick there is no
+// scarcity, and without scarcity none of the prices above are a decision.
+const everything = ALL_AMENITIES.reduce((sum, t) => sum + AMENITIES[t].build, 0);
+const fullUpkeep = ALL_AMENITIES.reduce((sum, t) => sum + AMENITIES[t].upkeep, 0);
+const builtOut = measure(fullyBuilt(null));
+console.log(`
+SCARCITY`);
+console.log(`  Every amenity costs $${everything.toLocaleString()} to build and $${fullUpkeep.toLocaleString()}/day to run.`);
+console.log(`  A fully built resort makes $${Math.round(builtOut.perDay).toLocaleString()}/day, so it buys itself back in `
+  + `${builtOut.perDay > 0 ? Math.round(everything / builtOut.perDay) : '-'} days of operating profit.`);
+console.log(`  The Act I gate asks for $50,000.`);
+
 // The kitchen is the one constraint that is invisible until it binds.
 const staffed = baseResort(1);
 for (const t of Object.keys(MENU_SLOTS)) staffed.resort.amenities.push(amenity(t));
