@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, serialize, deserialize, defaultMenuFor } from '../src/sim/state.js';
+import { runDay } from '../src/sim/day.js';
+import { openHoles, newGame, serialize, deserialize, defaultMenuFor } from '../src/sim/state.js';
 import { MENU_SLOTS, ITEMS, itemsFor } from '../src/sim/menu.js';
 
 test('a new game starts on day one of act one', () => {
@@ -91,4 +92,27 @@ test('a save made before menus existed gets one', () => {
     'an existing halfway house should come back with a board on it');
   const restrooms = loaded.resort.amenities.find((a) => a.type === 'restrooms');
   assert.deepEqual(restrooms.menu, []);
+});
+
+test('a hole flagged open but never built is not played', () => {
+  // Flipping `open` on one of the unbuilt stubs used to make the entire
+  // day NaN — money, round time, satisfaction, all of it — and the report
+  // looked plausible right up until the numbers came out. The editor can
+  // never do this, but tooling and tests have three times.
+  const state = newGame(1);
+  for (const h of state.resort.courses[0].holes) h.open = true;
+  const playable = openHoles(state);
+  assert.equal(playable.length, 3, 'only the three real holes should be playable');
+  for (const h of playable) {
+    assert.ok(h.corridor.length > 1 && h.teePos, 'a playable hole has geometry');
+  }
+});
+
+test('a day with stubs forced open still produces real numbers', () => {
+  const state = newGame(1);
+  for (const h of state.resort.courses[0].holes) h.open = true;
+  const { report } = runDay(state, 5);
+  assert.ok(Number.isFinite(report.groupsPlayed), `groupsPlayed was ${report.groupsPlayed}`);
+  assert.ok(Number.isFinite(report.revenue.total), `revenue was ${report.revenue.total}`);
+  assert.ok(Number.isFinite(report.averageRoundMinutes), `round time was ${report.averageRoundMinutes}`);
 });

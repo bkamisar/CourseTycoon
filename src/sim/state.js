@@ -123,7 +123,23 @@ export function deserialize(text) {
   return parsed;
 }
 
-/** Every hole currently open for play. */
+/**
+ * Every hole currently open for play.
+ *
+ * A hole needs a corridor to be playable at all. Holes 4-9 of a new game
+ * are stubs — `corridor: []`, `teePos: null` — waiting to be built, and
+ * flipping one to `open` without building it makes the whole day NaN:
+ * every stroke, every minute, every dollar. The editor never does that
+ * (it only ever assigns a hole built by `makeHole`), so this is not a
+ * path a player can reach — but it has been reached three times by test
+ * code and by tooling, each time producing a day that looked plausible
+ * until the money came out as NaN.
+ *
+ * Requiring geometry rather than just the flag makes the unplayable state
+ * unrepresentable instead of merely unlikely.
+ */
 export function openHoles(state) {
-  return state.resort.courses[0].holes.filter((h) => h.open);
+  return state.resort.courses[0].holes.filter(
+    (h) => h.open && h.corridor && h.corridor.length > 1 && h.teePos
+  );
 }
