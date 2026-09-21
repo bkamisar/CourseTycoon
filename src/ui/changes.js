@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-21c';
+export const BUILD = '2026-09-21d';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-21d',
+    notes: [
+      'The hotel has buildings now: a pool, a spa, a brew pub, a short course, an indoor range and nine more. Each one shows who it is for, and three of them do something beyond drawing a crowd — the range earns on a day the course is shut, the short course takes beginners off your first tee, and the kids’ club and spa make people stay longer.',
+      'The hotel’s nightly bill now includes those buildings. It was only counting the rooms, so it read lower than what you were actually being charged.',
+      'Save codes work. Every code copied from a game anyone had played was broken, and the game gave no sign of it until the code failed to load. Codes copied before today will not load; copy a fresh one.',
+    ],
+  },
   {
     version: '2026-09-21c',
     notes: [

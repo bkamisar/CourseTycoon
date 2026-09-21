@@ -18,7 +18,16 @@ import { PALETTE } from '../render/palette.js';
 import {
   ROOM_TYPES, ROOM_KINDS, roomCounts, totalRooms, nightlyUpkeep, nightlyRate,
 } from '../sim/rooms.js';
-import { SEGMENTS } from '../sim/segments.js';
+import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
+import {
+  HOTEL_AMENITIES, HOTEL_AMENITY_IDS, hotelUpkeep,
+} from '../sim/hotelAmenities.js';
+import { amenity } from '../sim/state.js';
+
+/** What demolishing anything returns, matching the Act I amenity panel
+ * and the room steppers below: a mistake should cost something without
+ * being ruinous. */
+const DEMOLITION_REFUND = 0.65;
 
 let stylesInjected = false;
 function injectStyles() {
@@ -70,6 +79,57 @@ function injectStyles() {
     .hotel-rate-value { color: ${PALETTE.ACCENT}; font-size: 15px; }
     .hotel-slider { width: 100%; height: 44px; }
     .hotel-suite-rate { color: ${PALETTE.UI_LIGHT}; font-size: 11px; margin-top: 2px; }
+
+    .hotel-heading {
+      color: ${PALETTE.WHITE}; font-family: monospace; font-size: 14px;
+      margin: 18px 0 2px;
+    }
+    .hotel-heading-note {
+      color: ${PALETTE.UI_LIGHT}; font-family: monospace; font-size: 11px;
+      line-height: 1.5; margin-bottom: 8px;
+    }
+    .hotel-am-head {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    }
+    .hotel-serves {
+      color: ${PALETTE.UI_LIGHT}; font-size: 10px; white-space: nowrap;
+      border: 1px solid ${PALETTE.UI_LIGHT}; border-radius: 4px; padding: 1px 4px;
+    }
+    .hotel-appeal { margin-top: 6px; }
+    .hotel-appeal-row {
+      display: flex; align-items: center; gap: 6px; margin-top: 3px;
+      font-size: 10px; color: ${PALETTE.UI_LIGHT};
+    }
+    .hotel-appeal-name { width: 52px; }
+    .hotel-appeal-track {
+      flex: 1; height: 7px; background: ${PALETTE.UI_DARK};
+      border-radius: 3px; overflow: hidden;
+    }
+    /* Both of these are spans, so both need blockifying: an inline
+     * element ignores width and height, which left every appeal bar
+     * rendering as an empty track. */
+    .hotel-appeal-fill { display: block; height: 100%; background: ${PALETTE.ACCENT}; }
+    .hotel-effect {
+      color: ${PALETTE.SAND}; font-size: 11px; line-height: 1.5; margin-top: 6px;
+    }
+    .hotel-build {
+      margin-top: 8px; width: 100%; min-height: 44px;
+      background: ${PALETTE.UI_DARK}; color: ${PALETTE.WHITE};
+      border: 1px solid ${PALETTE.UI_LIGHT}; border-radius: 8px;
+      font-family: monospace; font-size: 13px; cursor: pointer;
+    }
+    .hotel-build:disabled { opacity: 0.35; cursor: default; }
+    .hotel-built {
+      margin-top: 8px; display: flex; align-items: center;
+      justify-content: space-between; gap: 8px;
+    }
+    .hotel-built-tag { color: ${PALETTE.ACCENT}; font-size: 12px; }
+    .hotel-sell {
+      min-height: 44px; padding: 0 12px;
+      background: none; color: ${PALETTE.UI_LIGHT};
+      border: 1px solid ${PALETTE.UI_LIGHT}; border-radius: 8px;
+      font-family: monospace; font-size: 12px; cursor: pointer;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -85,6 +145,146 @@ function occupancyLine(report) {
     ? ` ${turnedAway} more wanted a bed and could not get one.`
     : '';
   return `Last night: ${sold} of ${capacity} rooms filled (${pct}%).${turned}`;
+}
+
+/** Who an amenity is for, in the fewest words that fit on a badge. */
+const SERVES_LABEL = {
+  overnight: 'Guests only',
+  day: 'Drive-in only',
+  both: 'Everyone',
+};
+
+/**
+ * The mechanical effects, spelled out.
+ *
+ * Three of the fourteen do real work rather than adding appeal, and those
+ * three are the reason the list is worth reading. Every string here is
+ * built from the amenity's own numbers, so a change in
+ * `hotelAmenities.js` moves this text with it — the sheet cannot end up
+ * describing a version of the building that no longer exists.
+ */
+function effectNotes(spec) {
+  const notes = [];
+  if (spec.weatherProof) {
+    notes.push('Earns on a day the course is shut — the one building a storm cannot close.');
+  }
+  if (spec.divertsGroups > 0) {
+    notes.push(
+      `Takes ${Math.round(spec.divertsGroups * 100)}% of groups off the main course, `
+      + 'which helps the pace of everyone still on it.',
+    );
+  }
+  if (spec.extraNights > 0) {
+    notes.push(`Stays run about ${spec.extraNights} nights longer.`);
+  }
+  return notes;
+}
+
+/** One building: what it costs, who wants it, and what it does. */
+function amenityRow(spec, state, commit) {
+  const row = document.createElement('div');
+  row.className = 'hotel-row';
+
+  const head = document.createElement('div');
+  head.className = 'hotel-am-head';
+  const title = document.createElement('div');
+  title.className = 'hotel-title';
+  title.textContent = spec.label;
+  const serves = document.createElement('span');
+  serves.className = 'hotel-serves';
+  serves.textContent = SERVES_LABEL[spec.serves] ?? spec.serves;
+  head.append(title, serves);
+
+  const detail = document.createElement('div');
+  detail.className = 'hotel-detail';
+  detail.textContent = `$${spec.build.toLocaleString()} to build · $${spec.upkeep}/night to run`;
+
+  const blurb = document.createElement('div');
+  blurb.className = 'hotel-blurb';
+  blurb.textContent = spec.blurb;
+
+  row.append(head, detail, blurb);
+
+  // Who wants it, as bars, the same way the menu board shows a dish.
+  const appeal = document.createElement('div');
+  appeal.className = 'hotel-appeal';
+  for (const key of SEGMENT_KEYS) {
+    const bar = document.createElement('div');
+    bar.className = 'hotel-appeal-row';
+    const name = document.createElement('span');
+    name.className = 'hotel-appeal-name';
+    name.textContent = SEGMENTS[key].shortLabel;
+    const track = document.createElement('span');
+    track.className = 'hotel-appeal-track';
+    const fill = document.createElement('span');
+    fill.className = 'hotel-appeal-fill';
+    fill.style.width = `${Math.round((spec.appeal[key] ?? 0) * 100)}%`;
+    track.appendChild(fill);
+    bar.append(name, track);
+    appeal.appendChild(bar);
+  }
+  row.appendChild(appeal);
+
+  for (const text of effectNotes(spec)) {
+    const note = document.createElement('div');
+    note.className = 'hotel-effect';
+    note.textContent = text;
+    row.appendChild(note);
+  }
+
+  // Hotel amenities live in the same `resort.amenities` array as Act I's,
+  // keyed by the same `type` field. `hotelAmenities.js` resolves the ids
+  // it knows and ignores the rest, and the Act I panel does the reverse,
+  // so one array serves both without either screen inventing a building.
+  const owned = state.resort.amenities.some((a) => a.type === spec.id);
+
+  if (owned) {
+    const built = document.createElement('div');
+    built.className = 'hotel-built';
+    const tag = document.createElement('span');
+    tag.className = 'hotel-built-tag';
+    tag.textContent = 'Built';
+    const sell = document.createElement('button');
+    sell.type = 'button';
+    sell.className = 'hotel-sell';
+    const refund = Math.round(spec.build * DEMOLITION_REFUND);
+    sell.textContent = `Demolish · +$${refund.toLocaleString()}`;
+    // Confirmation kept in a closure rather than on the element, so the
+    // button carries no state a re-render could silently reset.
+    let confirming = false;
+    sell.addEventListener('click', () => {
+      if (!confirming) {
+        confirming = true;
+        sell.textContent = 'Tap again to demolish';
+        return;
+      }
+      const next = structuredClone(state);
+      next.resort.amenities = next.resort.amenities.filter((a) => a.type !== spec.id);
+      next.money += refund;
+      commit(next);
+    });
+    built.append(tag, sell);
+    row.appendChild(built);
+  } else {
+    const build = document.createElement('button');
+    build.type = 'button';
+    build.className = 'hotel-build';
+    const affordable = state.money >= spec.build;
+    build.disabled = !affordable;
+    build.textContent = affordable
+      ? `Build · $${spec.build.toLocaleString()}`
+      : `$${(spec.build - state.money).toLocaleString()} short`;
+    build.addEventListener('click', () => {
+      if (state.money < spec.build) return;
+      const next = structuredClone(state);
+      next.money -= spec.build;
+      next.resort.amenities.push(amenity(spec.id));
+      commit(next);
+    });
+    row.appendChild(build);
+  }
+
+  return row;
 }
 
 /**
@@ -136,7 +336,7 @@ export function openHotelSheet(sheetHost, { state, onChange }) {
             // Selling a room back returns what demolishing anything else
             // returns, for the same reason: a mistake should cost
             // something without being ruinous.
-            next.money += Math.round(spec.build * 0.65);
+            next.money += Math.round(spec.build * DEMOLITION_REFUND);
             current = next;
             onChange(current);
             rerender();
@@ -227,12 +427,21 @@ export function openHotelSheet(sheetHost, { state, onChange }) {
         bill.className = 'hotel-bill';
         const figure = document.createElement('div');
         figure.className = 'hotel-bill-figure';
-        figure.textContent = `$${nightlyUpkeep(current.resort.rooms).toLocaleString()} a night`;
+        // Rooms AND buildings, because `day.js` charges the sum of the two.
+        // Showing only the rooms here would be this project's favourite
+        // bug again: a screen quoting a bill the simulation disagrees
+        // with, and the disagreement growing with every amenity built.
+        const rooms = nightlyUpkeep(current.resort.rooms);
+        const buildings = hotelUpkeep(current.resort.amenities);
+        figure.textContent = `$${(rooms + buildings).toLocaleString()} a night`;
         const note = document.createElement('div');
         note.className = 'hotel-bill-note';
-        note.textContent = totalRooms(current.resort.rooms) === 0
+        note.textContent = rooms + buildings === 0
           ? 'Nothing built yet, so nothing to pay.'
-          : 'Charged on every room you have built, filled or empty. This is the whole argument against building more than you can fill.';
+          : buildings === 0
+            ? 'Charged on every room you have built, filled or empty. This is the whole argument against building more than you can fill.'
+            : `$${rooms.toLocaleString()} of rooms and $${buildings.toLocaleString()} of buildings, `
+              + 'charged whether anybody uses them or not. This is the whole argument against building more than you can fill.';
         bill.append(figure, note);
 
         const occ = document.createElement('div');
@@ -248,6 +457,26 @@ export function openHotelSheet(sheetHost, { state, onChange }) {
         bill.appendChild(who);
 
         body.appendChild(bill);
+
+        // --- The buildings -------------------------------------------
+        const heading = document.createElement('div');
+        heading.className = 'hotel-heading';
+        heading.textContent = 'What else is on the property';
+        const headingNote = document.createElement('div');
+        headingNote.className = 'hotel-heading-note';
+        headingNote.textContent =
+          'Nothing here pleases everybody, and the bars say who each one is for. '
+          + `${SEGMENTS.locals.shortLabel} never book a room, so the buildings they drive out for `
+          + 'are the only way the hotel earns from the crowd Act I was spent building.';
+        body.append(heading, headingNote);
+
+        for (const id of HOTEL_AMENITY_IDS) {
+          body.appendChild(amenityRow(HOTEL_AMENITIES[id], current, (next) => {
+            current = next;
+            onChange(current);
+            rerender();
+          }));
+        }
       }
       rerender();
     },

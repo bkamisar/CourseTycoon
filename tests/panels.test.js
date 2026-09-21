@@ -6,97 +6,11 @@ import { maxGroupsForDay } from '../src/sim/schedule.js';
 import { makeHole } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 
-/**
- * A minimal fake DOM, just enough of `document.createElement` for panels.js
- * to run headless. panels.js never reads layout, style computation or CSS
- * matching — only element creation, property/attribute assignment, text
- * content, append/replaceChildren, and click/input events — so this stub
- * covers it without pulling in a real DOM dependency.
- */
-class FakeNode {
-  constructor(tag) {
-    this.tagName = tag;
-    this.children = [];
-    this.style = {};
-    this._listeners = {};
-    this._text = '';
-  }
-  appendChild(child) {
-    this.children.push(child);
-    child.parentNode = this;
-    return child;
-  }
-  append(...items) {
-    for (const item of items) {
-      this.appendChild(typeof item === 'string' ? fakeDocument.createTextNode(item) : item);
-    }
-  }
-  replaceChildren(...items) {
-    this.children = [];
-    this.append(...items);
-  }
-  remove() {
-    if (!this.parentNode) return;
-    const i = this.parentNode.children.indexOf(this);
-    if (i !== -1) this.parentNode.children.splice(i, 1);
-  }
-  addEventListener(type, fn) {
-    (this._listeners[type] ??= []).push(fn);
-  }
-  dispatch(type, evt = {}) {
-    for (const fn of this._listeners[type] ?? []) fn(evt);
-  }
-  click() {
-    this.dispatch('click', {});
-  }
-  fireInput() {
-    this.dispatch('input', {});
-  }
-  get textContent() {
-    if (this.tagName === '#text') return this._text;
-    if (this.children.length === 0) return this._text;
-    return this.children.map((c) => c.textContent).join('');
-  }
-  set textContent(v) {
-    this.children = [];
-    this._text = v;
-  }
-  // Buttons/inputs found by walking the tree, since these tests don't have
-  // a real querySelector.
-  findAll(pred, out = []) {
-    if (pred(this)) out.push(this);
-    for (const c of this.children) c.findAll(pred, out);
-    return out;
-  }
-}
+import { FakeNode, fakeSheetHost } from './helpers/fakeDom.js';
 
-const fakeDocument = {
-  createElement: (tag) => new FakeNode(tag),
-  createTextNode: (text) => {
-    const n = new FakeNode('#text');
-    n._text = text;
-    return n;
-  },
-  head: new FakeNode('head'),
-};
-
-globalThis.document = fakeDocument;
 
 const { openBuildSheet, openStaffSheet, openPricingSheet, paceConsequence, greenFeeCeiling } = await import('../src/ui/panels.js');
 
-function fakeSheetHost() {
-  let body = null;
-  return {
-    open(def) {
-      body = new FakeNode('div');
-      def.render(body);
-    },
-    dismiss() {},
-    get body() {
-      return body;
-    },
-  };
-}
 
 function buttonsByText(body, text) {
   return body.findAll((n) => n.tagName === 'button' && n.textContent === text);

@@ -433,10 +433,29 @@ function enterOverviewFromStart(nextState) {
   chiptune.playMusic('build');
 }
 
+/**
+ * The save code for the start screen, or `null` if it cannot be made.
+ *
+ * This runs while the start screen is being built, which is the one place
+ * a throw is most expensive: `hasBackNine` threw on a null state here
+ * once and took down the whole chrome with every test still green. The
+ * "Copy Save Code" card is a convenience; the Continue button is not.
+ * Losing the former must never cost the latter.
+ */
+function safeSaveCode(save) {
+  if (!save) return null;
+  try {
+    return encode(save);
+  } catch (err) {
+    console.error('could not build a save code for this game', err);
+    return null;
+  }
+}
+
 function renderStartScreen() {
   mountStartScreen(startRoot, {
     save: existingSave,
-    saveCode: existingSave ? encode(existingSave) : null,
+    saveCode: safeSaveCode(existingSave),
     sheets,
     topInset: embedded ? EMBEDDED_TOP_INSET : 0,
     onContinue() {
