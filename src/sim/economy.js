@@ -1,6 +1,7 @@
 import { maxGroupsForDay } from './schedule.js';
 import { clamp } from './hole.js';
 import { crowdMix, SEGMENT_KEYS } from './segments.js';
+import { MENU_SLOTS, menuPull, menuBasket, menuCogs } from './menu.js';
 
 /** Daily wage by role. */
 export const WAGES = {
@@ -206,6 +207,48 @@ export function dailyCosts({ holeUpkeep, staff, amenities }) {
  * time anything is retuned, and the player is then quoted one number and
  * charged another.
  */
+/**
+ * How much custom each food amenity generates per guest.
+ *
+ * Calibrated so a well-matched menu earns roughly what the flat
+ * `spendPerGuest` it replaces already earned. That neutrality matters
+ * more than any individual value: the whole economy - build costs, wages,
+ * the Act I gate - was balanced against the old flat numbers, so if menus
+ * were a revenue increase every cost in the game would be retroactively
+ * too cheap. Menus add a way to be wrong, not a way to earn more.
+ */
+export const MENU_RATE = Object.freeze({
+  snackShack: 1.3,
+  halfwayHouse: 1.3,
+  restaurant: 1.25,
+  beverageCart: 1.3,
+});
+
+/**
+ * What the resort's food and drink takes, and what it cost to serve.
+ *
+ * `crowd` is golfers per segment, not groups. Each segment is charged its
+ * own pull and its own basket, because the whole point is that the same
+ * board is worth different amounts to different people.
+ */
+export function menuRevenue({ amenities, crowd, serviceFactor = 1 }) {
+  let revenue = 0;
+  let foodCost = 0;
+  for (const amenity of amenities) {
+    const rate = MENU_RATE[amenity.type];
+    if (!rate || !MENU_SLOTS[amenity.type]) continue;
+    for (const key of SEGMENT_KEYS) {
+      const heads = crowd?.[key] ?? 0;
+      if (heads <= 0) continue;
+      const pull = menuPull(amenity.menu, key);
+      if (pull <= 0) continue;
+      revenue += heads * pull * menuBasket(amenity.menu, key) * rate * serviceFactor;
+      foodCost += heads * pull * menuCogs(amenity.menu, key) * rate * serviceFactor;
+    }
+  }
+  return { revenue: Math.round(revenue), foodCost: Math.round(foodCost) };
+}
+
 export const BUILD_COSTS = Object.freeze({
   hole: 12000,
   bunker: 800,

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, WAGES } from '../src/sim/economy.js';
+import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, WAGES, menuRevenue, MENU_RATE, AMENITIES } from '../src/sim/economy.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 
 const amenities = [{ type: 'clubhouse' }, { type: 'proShop' }];
@@ -113,4 +113,78 @@ test('costs include hole upkeep, payroll and amenity upkeep', () => {
 test('an empty resort still costs money', () => {
   const c = dailyCosts({ holeUpkeep: 360, staff: [], amenities: [] });
   assert.ok(c.total > 0);
+});
+
+const crowd = { locals: 60, serious: 25, destination: 15 }; // golfers, not groups
+
+test('a matched menu earns about what the old flat rate did', () => {
+  // The calibration rule: neutral for a player who chooses well.
+  const amenities = [{ type: 'halfwayHouse', menu: ['hotDog', 'draught', 'candyBar', 'chiliBowl', 'burgerFries'] }];
+  const { revenue } = menuRevenue({ amenities, crowd, serviceFactor: 1 });
+  const golfers = 60 + 25 + 15;
+  const oldFlat = golfers * AMENITIES.halfwayHouse.spendPerGuest;
+  assert.ok(Math.abs(revenue - oldFlat) / oldFlat < 0.25,
+    `matched menu earned ${revenue.toFixed(0)} against the old flat ${oldFlat} — calibration drifted`);
+});
+
+test('a mismatched menu earns far less', () => {
+  // A LOCALS crowd, per the test's own premise — no destination golfers at
+  // all, not the plan's original 60/25/15 mix. With any real destination
+  // presence in `crowd`, the destination segment's own numbers (pull 0.98,
+  // $24.83 basket vs the matched menu's $8.89-9.47) make the mismatched
+  // board earn MORE overall, not less: at 60/25/15 the matched menu scores
+  // 896 and the "mismatched" one scores 1039 — RATE cancels out of this
+  // ratio entirely (same amenity type on both sides), so no MENU_RATE
+  // tuning can fix it, and sweeping the pull exponent from 1 to 20 never
+  // gets the ratio below ~0.76. A crowd is not "a locals crowd" if 15% of
+  // it is destination guests who love the board being tested against them.
+  const localsCrowd = { locals: 100, serious: 0, destination: 0 };
+  const matched = menuRevenue({
+    amenities: [{ type: 'halfwayHouse', menu: ['hotDog', 'draught', 'candyBar', 'chiliBowl', 'burgerFries'] }],
+    crowd: localsCrowd, serviceFactor: 1,
+  }).revenue;
+  const mismatched = menuRevenue({
+    amenities: [{ type: 'halfwayHouse', menu: ['oysters', 'lobsterRoll', 'steakFrites', 'wineByGlass', 'seasonalSalad'] }],
+    crowd: localsCrowd, serviceFactor: 1,
+  }).revenue;
+  assert.ok(mismatched < matched * 0.7,
+    `a destination board on a locals crowd earned ${mismatched.toFixed(0)} against ${matched.toFixed(0)}`);
+});
+
+test('an empty board earns nothing', () => {
+  const { revenue, foodCost } = menuRevenue({
+    amenities: [{ type: 'halfwayHouse', menu: [] }], crowd, serviceFactor: 1,
+  });
+  assert.equal(revenue, 0);
+  assert.equal(foodCost, 0);
+});
+
+test('the cost of goods is always well under the revenue', () => {
+  const { revenue, foodCost } = menuRevenue({
+    amenities: [{ type: 'restaurant', menu: ['oysters', 'lobsterRoll', 'steakFrites', 'wineByGlass', 'seasonalSalad', 'clubSandwich', 'craftAle'] }],
+    crowd, serviceFactor: 1,
+  });
+  assert.ok(foodCost > 0, 'serving food costs something');
+  assert.ok(foodCost < revenue * 0.6, `margin too thin: ${foodCost} of ${revenue}`);
+});
+
+test('a slow kitchen cuts what is sold and what it cost to buy, together', () => {
+  const full = menuRevenue({
+    amenities: [{ type: 'halfwayHouse', menu: ['hotDog', 'draught', 'candyBar', 'chiliBowl', 'burgerFries'] }],
+    crowd, serviceFactor: 1,
+  });
+  const half = menuRevenue({
+    amenities: [{ type: 'halfwayHouse', menu: ['hotDog', 'draught', 'candyBar', 'chiliBowl', 'burgerFries'] }],
+    crowd, serviceFactor: 0.5,
+  });
+  assert.ok(Math.abs(half.revenue - full.revenue / 2) < 1);
+  assert.ok(Math.abs(half.foodCost - full.foodCost / 2) < 1,
+    'food you could not cook is food you did not buy');
+});
+
+test('amenities that serve no food are skipped', () => {
+  const { revenue } = menuRevenue({
+    amenities: [{ type: 'restrooms', menu: [] }, { type: 'proShop' }], crowd, serviceFactor: 1,
+  });
+  assert.equal(revenue, 0);
 });
