@@ -26,6 +26,7 @@ import { mountReport } from './ui/report.js';
 import { mountNarrationCard } from './ui/narration.js';
 import { mountEventCard } from './ui/event.js';
 import { mountChanges, liveVersion } from './ui/changes.js';
+import { openHotelSheet } from './ui/hotel.js';
 import { mountStartScreen, startNewGame, applySaveCode } from './ui/start.js';
 import { createSaveAdapter } from './save/adapter.js';
 import { createLocalBackend } from './save/local.js';
@@ -277,6 +278,25 @@ function toolbarButton(label, onClick, { primary = false } = {}) {
  * Act II's furniture around. It updates its own label rather than being
  * rebuilt, because replacing a button's DOM drops its listener.
  */
+/**
+ * The hotel, which only exists from Act II. Hidden until then rather than
+ * disabled, because a button that does nothing is a question the player
+ * has to keep answering.
+ */
+const hotelButton = toolbarButton('Hotel', () => {
+  openHotelSheet(sheets, {
+    state,
+    onChange: (next) => {
+      state = next;
+      hud.update(state);
+      amenityBar.update(state);
+    },
+  });
+});
+hotelButton.update = () => {
+  hotelButton.hidden = (state?.act ?? 1) < 2;
+};
+
 const nineToggle = toolbarButton('Back 9', () => {
   shownNine = shownNine === 0 ? 1 : 0;
   nineToggle.textContent = shownNine === 0 ? 'Back 9' : 'Front 9';
@@ -287,6 +307,7 @@ nineToggle.update = () => {
 
 overviewToolbar.append(
   nineToggle,
+  hotelButton,
   toolbarButton('Amenities', () => onAmenityTap()),
   toolbarButton('Staff', () =>
     openStaffSheet(sheets, {
@@ -383,6 +404,7 @@ function syncScreenChrome() {
   overviewMute.update();
   playbackMute.update();
   nineToggle.update();
+  hotelButton.update();
 }
 router.subscribe(syncScreenChrome);
 syncScreenChrome();

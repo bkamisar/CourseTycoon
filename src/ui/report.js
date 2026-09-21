@@ -16,6 +16,16 @@
  */
 import { PALETTE } from '../render/palette.js';
 import { CONDITIONS } from '../sim/weather.js';
+import { MEASURE_LABEL } from '../sim/investors.js';
+
+/** A target, in the units the measure is actually in. An occupancy of
+ * 0.62 shown as "0.62" is the interface handing the player a ratio when
+ * it means a percentage. */
+function formatTarget(measure, value) {
+  if (measure === 'occupancy') return `${Math.round(value * 100)}%`;
+  if (measure === 'revenuePerRoom') return `$${Math.round(value)}`;
+  return String(Math.round(value));
+}
 
 /** Short labels for the forecast strip, read from the simulation so the
  * report can never name a condition the game does not have. */
@@ -159,6 +169,8 @@ export function computeReportData(state, report) {
     averageSatisfaction: report.averageSatisfaction,
     complaints: report.complaints,
     weather: report.weather,
+    hotel: report.hotel,
+    investors: report.investors,
     gate: {
       passed: report.gate.passed,
       nearGate: report.gate.nearGate,
@@ -350,6 +362,21 @@ function injectStyles() {
       font-style: italic;
     }
 
+    .report-hotel {
+      margin: 0 0 12px;
+      padding: 8px 10px;
+      background: ${PALETTE.OUTLINE};
+      border-left: 3px solid ${PALETTE.ACCENT};
+      border-radius: 0 6px 6px 0;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .report-hotel-occ { color: ${PALETTE.WHITE}; font-size: 14px; }
+    .report-hotel-target { color: ${PALETTE.ACCENT}; }
+    .report-hotel-conf { color: ${PALETTE.UI_LIGHT}; }
+    .report-hotel-good { color: ${PALETTE.FAIRWAY}; }
+    .report-hotel-bad { color: ${PALETTE.SAND}; }
     .report-gate {
       background: ${PALETTE.UI_DARK};
       border: 1px solid ${PALETTE.UI_LIGHT};
@@ -492,6 +519,62 @@ export function mountReport(root, { state, report, onContinue } = {}) {
       sky.appendChild(ahead);
     }
     screen.appendChild(sky);
+  }
+
+  // --- The hotel, and the people who paid for it ----------------------
+  if (data.investors || (data.hotel?.capacity ?? 0) > 0) {
+    const hotel = document.createElement('div');
+    hotel.className = 'report-hotel';
+
+    if ((data.hotel?.capacity ?? 0) > 0) {
+      const occ = document.createElement('div');
+      occ.className = 'report-hotel-occ';
+      const pct = Math.round((data.hotel.sold / data.hotel.capacity) * 100);
+      occ.textContent = `Hotel ${data.hotel.sold} of ${data.hotel.capacity} filled — ${pct}%`;
+      hotel.appendChild(occ);
+    }
+
+    const inv = data.investors;
+    if (inv?.reviewed) {
+      const verdict = document.createElement('div');
+      verdict.className = inv.reviewed.change >= 0
+        ? 'report-hotel-good' : 'report-hotel-bad';
+      verdict.textContent =
+        `Review: they wanted ${MEASURE_LABEL[inv.reviewed.measure]} `
+        + `${formatTarget(inv.reviewed.measure, inv.reviewed.threshold)}, `
+        + `you had ${formatTarget(inv.reviewed.measure, inv.reviewed.actual)}. `
+        + `Confidence ${inv.reviewed.change >= 0 ? '+' : ''}${inv.reviewed.change}.`;
+      hotel.appendChild(verdict);
+    }
+
+    if (inv?.target) {
+      // The promise the whole design rests on: you are told the target at
+      // the start of the period it covers, never at the review.
+      const ahead = document.createElement('div');
+      ahead.className = 'report-hotel-target';
+      ahead.textContent =
+        `Next: ${MEASURE_LABEL[inv.target.measure]} of at least `
+        + `${formatTarget(inv.target.measure, inv.target.threshold)} by day ${inv.target.dueDay}.`;
+      hotel.appendChild(ahead);
+    }
+
+    if (inv && typeof inv.confidence === 'number' && !inv.bought) {
+      const conf = document.createElement('div');
+      conf.className = 'report-hotel-conf';
+      conf.textContent = `Investor confidence ${Math.round(inv.confidence)} of 100`;
+      hotel.appendChild(conf);
+    }
+
+    if (inv?.buyoutDemand) {
+      const demand = document.createElement('div');
+      demand.className = 'report-hotel-bad';
+      demand.textContent = inv.buyoutDemand.kind === 'offer'
+        ? `They will sell you their stake for $${inv.buyoutDemand.amount.toLocaleString()}, by day ${inv.buyoutDemand.dueDay}.`
+        : `They want their money back: $${inv.buyoutDemand.amount.toLocaleString()} by day ${inv.buyoutDemand.dueDay}.`;
+      hotel.appendChild(demand);
+    }
+
+    screen.appendChild(hotel);
   }
 
   // --- Revenue / cost breakdown -----------------------------------------

@@ -19,6 +19,7 @@ import { weatherOn, forecast, effectsOf } from './weather.js';
 import {
   REVIEW_EVERY, MEASURES, OFFER_CONFIDENCE,
   assessTarget, confidenceChange, nextTargetFor, measureNow, settlementDue,
+  startingInvestors,
 } from './investors.js';
 import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue } from './rooms.js';
 import {
@@ -596,7 +597,17 @@ export function runDay(state, seed) {
   next.history.push(report);
   next.satisfactionHistory.push(averageSatisfaction);
   next.day += 1;
-  if (gate.passed) next.act = 2;
+  if (gate.passed) {
+    next.act = 2;
+    // The investors arrive the moment the gate opens, with their first
+    // target already named. Not optional and not declinable: a mechanic
+    // you can refuse is one half the players never meet, and this
+    // mechanic is the act.
+    if (!next.investors) {
+      next.investors = startingInvestors(next, rng);
+      report.investorsArrived = true;
+    }
+  }
 
   return {
     state: next,
