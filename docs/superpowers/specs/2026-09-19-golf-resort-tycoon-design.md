@@ -870,6 +870,40 @@ made to fix a problem that was not there: the marshal was nearly deleted,
 and a revenue spread was invented to rescue a halfway house that did not
 need rescuing.
 
+### 15c. Shape tests and calibration tests
+
+A second family of hollow test, found the same way as §15b — by looking at
+output rather than at a green suite.
+
+Act II's investor thresholds had four tests. All four passed while the
+numbers were so soft a 180-room hotel held maximum confidence for twelve
+weeks. They checked **shape**: a small hotel is asked for more occupancy
+than a big one, the first review is gentler than the fifth. Every one of
+those would pass with a prestige target of 5, or of 500.
+
+**A shape test says the numbers are ordered. A calibration test says they
+are the right size.** The difference only shows when a number is wrong in
+a way that preserves the ordering, which is most of how numbers go wrong.
+
+The pattern that works, taken from `MENU_RATE` — the one figure in this
+game that has never drifted, because §4.1 of the food spec pinned it to
+"within 25% of the flat rate it replaced":
+
+1. Measure what the game actually produces when played properly.
+2. Assert the number against **that**, not against its neighbours.
+3. Then break it on purpose and check the test fails.
+
+Step 3 is not optional. The first calibration test written for the
+investors used a bound of `actual * 0.5` and **passed against the exact
+ladder it was written to catch** — a prestige target of 53 against a real
+80 is free, and 53 is comfortably above 40. A calibration test with a
+loose bound is a shape test wearing a calibration test's clothes. Tightened
+to 0.72, it fails with "an early target of 53 is free against a real 80".
+
+Worth auditing anywhere a constant governs difficulty: satisfaction term
+weights, weather multipliers, room demand. Each currently has shape tests
+and, apart from menus and now investors, no calibration.
+
 ## 16. Deferred decisions
 
 Recorded so they are not silently forgotten, and deliberately excluded from Act

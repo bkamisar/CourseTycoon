@@ -7,7 +7,9 @@ import {
   REVIEW_EVERY, STARTING_CONFIDENCE, MEASURES,
   confidenceChange, thresholdFor, assessTarget, pickMeasure,
   startingInvestors, measureNow,
+  SETTLEMENT_DAYS, buyoutPrice, payBuyout, forceLiquidation,
 } from '../src/sim/investors.js';
+import { totalRooms } from '../src/sim/rooms.js';
 
 /**
  * A resort at the moment Act II begins: a hotel, and a crowd that will
@@ -216,4 +218,133 @@ test('confidence cannot leave its bounds in either direction', () => {
 test('a resort with no investors runs exactly as it did in Act I', () => {
   const { report } = runDay(newGame(9), 12);
   assert.equal(report.investors, null);
+});
+
+// --- The two ways out -------------------------------------------------
+
+test('confidence at zero demands the money back rather than taking the hotel', () => {
+  let state = atConfidence(0, 11);
+  const before = { ...state.resort.rooms };
+  const { report, state: next } = runDay(state, 1200);
+  assert.ok(report.investors.buyoutDemand, 'they should call the loan');
+  assert.equal(report.investors.buyoutDemand.kind, 'demand');
+  assert.ok(report.investors.buyoutDemand.amount > 0);
+  assert.deepEqual(next.resort.rooms, before,
+    'the hotel is not confiscated; it is a debt, not a repossession');
+});
+
+test('the demand is visible for a fortnight before it lands', () => {
+  // A player should never be surprised by the buyout, only unable to stop it.
+  const { report } = runDay(atConfidence(0, 12), 1400);
+  assert.ok(report.investors.buyoutDemand.dueDay >= report.day + SETTLEMENT_DAYS - 1);
+});
+
+test('the demand does not renew itself every morning', () => {
+  let state = atConfidence(0, 13);
+  const first = runDay(state, 1500);
+  state = first.state;
+  const raisedOn = state.investors.buyoutDemand.dueDay;
+  for (let d = 0; d < 5; d++) state = runDay(state, 1501 + d).state;
+  assert.equal(state.investors.buyoutDemand.dueDay, raisedOn,
+    'the clock must not reset daily, or the fortnight never runs out');
+});
+
+test('paying it ends the act and leaves the hotel yours', () => {
+  let state = atConfidence(0, 14);
+  state = runDay(state, 1600).state;
+  state.money = 500000;
+  const owed = state.investors.buyoutDemand.amount;
+  const paid = payBuyout(state);
+  assert.equal(paid.investors.bought, true);
+  assert.equal(paid.money, 500000 - owed, 'it must actually cost the money');
+  assert.equal(paid.investors.buyoutDemand, null);
+  // Reviews stop. This is the ending and it must actually end.
+  const after = runDay(paid, 1700).report;
+  assert.equal(after.investors.reviewed, null);
+  assert.equal(after.investors.bought, true);
+});
+
+test('you cannot pay with money you do not have', () => {
+  let state = atConfidence(0, 15);
+  state = runDay(state, 1800).state;
+  state.money = 10;
+  const attempted = payBuyout(state);
+  assert.notEqual(attempted.investors.bought, true,
+    'a buyout you cannot afford must not go through');
+  assert.equal(attempted.money, 10, 'and must not overdraw the bank');
+});
+
+test('failing to pay sells rooms at the demolition haircut', () => {
+  let state = atConfidence(0, 16);
+  state.resort.rooms = { standard: 30, suite: 15 };
+  state = runDay(state, 1900).state;
+  state.money = 0;
+  const before = totalRooms(state.resort.rooms);
+  const after = forceLiquidation(state);
+  assert.ok(totalRooms(after.resort.rooms) < before, 'rooms should be sold to clear it');
+  assert.ok(after.money >= 0, 'liquidation clears the debt rather than deepening it');
+  assert.equal(after.investors.liquidated, true);
+  assert.equal(after.investors.bought, true, 'and either way they are gone');
+});
+
+test('THE GOOD ENDING IS REACHABLE WITHOUT FAILING', () => {
+  // The hole this task existed to close. The buyout fires at confidence
+  // 0, a well-run resort sits at 100, and so the player doing everything
+  // right never finished the act while the player doing badly got the
+  // only exit.
+  let state = startOfActTwo(17);
+  state.investors.confidence = 95;
+  state.investors.goodReviews = 2;
+  const { report } = runDay(state, 2000);
+  assert.ok(report.investors.buyoutDemand, 'a resort this healthy should be offered the door');
+  assert.equal(report.investors.buyoutDemand.kind, 'offer');
+});
+
+test('the good ending costs more than the bad one', () => {
+  // You are under no pressure and they know what the place is worth, so
+  // the graduation should cost more than the rescue.
+  const investors = { principal: 180000 };
+  assert.ok(buyoutPrice(investors, { offered: true }) > buyoutPrice(investors));
+});
+
+test('a streak of good reviews is required, not one lucky fortnight', () => {
+  let state = startOfActTwo(18);
+  state.investors.confidence = 95;
+  state.investors.goodReviews = 1;
+  const { report } = runDay(state, 2100);
+  assert.equal(report.investors.buyoutDemand, null,
+    'one good review is not a track record');
+});
+
+test('CALIBRATION: targets are demanding but not absurd on a real resort', () => {
+  // The test the threshold work should have had from the start.
+  //
+  // Everything else about thresholdFor checks SHAPE — small above large,
+  // first below later — and every one of those passed while the numbers
+  // were calibrated on the opening three-hole course, soft enough that a
+  // 180-room hotel held 100 confidence for twelve weeks. A shape test
+  // would pass with a prestige target of 5 or of 500.
+  //
+  // These are the measured figures for a resort being run properly.
+  const running = { prestige: 80, satisfaction: 72, revenuePerRoom: 140, occupancy: 1.0 };
+  const rooms = { standard: 20, suite: 10 };
+  const roomRate = 95;
+
+  for (const measure of MEASURES) {
+    const early = thresholdFor(measure, { rooms, roomRate, reviewIndex: 1 });
+    const late = thresholdFor(measure, { rooms, roomRate, reviewIndex: 8 });
+    const actual = running[measure];
+
+    assert.ok(early < actual,
+      `${measure}: an early target of ${early} is unreachable against a real ${actual}`);
+    // 0.72 rather than 0.5, because 0.5 does not bite. The first version
+    // of this test used it and passed against the very ladder it was
+    // written to catch: a prestige target of 53 against a real 80 is
+    // free, and 53 > 40. A calibration test with a loose bound is a shape
+    // test wearing a calibration test's clothes.
+    assert.ok(early > actual * 0.72,
+      `${measure}: an early target of ${early} is free against a real ${actual}`);
+    assert.ok(late >= actual * 0.9,
+      `${measure}: a late target of ${late} never catches up with ${actual} — standing still would never become failure`);
+  }
 });

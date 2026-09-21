@@ -24,7 +24,12 @@
  * to drift.
  */
 import { clamp } from './hole.js';
-import { totalRooms } from './rooms.js';
+import { totalRooms, ROOM_TYPES } from './rooms.js';
+
+/** What a sold room fetches, as a share of what it cost. The same haircut
+ * demolishing an amenity takes — a mistake should cost something without
+ * being ruinous. */
+export const LIQUIDATION_RETURN = 0.6;
 
 /** A fortnight. Long enough to change something, short enough to feel it. */
 export const REVIEW_EVERY = 14;
@@ -200,4 +205,120 @@ export function startingInvestors(state, rng, { principal = 180000 } = {}) {
     nextTarget: nextTargetFor(state, rng, { recent: [], reviewIndex: 0 }),
     buyoutDemand: null,
   };
+}
+
+// ---------------------------------------------------------------------
+// The two ways out
+//
+// Confidence 0 and they demand their money back. Confidence high enough,
+// for long enough, and they offer to sell you their stake instead.
+//
+// Both endings exist because building the reviews showed that only one
+// did: the buyout fired at zero, a well-run resort sat at 100, and so the
+// player doing everything right never finished the act while the player
+// doing badly got the only exit. Symmetry matters more here than either
+// number — the good path has to be a door, not a consolation.
+// ---------------------------------------------------------------------
+
+/** Held at or above this for two reviews running and they will sell. */
+export const OFFER_CONFIDENCE = 85;
+
+/** Days to find the money, either way. Long enough to sell something. */
+export const SETTLEMENT_DAYS = 14;
+
+/**
+ * What it costs to be rid of them.
+ *
+ * A demand is the principal plus a modest penalty: they want out and they
+ * are not negotiating. An offer costs *more*, because you are under no
+ * pressure and they know what the place is worth now — which is the right
+ * shape, since the good ending should feel earned rather than cheap.
+ */
+export function buyoutPrice(investors, { offered = false } = {}) {
+  const principal = investors?.principal ?? 0;
+  return Math.round(offered ? principal * 1.45 : principal * 1.15);
+}
+
+/**
+ * Whether the investors want to settle today, and on whose terms.
+ *
+ * Returns null when nothing is happening, which is most days.
+ */
+export function settlementDue(investors, day) {
+  if (!investors || investors.bought) return null;
+  if (investors.buyoutDemand) return investors.buyoutDemand;
+
+  if (investors.confidence <= 0) {
+    return {
+      kind: 'demand',
+      amount: buyoutPrice(investors),
+      dueDay: day + SETTLEMENT_DAYS,
+    };
+  }
+  if ((investors.goodReviews ?? 0) >= 2 && investors.confidence >= OFFER_CONFIDENCE) {
+    return {
+      kind: 'offer',
+      amount: buyoutPrice(investors, { offered: true }),
+      dueDay: day + SETTLEMENT_DAYS,
+    };
+  }
+  return null;
+}
+
+/**
+ * Pays them off. Pure, like everything here.
+ *
+ * Afterwards the hotel is yours: reviews stop, confidence stops mattering,
+ * and the act's pressure is over. Refuses rather than overdrawing if the
+ * money is not there.
+ */
+export function payBuyout(state) {
+  const settlement = state.investors?.buyoutDemand;
+  if (!settlement || (state.money ?? 0) < settlement.amount) return state;
+  const next = structuredClone(state);
+  next.money -= settlement.amount;
+  next.investors = {
+    ...next.investors,
+    bought: true,
+    boughtOnDay: next.day,
+    buyoutDemand: null,
+    nextTarget: null,
+  };
+  return next;
+}
+
+/**
+ * When the money is not there and the clock has run out.
+ *
+ * Rooms are sold off at the same 60% haircut demolishing an amenity
+ * takes, for the same reason — a mistake should cost something without
+ * being ruinous. Suites go first: they are worth most and are the thing a
+ * struggling hotel least needs.
+ */
+export function forceLiquidation(state) {
+  const settlement = state.investors?.buyoutDemand;
+  if (!settlement) return state;
+  const next = structuredClone(state);
+  let owed = settlement.amount - (next.money ?? 0);
+
+  for (const kind of ['suite', 'standard']) {
+    const unitValue = Math.round(ROOM_TYPES[kind].build * LIQUIDATION_RETURN);
+    while (owed > 0 && (next.resort.rooms[kind] ?? 0) > 0) {
+      next.resort.rooms[kind] -= 1;
+      owed -= unitValue;
+    }
+  }
+
+  // Whatever the rooms fetched clears the debt; anything over stays in
+  // the bank. The player is left poor and free rather than in a hole they
+  // cannot climb out of.
+  next.money = Math.max(0, -owed);
+  next.investors = {
+    ...next.investors,
+    bought: true,
+    liquidated: true,
+    buyoutDemand: null,
+    nextTarget: null,
+  };
+  return next;
 }

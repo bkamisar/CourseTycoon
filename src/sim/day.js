@@ -17,7 +17,8 @@ import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEv
 import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
 import { weatherOn, forecast, effectsOf } from './weather.js';
 import {
-  REVIEW_EVERY, MEASURES, assessTarget, confidenceChange, nextTargetFor, measureNow,
+  REVIEW_EVERY, MEASURES, OFFER_CONFIDENCE,
+  assessTarget, confidenceChange, nextTargetFor, measureNow, settlementDue,
 } from './investors.js';
 import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue } from './rooms.js';
 import {
@@ -567,7 +568,25 @@ export function runDay(state, seed) {
         reviewIndex: (target.reviewIndex ?? 0) + 1,
       });
       report.investors.target = next.investors.nextTarget;
+
+      // A run of good reviews is what earns the offer to buy them out.
+      // Reset by any review that is not at least met, so the good ending
+      // is a streak rather than a high-water mark.
+      const good = outcome === 'beat' || outcome === 'met';
+      next.investors.goodReviews = good
+        && next.investors.confidence >= OFFER_CONFIDENCE
+        ? (next.investors.goodReviews ?? 0) + 1
+        : 0;
     }
+
+    // Either ending. Raised once and then held on the state until it is
+    // settled, so the player has the full fortnight to find the money
+    // rather than a fresh demand every morning.
+    const settlement = settlementDue(next.investors, next.day);
+    if (settlement && !next.investors.buyoutDemand) {
+      next.investors.buyoutDemand = settlement;
+    }
+    report.investors.buyoutDemand = next.investors.buyoutDemand ?? null;
   } else {
     report.investors = next.investors?.bought
       ? { target: null, reviewed: null, confidence: 100, bought: true }
