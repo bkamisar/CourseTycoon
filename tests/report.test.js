@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, openHoles } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
-import { computeReportData, paceVerdict } from '../src/ui/report.js';
+import { computeReportData, paceVerdict, crowdRows } from '../src/ui/report.js';
 import { ordinal } from '../src/sim/satisfaction.js';
 import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
+import { SEGMENT_KEYS, SEGMENTS } from '../src/sim/segments.js';
 
 test('computeReportData reads profit and the revenue/cost breakdown straight from the report', () => {
   const { state, report } = runDay(newGame(1), 1);
@@ -113,4 +114,100 @@ test('over target with nobody waiting blames the holes, not a queue', () => {
   const r = paceVerdict({ avgMinutes: 210, targetMinutes: 144, hadWaits: false });
   assert.equal(r.kind, 'slowHoles');
   assert.doesNotMatch(r.verdict, /backing up/i);
+});
+
+// --- Task 8: the crowd section -----------------------------------------
+
+test('crowdRows reads count and satisfaction straight from report.crowd, and covers every segment', () => {
+  const { report } = runDay(newGame(20), 1);
+  const rows = crowdRows(report, null);
+  assert.equal(rows.length, SEGMENT_KEYS.length);
+  const total = SEGMENT_KEYS.reduce((s, key) => s + report.crowd[key].count, 0);
+  for (const key of SEGMENT_KEYS) {
+    const row = rows.find((r) => r.key === key);
+    assert.ok(row, `missing crowd row for ${key}`);
+    assert.equal(row.label, SEGMENTS[key].label);
+    assert.equal(row.count, report.crowd[key].count);
+    assert.equal(row.satisfaction, report.crowd[key].averageSatisfaction);
+    const expectedShare = total > 0 ? report.crowd[key].count / total : 0;
+    assert.ok(Math.abs(row.share - expectedShare) < 1e-9);
+  }
+});
+
+test('crowd shares sum to 1 when anybody came at all', () => {
+  const { report } = runDay(newGame(21), 1);
+  const rows = crowdRows(report, null);
+  const totalShare = rows.reduce((s, r) => s + r.share, 0);
+  assert.ok(Math.abs(totalShare - 1) < 1e-9, `shares summed to ${totalShare}`);
+});
+
+test('with no previous day, every crowd row has no delta to show', () => {
+  const { report } = runDay(newGame(22), 1);
+  const rows = crowdRows(report, null);
+  for (const row of rows) {
+    assert.equal(row.shareDelta, null);
+    assert.equal(row.satisfactionDelta, null);
+  }
+});
+
+test('a segment nobody visited reads as absent, not as zero satisfaction', () => {
+  // Built directly rather than hunting for a seed that draws nobody from a
+  // segment: crowdRows only ever looks at report.crowd, so a synthetic
+  // report exercises the same code the real one does.
+  const report = {
+    crowd: {
+      locals: { count: 20, averageSatisfaction: 61 },
+      serious: { count: 0, averageSatisfaction: null },
+      destination: { count: 5, averageSatisfaction: 74 },
+    },
+  };
+  const rows = crowdRows(report, null);
+  const serious = rows.find((r) => r.key === 'serious');
+  assert.equal(serious.count, 0);
+  assert.equal(serious.satisfaction, null, 'an absent segment must not report a satisfaction figure');
+  assert.equal(serious.share, 0, 'a genuine zero share is fine -- it is satisfaction that must not be faked');
+  assert.equal(serious.satisfactionDelta, null);
+});
+
+test('crowdRows measures the change since yesterday from the previous report\'s crowd', () => {
+  const yesterday = {
+    crowd: {
+      locals: { count: 30, averageSatisfaction: 70 },
+      serious: { count: 10, averageSatisfaction: 40 },
+      destination: { count: 0, averageSatisfaction: null },
+    },
+  };
+  const today = {
+    crowd: {
+      locals: { count: 20, averageSatisfaction: 60 },
+      serious: { count: 20, averageSatisfaction: 55 },
+      destination: { count: 0, averageSatisfaction: null },
+    },
+  };
+  const rows = crowdRows(today, yesterday);
+
+  const locals = rows.find((r) => r.key === 'locals');
+  // Yesterday: 30/40 = 75% locals. Today: 20/40 = 50% locals. Down 25pp.
+  assert.ok(Math.abs(locals.shareDelta - (-0.25)) < 1e-9, `locals shareDelta ${locals.shareDelta}`);
+  assert.ok(Math.abs(locals.satisfactionDelta - (-10)) < 1e-9);
+
+  const serious = rows.find((r) => r.key === 'serious');
+  // Yesterday: 10/40 = 25% serious. Today: 20/40 = 50% serious. Up 25pp --
+  // the locals-to-serious drift a player most needs to be able to read.
+  assert.ok(Math.abs(serious.shareDelta - 0.25) < 1e-9, `serious shareDelta ${serious.shareDelta}`);
+  assert.ok(Math.abs(serious.satisfactionDelta - 15) < 1e-9);
+
+  const destination = rows.find((r) => r.key === 'destination');
+  assert.equal(destination.satisfaction, null);
+  assert.equal(destination.satisfactionDelta, null);
+  assert.equal(destination.shareDelta, 0, 'absent both days is no change, not "New"');
+});
+
+test('computeReportData wires the crowd rows in, matching crowdRows directly', () => {
+  let state = newGame(23);
+  ({ state } = runDay(state, 1));
+  const day2 = runDay(state, 2);
+  const data = computeReportData(day2.state, day2.report);
+  const previous = day2.state.history[day2.state.history.length - 2];
+  assert.deepEqual(data.crowd, crowdRows(day2.report, previous));
 });

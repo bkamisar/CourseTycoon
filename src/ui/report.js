@@ -18,12 +18,65 @@ import { PALETTE } from '../render/palette.js';
 import { ordinal } from '../sim/satisfaction.js';
 import { openHoles } from '../sim/state.js';
 import { TARGET_MINUTES_PER_HOLE } from '../sim/schedule.js';
+import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 
 const RATING_SPECS = [
   { key: 'courseRating', label: 'Course Rating' },
   { key: 'prestige', label: 'Prestige' },
   { key: 'turfQuality', label: 'Turf Quality' },
 ];
+
+// One accent per segment, purely so the three cards read as different
+// crowds at a glance rather than blurring into one grey list. Colours are
+// borrowed from PALETTE for what they already evoke elsewhere in the game
+// -- fairway green for the locals who are always on it, sand for the
+// serious golfers who go looking for a proper test, water for the
+// destination guests who came for the view -- not new meanings.
+const SEGMENT_ACCENT = {
+  locals: PALETTE.FAIRWAY,
+  serious: PALETTE.SAND,
+  destination: PALETTE.WATER,
+};
+
+/**
+ * Per-segment count, share of the day, satisfaction and the change in
+ * each since `previous` (yesterday's report, or `null` on day one / when
+ * nobody has a "yesterday" to compare against).
+ *
+ * Share is computed from `report.crowd`'s own counts rather than trusted
+ * as a separate field, so it can never disagree with the counts sitting
+ * right next to it. A segment nobody visited keeps `satisfaction: null`
+ * -- rendering that as 0 would claim a crowd that never showed up left
+ * unhappy, which is a lie the report must not tell.
+ */
+export function crowdRows(report, previous) {
+  const total = SEGMENT_KEYS.reduce((s, key) => s + report.crowd[key].count, 0);
+  const prevTotal = previous
+    ? SEGMENT_KEYS.reduce((s, key) => s + previous.crowd[key].count, 0)
+    : 0;
+
+  return SEGMENT_KEYS.map((key) => {
+    const seg = report.crowd[key];
+    const prevSeg = previous?.crowd?.[key];
+    const share = total > 0 ? seg.count / total : 0;
+    const prevShare = previous && prevTotal > 0 ? prevSeg.count / prevTotal : null;
+    const satisfaction = seg.averageSatisfaction;
+    const prevSatisfaction = prevSeg?.averageSatisfaction ?? null;
+
+    return {
+      key,
+      label: SEGMENTS[key].label,
+      count: seg.count,
+      share,
+      shareDelta: prevShare === null ? null : share - prevShare,
+      satisfaction,
+      satisfactionDelta:
+        satisfaction !== null && prevSatisfaction !== null
+          ? satisfaction - prevSatisfaction
+          : null,
+    };
+  });
+}
 
 /**
  * Extracts everything the report screen shows from `state` (the state
@@ -93,6 +146,7 @@ export function computeReportData(state, report) {
     averageRoundMinutes: report.averageRoundMinutes,
     targetRoundMinutes,
     bottleneckHoleName,
+    crowd: crowdRows(report, previous),
     overrunGroups: report.overrunGroups,
     groupsPlayed: report.groupsPlayed,
     averageSatisfaction: report.averageSatisfaction,
@@ -198,6 +252,62 @@ function injectStyles() {
     .report-rating-delta--down { color: ${PALETTE.SAND}; }
     .report-rating-delta--flat { color: ${PALETTE.UI_LIGHT}; }
 
+    .report-crowd {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 22px;
+    }
+    .report-crowd-card {
+      flex: 1;
+      min-width: 0;
+      background: ${PALETTE.UI_DARK};
+      border: 1px solid ${PALETTE.UI_LIGHT};
+      border-left: 4px solid ${PALETTE.UI_LIGHT};
+      border-radius: 8px;
+      padding: 8px 6px;
+    }
+    .report-crowd-label {
+      color: ${PALETTE.UI_LIGHT};
+      font-size: 10px;
+      line-height: 1.25;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 4px;
+      min-height: 25px;
+    }
+    .report-crowd-count {
+      color: ${PALETTE.WHITE};
+      font-size: 20px;
+      font-weight: bold;
+      line-height: 1.1;
+    }
+    .report-crowd-count-unit {
+      color: ${PALETTE.UI_LIGHT};
+      font-size: 10px;
+      font-weight: normal;
+      margin-left: 2px;
+    }
+    .report-crowd-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 4px;
+      font-size: 11px;
+      color: ${PALETTE.UI_LIGHT};
+      margin-top: 4px;
+      white-space: nowrap;
+    }
+    .report-crowd-row--absent {
+      color: ${PALETTE.UI_LIGHT};
+      font-style: italic;
+      margin-top: 4px;
+      font-size: 11px;
+    }
+    .report-crowd-delta { font-size: 10px; flex: none; }
+    .report-crowd-delta--up { color: ${PALETTE.FAIRWAY}; }
+    .report-crowd-delta--down { color: ${PALETTE.SAND}; }
+    .report-crowd-delta--flat { color: ${PALETTE.UI_LIGHT}; }
+
     .report-pace {
       background: ${PALETTE.UI_DARK};
       border: 1px solid ${PALETTE.UI_LIGHT};
@@ -299,6 +409,23 @@ function deltaClass(delta) {
   return delta > 0 ? 'report-rating-delta--up' : 'report-rating-delta--down';
 }
 
+/** Same idea as `deltaText`, for the crowd cards' percentage-point and
+ * satisfaction-point deltas, which use a slightly finer threshold (0.5%
+ * of the day, not 0.5 rating points) so a genuine shift in a small crowd
+ * still registers as movement rather than "flat". */
+function crowdDeltaText(delta, { pp = false } = {}) {
+  if (delta === null) return 'New';
+  if (Math.abs(delta) < 0.5) return '– flat';
+  const rounded = Math.round(Math.abs(delta));
+  const arrow = delta > 0 ? '▲' : '▼';
+  return pp ? `${arrow} ${rounded}pp` : `${arrow} ${rounded}`;
+}
+
+function crowdDeltaClass(delta) {
+  if (delta === null || Math.abs(delta) < 0.5) return 'report-crowd-delta--flat';
+  return delta > 0 ? 'report-crowd-delta--up' : 'report-crowd-delta--down';
+}
+
 /**
  * Mounts (or re-mounts, replacing any previous content) the report screen
  * into `root`. `onContinue`, if given, is wired to the bottom button.
@@ -371,6 +498,76 @@ export function mountReport(root, { state, report, onContinue } = {}) {
     ratingsRow.appendChild(card);
   }
   screen.appendChild(ratingsRow);
+
+  // --- Crowd: who came, and how that's shifting -------------------------
+  // The single most important thing this screen can teach: not just how
+  // many people showed up, but which of the three crowds they were, and
+  // whether that mix is drifting. A count alone hides the story -- 40
+  // guests reads the same whether they're all locals or all serious
+  // golfers -- so every card carries its share of the day and, once there
+  // is a yesterday to compare against, how much that share and that
+  // segment's satisfaction moved.
+  const crowdTitle = document.createElement('p');
+  crowdTitle.className = 'report-section-title';
+  crowdTitle.textContent = 'Who Came';
+  screen.appendChild(crowdTitle);
+
+  const crowdRowEl = document.createElement('div');
+  crowdRowEl.className = 'report-crowd';
+  for (const seg of data.crowd) {
+    const card = document.createElement('div');
+    card.className = 'report-crowd-card';
+    card.style.borderLeftColor = SEGMENT_ACCENT[seg.key];
+
+    const label = document.createElement('div');
+    label.className = 'report-crowd-label';
+    label.textContent = seg.label;
+    card.appendChild(label);
+
+    const count = document.createElement('div');
+    count.className = 'report-crowd-count';
+    count.textContent = String(seg.count);
+    const unit = document.createElement('span');
+    unit.className = 'report-crowd-count-unit';
+    unit.textContent = seg.count === 1 ? 'guest' : 'guests';
+    count.appendChild(unit);
+    card.appendChild(count);
+
+    const shareRow = document.createElement('div');
+    shareRow.className = 'report-crowd-row';
+    const shareText = document.createElement('span');
+    shareText.textContent = `${Math.round(seg.share * 100)}% of day`;
+    const shareDelta = document.createElement('span');
+    shareDelta.className = `report-crowd-delta ${crowdDeltaClass(
+      seg.shareDelta === null ? null : seg.shareDelta * 100
+    )}`;
+    shareDelta.textContent = crowdDeltaText(
+      seg.shareDelta === null ? null : seg.shareDelta * 100,
+      { pp: true }
+    );
+    shareRow.append(shareText, shareDelta);
+    card.appendChild(shareRow);
+
+    if (seg.satisfaction === null) {
+      const absent = document.createElement('div');
+      absent.className = 'report-crowd-row--absent';
+      absent.textContent = 'No visits today';
+      card.appendChild(absent);
+    } else {
+      const satRow = document.createElement('div');
+      satRow.className = 'report-crowd-row';
+      const satText = document.createElement('span');
+      satText.textContent = `${Math.round(seg.satisfaction)} satisfaction`;
+      const satDelta = document.createElement('span');
+      satDelta.className = `report-crowd-delta ${crowdDeltaClass(seg.satisfactionDelta)}`;
+      satDelta.textContent = crowdDeltaText(seg.satisfactionDelta);
+      satRow.append(satText, satDelta);
+      card.appendChild(satRow);
+    }
+
+    crowdRowEl.appendChild(card);
+  }
+  screen.appendChild(crowdRowEl);
 
   // --- Pace of play --------------------------------------------------
   const paceTitle = document.createElement('p');
