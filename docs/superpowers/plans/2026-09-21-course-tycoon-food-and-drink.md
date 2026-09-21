@@ -351,7 +351,10 @@ test('a cart can never satisfy destination guests', () => {
 - [ ] **Step 2: Run and watch it fail.**
 
 Run: `node --test`
-Expected: FAIL, `menuPull is not a function`.
+Expected: FAIL. Note the message will be a `SyntaxError: ... does not
+provide an export named 'menuBasket'` thrown at module load, not a runtime
+"not a function" — ESM resolves named imports statically, so the failure
+arrives before any test body runs. Same cause, different manifestation.
 
 - [ ] **Step 3: Append the maths to `src/sim/menu.js`.**
 
@@ -606,6 +609,7 @@ test('a save made before menus existed gets one', () => {
   // Never make an old save unloadable. The author plays on a phone and on
   // a desktop, and a save code moves between them.
   const old = JSON.stringify({
+    version: 1,
     day: 4, money: 1000, prestige: 10, turfQuality: 50,
     resort: {
       courses: [{ holes: [] }],
@@ -614,7 +618,7 @@ test('a save made before menus existed gets one', () => {
     },
     history: [], satisfactionHistory: [],
   });
-  const loaded = fromJSON(old);
+  const loaded = deserialize(old);
   const halfway = loaded.resort.amenities.find((a) => a.type === 'halfwayHouse');
   assert.ok(Array.isArray(halfway.menu) && halfway.menu.length > 0,
     'an existing halfway house should come back with a board on it');
@@ -623,8 +627,14 @@ test('a save made before menus existed gets one', () => {
 });
 ```
 
-> If `tests/state.test.js` does not already import `fromJSON`, add it to that
-> file's existing import from `../src/sim/state.js`.
+> The function is `deserialize`, exported from `src/sim/state.js` — there is
+> no `fromJSON` in this codebase. Add it to that test file's existing import
+> if it is not already there.
+>
+> The fixture below **must** include `version: 1`. `deserialize` checks
+> `parsed.version !== SAVE_VERSION` and throws before it reaches any
+> back-fill, so a fixture without it fails the version guard rather than
+> testing what this test is for.
 
 - [ ] **Step 2: Run and watch it fail.**
 
@@ -660,7 +670,7 @@ export function defaultMenuFor(type) {
 ```
 
 In `newGame`, wherever an amenity object is created, give it
-`menu: defaultMenuFor(type)`. In `fromJSON`, after the existing
+`menu: defaultMenuFor(type)`. In `deserialize`, after the existing
 back-compatibility block that fills in `goodwill` and `eventsSeen`, add:
 
 ```js
