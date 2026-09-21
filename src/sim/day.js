@@ -75,7 +75,11 @@ export function runDay(state, seed) {
   const hasPracticeGreen = amenityTypes.includes('practiceGreen');
   const hasHalfwayHouse = amenityTypes.includes('halfwayHouse');
 
-  const rating = holes.length ? courseRating(holes, next.turfQuality) : 0;
+  // Rated against yesterday's crowd: rating feeds demand and demand decides
+  // today's crowd, so today's is not knowable yet. The lag is the point -
+  // change the course and the rating dips until the clientele catches up.
+  const yesterdayCrowd = next.history.at(-1)?.crowd ?? null;
+  const rating = holes.length ? courseRating(holes, next.turfQuality, yesterdayCrowd) : 0;
 
   // The mean difficulty across every open hole is what the segments react
   // to — both when deciding whether to turn up (economy.demandGroups) and

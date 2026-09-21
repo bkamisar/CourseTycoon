@@ -84,3 +84,33 @@ test('nearGate is true once most conditions are met', () => {
   assert.equal(result.passed, false);
   assert.equal(result.nearGate, true);
 });
+
+test('a course is rated on whether it suits the people playing it', () => {
+  // Fairness used to target a fixed difficulty of 48, which asserted that
+  // golf courses have one correct difficulty - exactly what the segments
+  // deny. Building what serious golfers want (72) therefore cost about
+  // eleven points of rating for doing it deliberately.
+  const brutal = ['waterPar3', 'doglegPar4', 'longPar5', 'waterPar3', 'doglegPar4',
+    'longPar5', 'doglegPar4', 'waterPar3', 'longPar5']
+    .map((t, i) => { const h = makeHole(t, i + 1); h.corridorWidth = 26; return h; });
+
+  const localsCrowd = { locals: { count: 80 }, serious: { count: 10 }, destination: { count: 10 } };
+  const seriousCrowd = { locals: { count: 10 }, serious: { count: 80 }, destination: { count: 10 } };
+
+  const suited = courseRating(brutal, 80, seriousCrowd);
+  const mismatched = courseRating(brutal, 80, localsCrowd);
+
+  assert.ok(suited > mismatched + 8,
+    `the same course should rate far better for the crowd it suits: ${suited} vs ${mismatched}`);
+});
+
+test('rating with no crowd falls back to the mean of what the segments want', () => {
+  // Day one has no crowd, and the fallback must not be a magic number.
+  const holes = [makeHole('straightPar4', 1), makeHole('shortPar3', 2)];
+  const noCrowd = courseRating(holes, 80, null);
+  const empty = courseRating(holes, 80, {
+    locals: { count: 0 }, serious: { count: 0 }, destination: { count: 0 },
+  });
+  assert.equal(noCrowd, empty);
+  assert.ok(noCrowd > 0 && noCrowd <= 100);
+});

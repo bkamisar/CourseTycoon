@@ -1,4 +1,5 @@
 import { holeStats, clamp } from './hole.js';
+import { crowdIdealDifficulty } from './segments.js';
 
 /**
  * Design quality across the nine, 0–100.
@@ -8,7 +9,7 @@ import { holeStats, clamp } from './hole.js';
  * to end - the player should not be able to max the rating by making
  * everything as hard as possible.
  */
-export function courseRating(holes, turfQuality) {
+export function courseRating(holes, turfQuality, crowd = null) {
   const stats = holes.map(holeStats);
 
   const pars = stats.map((s) => s.par);
@@ -22,10 +23,22 @@ export function courseRating(holes, turfQuality) {
   const scenery =
     (stats.reduce((s, x) => s + x.scenery, 0) / stats.length) * 0.28;
 
-  // Mid handicappers want a test, not a punishment beating.
+  // Fairness asks whether the course suits the people actually playing it,
+  // not whether it hits some universal number.
+  //
+  // This used to target a fixed difficulty of 48, which asserted that golf
+  // courses have one correct difficulty - precisely what the segments deny.
+  // It meant that building the course serious golfers want (they want 72)
+  // cost about eleven points of rating for doing it on purpose, and rating
+  // feeds value and prestige, so the player was paid less for succeeding.
+  //
+  // The crowd is yesterday's, because rating feeds demand and demand
+  // decides today's crowd. The lag is welcome: change the course and the
+  // rating dips until the clientele catches up, which is the awkward middle
+  // of any pivot and ought to be felt.
   const meanDifficulty =
     stats.reduce((s, x) => s + x.difficulty, 0) / stats.length;
-  const fairness = 22 - Math.abs(meanDifficulty - 48) * 0.45;
+  const fairness = 22 - Math.abs(meanDifficulty - crowdIdealDifficulty(crowd)) * 0.45;
 
   const condition = (turfQuality / 100) * 20;
 

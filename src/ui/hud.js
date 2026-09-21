@@ -25,8 +25,10 @@ import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 
 export function computeHudData(state) {
   const holes = openHoles(state);
-  const rating = holes.length ? courseRating(holes, state.turfQuality) : 0;
   const lastReport = state.history.length ? state.history[state.history.length - 1] : null;
+  const rating = holes.length
+    ? courseRating(holes, state.turfQuality, lastReport?.crowd ?? null)
+    : 0;
   return {
     money: state.money,
     day: state.day,

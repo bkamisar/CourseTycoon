@@ -103,3 +103,32 @@ export function crowdMix(conditions, goodwill) {
   for (const key of SEGMENT_KEYS) share[key] = total > 0 ? appeal[key] / total : 0;
   return { appeal, share, total };
 }
+
+/**
+ * The difficulty the crowd currently playing here would most enjoy — the
+ * share-weighted average of their individual ideals.
+ *
+ * Course rating uses this rather than a fixed number. A fixed ideal asserts
+ * there is one correct difficulty for a golf course, which is exactly what
+ * the rest of this file denies: locals want 30, serious golfers want 72,
+ * and no course satisfies both. Rating a course against a universal ideal
+ * meant building the course serious golfers wanted cost you about eleven
+ * points of rating for doing it deliberately.
+ *
+ * With no crowd yet - day one - it falls back to the unweighted mean of the
+ * three ideals rather than a magic number.
+ */
+export function crowdIdealDifficulty(crowd) {
+  let total = 0;
+  let weighted = 0;
+  for (const key of SEGMENT_KEYS) {
+    const count = crowd?.[key]?.count ?? 0;
+    total += count;
+    weighted += count * SEGMENTS[key].idealDifficulty;
+  }
+  if (total === 0) {
+    const sum = SEGMENT_KEYS.reduce((s, k) => s + SEGMENTS[k].idealDifficulty, 0);
+    return sum / SEGMENT_KEYS.length;
+  }
+  return weighted / total;
+}
