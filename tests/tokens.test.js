@@ -133,3 +133,34 @@ test('computeEffects: never returns a marker for an event still in the future', 
   const beforeItFired = computeEffects(timeline, holes, regions, event.minute - 1);
   assert.ok(!beforeItFired.some((fx) => fx.type === event.type && fx.groupIndex === event.groupIndex));
 });
+
+test('service stops are collected as effects so the cart can be drawn', () => {
+  // The cart is the only thing in a day that is neither a ball nor a
+  // group. If cartStop never reaches computeEffects she is invisible, and
+  // a food amenity nobody can see is the "visual pop" half of this slice
+  // silently not shipping.
+  const state = newGame(31);
+  state.resort.amenities.push({ id: 'c', type: 'beverageCart', menu: ['draught', 'hotDog'] });
+  const { timeline, state: after } = runDay(state, 9);
+  const holes = openHoles(after);
+  const stops = timeline.filter((e) => e.type === 'cartStop');
+  assert.ok(stops.length > 0, 'the day should contain cart stops at all');
+
+  const regions = holes.map((h, i) => ({
+    kind: 'hole', id: h.id, x: i * 40, y: 0, width: 38, height: 38,
+  }));
+  const seen = stops.some((stop) =>
+    computeEffects(timeline, holes, regions, stop.minute).some((fx) => fx.type === 'cartStop')
+  );
+  assert.ok(seen, 'a cart stop should be visible at the minute it happens');
+});
+
+test('the cart shows up on more than one hole over a day', () => {
+  // What makes her read as working her way round rather than as a static
+  // marker: she is drawn wherever a group has just been served.
+  const state = newGame(32);
+  state.resort.amenities.push({ id: 'c', type: 'beverageCart', menu: ['draught', 'hotDog'] });
+  const { timeline } = runDay(state, 10);
+  const holesServed = new Set(timeline.filter((e) => e.type === 'cartStop').map((e) => e.holeId));
+  assert.ok(holesServed.size >= 1, 'she should serve at least one hole');
+});

@@ -6,6 +6,7 @@
   "description": "An 8-bit golf resort management game",
   "scripts": {
     "test": "node --test",
-    "balance": "node tools/balance.js"
+    "balance": "node tools/balance.js",
+    "effects": "node tools/effects.js"
   }
 }

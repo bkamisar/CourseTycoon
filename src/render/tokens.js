@@ -16,6 +16,7 @@
  * drift off the fairway it is meant to be walking down.
  */
 import { PALETTE } from './palette.js';
+import { SPRITES, drawSprite } from './sprites.js';
 import { computeHoleTransform } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
 import { pathLength, pointAtDistance } from '../sim/geometry.js';
@@ -28,7 +29,30 @@ const EFFECT_COLOR = {
   water: PALETTE.WATER_DEEP,
   sand: PALETTE.SAND,
   holed: PALETTE.ACCENT,
+  // Service stops draw as sprites rather than pixel marks (see
+  // EFFECT_SPRITE), but they still need to be in here to be collected.
+  cartStop: PALETTE.ACCENT,
+  refuel: PALETTE.SAND,
 };
+
+/**
+ * Effects drawn as an 8x8 sprite instead of the usual 2x2 mark.
+ *
+ * Dee and the halfway house are the only things in a day that are not a
+ * ball or a group, and a two-pixel dot cannot say "somebody is out there
+ * serving drinks". Because a cartStop fires on every third hole as each
+ * group reaches it, she appears at different holes as the day plays out —
+ * which reads as her working her way round, without any path-following
+ * machinery.
+ */
+const EFFECT_SPRITE = {
+  cartStop: 'beverageCart',
+  refuel: 'halfwayHouse',
+};
+
+/** Service sprites linger longer than a splash: a cart is a thing that is
+ * there, not a thing that just happened. */
+const SERVICE_WINDOW_MINUTES = 7;
 
 const EFFECT_TYPES = new Set(Object.keys(EFFECT_COLOR));
 
@@ -86,7 +110,7 @@ export function computeEffects(timeline, holes, regions, minute, window = EFFECT
     if (!EFFECT_TYPES.has(e.type)) continue;
     if (e.minute > minute) continue;
     const age = minute - e.minute;
-    if (age > window) continue;
+    if (age > (EFFECT_SPRITE[e.type] ? SERVICE_WINDOW_MINUTES : window)) continue;
 
     const hole = holesById.get(e.holeId);
     const rect = hole && holeRegions.get(hole.id);
@@ -118,11 +142,25 @@ export function drawTokens(ctx, tokens) {
 /** Draws every active effect marker, fading out over its window. */
 export function drawEffects(ctx, effects, window = EFFECT_WINDOW_MINUTES) {
   for (const fx of effects) {
-    const color = EFFECT_COLOR[fx.type] ?? PALETTE.WHITE;
     const x = Math.round(fx.x);
     const y = Math.round(fx.y);
-    const fade = Math.max(0.2, 1 - fx.age / window);
+    const spriteName = EFFECT_SPRITE[fx.type];
 
+    if (spriteName && SPRITES[spriteName]) {
+      // Centred on the group it is serving, and held at full opacity for
+      // most of its life — a fading cart reads as a rendering glitch
+      // rather than as somebody driving away.
+      const fade = Math.max(0.25, 1 - Math.max(0, fx.age - SERVICE_WINDOW_MINUTES * 0.6)
+        / (SERVICE_WINDOW_MINUTES * 0.4));
+      ctx.save();
+      ctx.globalAlpha = fade;
+      drawSprite(ctx, SPRITES[spriteName], x - 4, y - 9);
+      ctx.restore();
+      continue;
+    }
+
+    const color = EFFECT_COLOR[fx.type] ?? PALETTE.WHITE;
+    const fade = Math.max(0.2, 1 - fx.age / window);
     ctx.save();
     ctx.globalAlpha = fade;
     ctx.fillStyle = color;
