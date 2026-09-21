@@ -343,6 +343,11 @@ function primedForCapacity() {
   }
   state.prestige = 95;
   state.turfQuality = 95;
+  // A resort at prestige 95 with every amenity built has happy guests.
+  // Leaving this empty meant the fixture implied satisfaction 50 — the
+  // no-history default — which is a resort nobody enjoys, and word of
+  // mouth is now steep enough that the contradiction decides the result.
+  state.satisfactionHistory = Array(7).fill(85);
   state.resort.amenities = Object.keys(AMENITIES).map((type) => ({ type }));
   state.resort.pricing.greenFee = 10;
   state.resort.pricing.teeInterval = 30;

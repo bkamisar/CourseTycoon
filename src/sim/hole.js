@@ -30,6 +30,11 @@ export function makeHole(templateName, id) {
     corridor: structuredClone(template.corridor),
     corridorWidth: template.corridorWidth,
     greenPreset: template.greenPreset,
+    // The hardest green ever paid for on this hole. Re-configuring down
+    // to something easier and back up again is then free, because the
+    // construction was already bought. See greenCycleCost in the editor
+    // for why charging per change was a trap.
+    greenPaidTo: GREEN_DIFFICULTY[template.greenPreset],
     features: structuredClone(template.features),
     teePos: { ...template.corridor[0] },
   };

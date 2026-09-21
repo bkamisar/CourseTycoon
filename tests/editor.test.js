@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeHole, holeStats } from '../src/sim/hole.js';
+import { makeHole, holeStats, GREEN_DIFFICULTY } from '../src/sim/hole.js';
 import { expectedMinutes } from '../src/sim/round.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { newGame } from '../src/sim/state.js';
@@ -183,32 +183,64 @@ test('removalRefund pays the full scaled value of a hazard at its CURRENT size, 
   assert.equal(removalRefund(defaultTrees), featureCost('trees'));
 });
 
-test('greenCycleCost charges the upgrade price when moving to a harder preset', () => {
-  // small (1.15) -> tiered (1.3) is strictly harder.
-  assert.equal(greenCycleCost('small', 'tiered'), BUILD_COSTS.greenUpgrade);
+test('a green costs the upgrade price the first time you go beyond what is built', () => {
+  const hole = { greenPreset: 'small', greenPaidTo: GREEN_DIFFICULTY.small };
+  assert.equal(greenCycleCost(hole, 'tiered'), BUILD_COSTS.greenUpgrade);
 });
 
-test('greenCycleCost is free when moving to an easier or equally hard preset', () => {
-  // tiered (1.3) -> elevated (1.1) is easier.
-  assert.equal(greenCycleCost('tiered', 'elevated'), 0);
-  // island (1.25) -> small (1.15) is easier too.
-  assert.equal(greenCycleCost('island', 'small'), 0);
+test('an easier green is free, and so is going back to one you already bought', () => {
+  const hole = { greenPreset: 'tiered', greenPaidTo: GREEN_DIFFICULTY.tiered };
+  assert.equal(greenCycleCost(hole, 'elevated'), 0, 'easier is free');
+  assert.equal(greenCycleCost(hole, 'island'), 0, 'anything under what you paid for is free');
+  assert.equal(greenCycleCost(hole, 'tiered'), 0, 'the one you are already on is free');
 });
 
-test('cycling every green preset in a full loop cannot generate money', () => {
-  // Forward through the whole cycle, then confirm nothing downgrades ever
-  // refunds: total cost of a full loop is the sum of the "harder" hops
-  // only, and there is no way to recoup any of it by continuing to cycle.
+test('CYCLING BACK TO THE GREEN YOU STARTED ON COSTS NOTHING', () => {
+  // The bug this replaced. greenCycleCost used to compare against the
+  // CURRENT preset, and the button only cycles forward through an order
+  // that is not difficulty order — so tapping through all five and back to
+  // where you began charged $3,000 for no change at all. A control that
+  // bills you for looking is a bug however it is priced.
+  //
+  // The old test for this asserted `totalCost > 0`, which is to say it
+  // encoded the trap as the specification.
   const order = ['small', 'large', 'tiered', 'elevated', 'island'];
-  let totalCost = 0;
+  const hole = { greenPreset: 'small', greenPaidTo: GREEN_DIFFICULTY.small };
+  let total = 0;
   for (let i = 0; i < order.length; i++) {
-    const from = order[i];
     const to = order[(i + 1) % order.length];
-    const cost = greenCycleCost(from, to);
-    assert.ok(cost === 0 || cost === BUILD_COSTS.greenUpgrade);
-    totalCost += cost;
+    const cost = greenCycleCost(hole, to);
+    total += cost;
+    hole.greenPreset = to;
+    hole.greenPaidTo = Math.max(hole.greenPaidTo, GREEN_DIFFICULTY[to]);
   }
-  assert.ok(totalCost > 0, 'at least one hop in a full loop must be an upgrade');
+  assert.equal(hole.greenPreset, 'small', 'a full loop must end where it began');
+  assert.equal(total, BUILD_COSTS.greenUpgrade,
+    `a full loop should cost one upgrade at most, charged ${total}`);
+});
+
+test('cycling can still never generate money', () => {
+  // The property the old rule was protecting, which this one keeps: no
+  // transition ever returns anything, so there is no profitable loop.
+  const hole = { greenPreset: 'island', greenPaidTo: GREEN_DIFFICULTY.tiered };
+  for (const to of Object.keys(GREEN_DIFFICULTY)) {
+    assert.ok(greenCycleCost(hole, to) >= 0, `${to} refunded money`);
+  }
+});
+
+test('a hole is born already paid up to its own green', () => {
+  const hole = makeHole('straightPar4', 1);
+  assert.equal(hole.greenPaidTo, GREEN_DIFFICULTY[hole.greenPreset]);
+  assert.equal(greenCycleCost(hole, hole.greenPreset), 0,
+    'the green a hole is built with must not cost extra');
+});
+
+test('a save made before greens tracked what was paid still works', () => {
+  // greenPaidTo falls back to the current preset, so an old hole behaves
+  // as though it had paid for exactly the green it has.
+  const legacy = { greenPreset: 'tiered' };
+  assert.equal(greenCycleCost(legacy, 'elevated'), 0);
+  assert.equal(greenCycleCost(legacy, 'tiered'), 0);
 });
 
 // --- Resizing a hazard: cost scales with area ------------------------------

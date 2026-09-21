@@ -83,12 +83,24 @@ export function refundFor(cost) {
 
 /**
  * What cycling the green preset from `fromPreset` to `toPreset` costs.
- * Only charges when the new preset is strictly harder than the old one —
- * cycling down to an easier preset is free, never refunded, so there is no
- * way to profit by cycling forward and back.
+ * Charges for the green you end up with, not the path you took there.
+ *
+ * This used to compare the new preset against the *current* one, which
+ * made browsing cost money: the button only cycles forward, the cycle
+ * order is not difficulty order (small 1.15, large 0.85, tiered 1.3,
+ * elevated 1.1, island 1.25), and so tapping through all five back to the
+ * one you started on charged $3,000 and left the hole exactly as it was.
+ * A control that bills you for looking is a bug however it is priced.
+ *
+ * `greenPaidTo` records the hardest green ever bought for this hole.
+ * Going above it costs the upgrade price and raises the mark; anything at
+ * or below it is free, because that construction is already paid for.
+ * Nothing is ever refunded, so there is still no way to profit by
+ * cycling — only, now, no way to lose by it either.
  */
-export function greenCycleCost(fromPreset, toPreset) {
-  return GREEN_DIFFICULTY[toPreset] > GREEN_DIFFICULTY[fromPreset] ? BUILD_COSTS.greenUpgrade : 0;
+export function greenCycleCost(hole, toPreset) {
+  const paidTo = hole.greenPaidTo ?? GREEN_DIFFICULTY[hole.greenPreset];
+  return GREEN_DIFFICULTY[toPreset] > paidTo ? BUILD_COSTS.greenUpgrade : 0;
 }
 
 /**
@@ -938,11 +950,14 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
 
   function cycleGreenPreset() {
     const next = nextGreenPreset();
-    const cost = greenCycleCost(hole.greenPreset, next);
+    const cost = greenCycleCost(hole, next);
     if (cost > 0 && state.money < cost) return; // belt and suspenders
     state.money -= cost;
     sessionSpend += cost;
     hole.greenPreset = next;
+    hole.greenPaidTo = Math.max(
+      hole.greenPaidTo ?? GREEN_DIFFICULTY[next], GREEN_DIFFICULTY[next]
+    );
     recomputeMinutes();
     renderToolbar();
   }
@@ -984,7 +999,7 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
     });
 
     const nextPreset = nextGreenPreset();
-    const greenCost = greenCycleCost(hole.greenPreset, nextPreset);
+    const greenCost = greenCycleCost(hole, nextPreset);
     const greenButton = makeButton(`Green: ${hole.greenPreset}`, cycleGreenPreset, {
       disabled: greenCost > 0 && state.money < greenCost,
       sub: greenCost > 0 ? costSub(greenCost) : undefined,

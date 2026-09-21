@@ -144,9 +144,27 @@ export function demandGroups({
 
   const reputationPull = 0.35 + (prestige / 100) * 0.9;
 
-  // Word of mouth. A resort people leave unhappy empties out, and this is
-  // the only route by which a bad course reaches the player's wallet.
-  const wordOfMouth = clamp((recentSatisfaction / 55) ** 1.5, 0.05, 1.25);
+  /**
+   * Word of mouth. A resort people leave unhappy empties out, and this is
+   * the only route by which a bad course reaches the player's wallet.
+   *
+   * The exponent was 1.5, and at that slope Act I had one right answer.
+   * Measured on a fully built nine over ninety days, the best green fee
+   * was $40 with guests at 31% satisfaction — a packed, miserable resort
+   * — and the strategy got *better* over time rather than decaying,
+   * because food revenue scales with bodies through the gate and prestige
+   * only fell thirteen points for the misery. Cheap-and-jammed beat
+   * expensive-and-pleasant at every horizon tested.
+   *
+   * At 2.5 the optimum moves to $80 with guests at 57, and $60, $80 and
+   * $100 all land within 18% of each other: a price range to judge rather
+   * than a number to find. 3.5 overcorrects and collapses the low end.
+   *
+   * The passive-operator floor barely notices — money $81,526 to $79,059,
+   * satisfaction and turf marginally up — because a passive operator was
+   * never running the miserable strategy in the first place.
+   */
+  const wordOfMouth = clamp((recentSatisfaction / 55) ** 2.5, 0.05, 1.25);
   const pull = reputationPull * wordOfMouth;
 
   const capacity = maxGroupsForDay(teeInterval);
