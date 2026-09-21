@@ -12,7 +12,7 @@ import { PALETTE } from './render/palette.js';
 import { drawResort } from './render/resortView.js';
 import { computeTokens, computeEffects, drawTokens, drawEffects } from './render/tokens.js';
 import { openHoles } from './sim/state.js';
-import { runDay } from './sim/day.js';
+import { runDay, applyEventChoice } from './sim/day.js';
 import { holeStats } from './sim/hole.js';
 import { createClock, PLAYBACK_SPEEDS } from './play/clock.js';
 import { mountHud } from './ui/hud.js';
@@ -24,6 +24,7 @@ import { openBuildSheet, openStaffSheet, openPricingSheet } from './ui/panels.js
 import { openGlossarySheet } from './ui/glossary.js';
 import { mountReport } from './ui/report.js';
 import { mountNarrationCard } from './ui/narration.js';
+import { mountEventCard } from './ui/event.js';
 import { mountStartScreen, startNewGame, applySaveCode } from './ui/start.js';
 import { createSaveAdapter } from './save/adapter.js';
 import { createLocalBackend } from './save/local.js';
@@ -106,6 +107,12 @@ document.body.appendChild(reportRoot);
 // doc comment for why that separation is the point.
 const narrationRoot = document.createElement('div');
 document.body.appendChild(narrationRoot);
+
+// The decision card sits above the narration card and the report both,
+// and unlike either of them it blocks. Its own root so that clearing it
+// is one call and cannot take the report down with it.
+const eventRoot = document.createElement('div');
+document.body.appendChild(eventRoot);
 
 const startRoot = document.createElement('div');
 document.body.appendChild(startRoot);
@@ -337,6 +344,9 @@ function syncScreenChrome() {
   // screens.js documents) -- it is content ON the report screen's moment,
   // not a screen of its own.
   narrationRoot.hidden = router.current !== 'report';
+  // Same reasoning as the narration root: content on the report screen's
+  // moment, not a screen of its own.
+  eventRoot.hidden = router.current !== 'report';
   startRoot.hidden = !onStart;
   // The HUD bar and amenity strip have nothing real to show before a game
   // state exists at all -- hide them rather than let them sit empty behind
@@ -474,7 +484,52 @@ function enterReport() {
   });
 }
 
+/**
+ * Leaving the report. If the day threw up a decision, it happens HERE —
+ * between reading the day and committing it — and the resort does not
+ * come back until it is answered.
+ *
+ * Deliberately after the report rather than before it: the numbers on
+ * the report are what the decision should be weighed against, and a card
+ * that arrived first would be a decision made blind.
+ */
 function onReportContinue() {
+  const pending = dayResult.report.pendingEvent;
+  if (pending) {
+    // The narration card would otherwise float on top of the decision,
+    // and the decision is the thing that matters this evening.
+    narrationRoot.replaceChildren();
+    mountEventCard(eventRoot, {
+      event: pending,
+      onChoose: (index) => {
+        // Settle the report BEFORE applying the choice, not after.
+        // applyEventChoice deep-clones the state (it is pure), and the
+        // report is the very object runDay pushed onto history — so a
+        // mutation made after the clone lands on the copy nobody keeps,
+        // and the saved game goes on carrying an unanswered decision
+        // forever. runDay guarantees this identity; tests/day.test.js
+        // pins it, because this is the only place that leans on it.
+        const chosen = pending.choices[index];
+        dayResult.report.pendingEvent = null;
+        dayResult.report.decision = {
+          id: pending.id, label: chosen.label, stance: chosen.stance,
+        };
+        // Applied to the day's resolved state before it is committed and
+        // saved below, so the consequence and the day land together —
+        // quitting mid-card replays the day rather than half-applying it.
+        dayResult.state = applyEventChoice(dayResult.state, pending.id, index);
+        eventRoot.replaceChildren();
+        commitDay();
+      },
+    });
+    return;
+  }
+  commitDay();
+}
+
+/** Commits the played day: the resolved state becomes the game, it is
+ * saved, and the player is back at the resort. */
+function commitDay() {
   state = dayResult.state;
   dayResult = null;
   clock = null;

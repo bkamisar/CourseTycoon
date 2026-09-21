@@ -224,6 +224,16 @@ test('a pending event, when offered, carries a speaker, a prompt and choices wit
   }
 });
 
+test("runDay's report IS the entry it pushed onto history, not a copy", () => {
+  // src/main.js settles an answered decision by mutating the report it
+  // was handed, and relies on that reaching the state it saves. If runDay
+  // ever starts cloning on the way into history, that write lands on an
+  // object nobody keeps and saved games quietly carry answered events
+  // around as though they were still open.
+  const { state: next, report } = runDay(newGame(42), 5);
+  assert.equal(next.history.at(-1), report);
+});
+
 test('an event is offered roughly weekly, over many days, and never more than one on a single day', () => {
   let state = newGame(9001);
   let offered = 0;
