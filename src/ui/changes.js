@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-21d';
+export const BUILD = '2026-09-21e';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-21e',
+    notes: [
+      'The day recap now shows what the hotel took and what it cost to run. It was counting both into the totals and showing neither, so there was no way to tell whether your nightly rate was covering the beds.',
+      'The recap no longer lists Act I’s goals once you are past them. The investors’ standing target is the thing you are playing to now.',
+      'This note used to show only the newest update, so if you missed one you never saw it. It now shows everything since you last played, and the start screen has a "What Has Changed" card you can read back at any time.',
+    ],
+  },
   {
     version: '2026-09-21d',
     notes: [
@@ -99,6 +107,14 @@ function injectStyles() {
       text-transform: uppercase;
     }
     .changes-title { margin: 0 0 10px; color: ${PALETTE.WHITE}; font-size: 15px; }
+    .changes-stamp {
+      color: ${PALETTE.ACCENT};
+      font-family: monospace;
+      font-size: 11px;
+      margin: 14px 0 6px;
+      border-bottom: 1px solid ${PALETTE.UI_DARK};
+      padding-bottom: 4px;
+    }
     .changes-item {
       color: ${PALETTE.UI_LIGHT};
       font-size: 13px;
@@ -125,6 +141,33 @@ function injectStyles() {
 }
 
 const SEEN_KEY = 'courseTycoon.changesSeen';
+
+/**
+ * The entries a player has not read yet, newest first.
+ *
+ * `mountChanges` used to show `CHANGES[0]` and nothing else, under a
+ * heading reading "Since you last played". It stored which version had
+ * been seen and then did not use it, so anybody who missed a release
+ * never saw those notes at all — the heading claimed a span the data did
+ * not support, which is the same disagreement this project keeps
+ * producing in other places.
+ *
+ * Position is used rather than comparing version strings: `CHANGES` is
+ * newest first, so everything above the last-seen entry is new. A stored
+ * version that no longer appears in the list (an old format, a hand-edit,
+ * a cleared entry) is treated as having seen nothing, which shows too
+ * much rather than too little.
+ *
+ * `list` is a parameter only so this can be tested against more releases
+ * than the game has shipped. With two entries in `CHANGES`, "everything
+ * since" and "only the newest" are the same list, and a test written
+ * against the real one passes whether this is fixed or not.
+ */
+export function unseenChanges(seen = lastSeen(), list = CHANGES) {
+  if (!seen) return list.slice();
+  const index = list.findIndex((entry) => entry.version === seen);
+  return index === -1 ? list.slice() : list.slice(0, index);
+}
 
 /** Browser storage is per-viewer and can throw, so every access is
  * guarded and a failure just means the note shows again. */
@@ -166,8 +209,8 @@ export function mountChanges(root, { serverBuild, onDismiss } = {}) {
   root.replaceChildren();
 
   const stale = serverBuild && serverBuild !== BUILD;
-  const entry = CHANGES[0];
-  if (!stale && (!entry || lastSeen() === entry.version)) return false;
+  const unseen = unseenChanges();
+  if (!stale && unseen.length === 0) return false;
 
   const wrap = document.createElement('div');
   wrap.className = 'changes-wrap';
@@ -192,13 +235,25 @@ export function mountChanges(root, { serverBuild, onDismiss } = {}) {
     card.append(kicker, title, item);
   } else {
     kicker.textContent = 'Since you last played';
-    title.textContent = 'A few things have changed.';
+    title.textContent = unseen.length > 1
+      ? `A few things have changed, across ${unseen.length} updates.`
+      : 'A few things have changed.';
     card.append(kicker, title);
-    for (const note of entry.notes) {
-      const item = document.createElement('p');
-      item.className = 'changes-item';
-      item.textContent = note;
-      card.appendChild(item);
+    // Oldest first inside the card, so it reads forwards even though
+    // CHANGES is stored newest first.
+    for (const entry of unseen.slice().reverse()) {
+      if (unseen.length > 1) {
+        const stamp = document.createElement('p');
+        stamp.className = 'changes-stamp';
+        stamp.textContent = entry.version;
+        card.appendChild(stamp);
+      }
+      for (const note of entry.notes) {
+        const item = document.createElement('p');
+        item.className = 'changes-item';
+        item.textContent = note;
+        card.appendChild(item);
+      }
     }
   }
 
@@ -207,7 +262,7 @@ export function mountChanges(root, { serverBuild, onDismiss } = {}) {
   go.className = 'changes-go';
   go.textContent = stale ? 'Carry on anyway' : 'Got it';
   go.addEventListener('click', () => {
-    if (!stale) rememberSeen(entry.version);
+    if (!stale) rememberSeen(CHANGES[0]?.version);
     root.replaceChildren();
     onDismiss?.();
   });
@@ -216,4 +271,48 @@ export function mountChanges(root, { serverBuild, onDismiss } = {}) {
   wrap.appendChild(card);
   root.appendChild(wrap);
   return true;
+}
+
+/**
+ * The whole history, as a sheet, for reading back at any time.
+ *
+ * The pop-up is a one-shot: it appears once per player per release and
+ * then is gone for good. That is right for something that interrupts you
+ * on the way into a game, and wrong as the only copy of what changed —
+ * miss it, dismiss it early, play on another device, and there is no way
+ * back to it. So the start screen keeps a door to the same notes, and
+ * this reads every entry rather than only the unseen ones.
+ */
+export function openChangeLog(sheets) {
+  injectStyles();
+  sheets.open({
+    id: 'changelog',
+    title: 'What has changed',
+    render(body) {
+      if (CHANGES.length === 0) {
+        const none = document.createElement('p');
+        none.className = 'changes-item';
+        none.textContent = 'Nothing yet.';
+        body.appendChild(none);
+        return;
+      }
+      // Newest first here, unlike the pop-up: somebody opening this on
+      // purpose is looking for what just changed, not reading a history
+      // forwards from the beginning.
+      for (const entry of CHANGES) {
+        const stamp = document.createElement('p');
+        stamp.className = 'changes-stamp';
+        stamp.textContent = entry.version === CHANGES[0].version
+          ? `${entry.version} — current`
+          : entry.version;
+        body.appendChild(stamp);
+        for (const note of entry.notes) {
+          const item = document.createElement('p');
+          item.className = 'changes-item';
+          item.textContent = note;
+          body.appendChild(item);
+        }
+      }
+    },
+  });
 }

@@ -14,6 +14,7 @@
  * the same split `src/ui/report.js` and `src/ui/hud.js` already use.
  */
 import { PALETTE } from '../render/palette.js';
+import { openChangeLog, BUILD } from './changes.js';
 import { newGame, openHoles } from '../sim/state.js';
 import { decode } from '../save/code.js';
 
@@ -309,6 +310,25 @@ export function mountStartScreen(root, { save, saveCode, sheets, topInset = 0, o
   });
   newGameCard.append(newGameTitle, newGameBtn);
   screen.appendChild(newGameCard);
+
+  // --- What has changed --------------------------------------------------
+  //
+  // The pop-up on the way in is a one-shot: seen once per release and
+  // then gone. Miss it, dismiss it early, or play on another device and
+  // there is no way back to it. This is that way back.
+  const logCard = document.createElement('div');
+  logCard.className = 'start-card';
+  const logTitle = document.createElement('p');
+  logTitle.className = 'start-card-title';
+  logTitle.textContent = 'What Has Changed';
+  const logHint = document.createElement('p');
+  logHint.className = 'start-hint';
+  logHint.textContent =
+    `Every update, newest first, including any you missed. You are on ${BUILD}.`;
+  const logBtn = button('Read the Changes');
+  logBtn.addEventListener('click', () => openChangeLog(sheets));
+  logCard.append(logTitle, logHint, logBtn);
+  screen.appendChild(logCard);
 
   // --- Load from a save code ---------------------------------------------
   const loadCard = document.createElement('div');

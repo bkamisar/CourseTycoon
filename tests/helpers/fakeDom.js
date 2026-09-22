@@ -36,6 +36,17 @@ class FakeNode {
     const i = this.parentNode.children.indexOf(this);
     if (i !== -1) this.parentNode.children.splice(i, 1);
   }
+  // Attributes are stored but never read back by the UI modules; they
+  // exist so a render that sets one does not throw.
+  setAttribute(name, value) {
+    (this.attributes ??= {})[name] = String(value);
+  }
+  getAttribute(name) {
+    return this.attributes?.[name] ?? null;
+  }
+  removeAttribute(name) {
+    if (this.attributes) delete this.attributes[name];
+  }
   addEventListener(type, fn) {
     (this._listeners[type] ??= []).push(fn);
   }
