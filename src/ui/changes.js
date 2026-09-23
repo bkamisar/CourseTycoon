@@ -31,13 +31,23 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23d';
+export const BUILD = '2026-09-23e';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23e',
+    notes: [
+      'Act I is meant to be properly hard now, and if you are mid-game it will feel different from this morning. Nothing is broken — the rules underneath changed.',
+      'Your course sits in a town. There are only so many golfers to be had, and your reputation decides how far away they will come from. Printing more tee times no longer conjures more people, so the question is now whether your tee sheet matches the crowd you can actually draw.',
+      'Golf wears out a golf course. A busy day now does real damage to the turf, so a crowd you cannot afford to maintain will ruin the greens they came for. Two groundskeepers on a busy nine will lose you money; four will not.',
+      'Reputation falls faster than it climbs, a bit more than twice as fast. A bad week costs more than a good week earns.',
+      'The bar for reaching Act II has moved up, and deliberately sits above what the most profitable way to play will give you. Clearing it means choosing to leave money on the table — charge a bit less, space the tee times a bit wider — which is the decision the act is supposed to be about. Playing purely for profit will now stall short of it.',
+    ],
+  },
   {
     version: '2026-09-23d',
     notes: [
