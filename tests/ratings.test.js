@@ -43,7 +43,10 @@ test('the act one gate needs all four conditions', () => {
     holesOpen: 9,
     money: GATE_THRESHOLDS.money,
     prestige: GATE_THRESHOLDS.prestige,
-    satisfactionHistory: new Array(7).fill(GATE_THRESHOLDS.satisfaction),
+    // Read from the constant, not a literal: this said 7 and broke the
+    // moment satisfactionDays moved to 10, reporting a gate failure that
+    // was really a stale fixture.
+    satisfactionHistory: new Array(GATE_THRESHOLDS.satisfactionDays).fill(GATE_THRESHOLDS.satisfaction),
   };
   assert.equal(actOneGate(met).passed, true);
 
@@ -51,7 +54,7 @@ test('the act one gate needs all four conditions', () => {
   assert.equal(actOneGate({ ...met, money: GATE_THRESHOLDS.money - 1 }).passed, false);
   assert.equal(actOneGate({ ...met, prestige: GATE_THRESHOLDS.prestige - 1 }).passed, false);
   assert.equal(
-    actOneGate({ ...met, satisfactionHistory: new Array(7).fill(GATE_THRESHOLDS.satisfaction - 5) }).passed,
+    actOneGate({ ...met, satisfactionHistory: new Array(GATE_THRESHOLDS.satisfactionDays).fill(GATE_THRESHOLDS.satisfaction - 5) }).passed,
     false
   );
 });

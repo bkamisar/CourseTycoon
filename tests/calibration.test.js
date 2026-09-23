@@ -183,10 +183,22 @@ test('the Act I gate is demanding without being out of reach', () => {
   // Three of four conditions were met by day 60 by any competent
   // operator while the fourth was never met at all, so the gate was one
   // condition wearing four hats.
-  assert.ok(GATE_THRESHOLDS.satisfaction >= 55 && GATE_THRESHOLDS.satisfaction <= 70,
-    `satisfaction ${GATE_THRESHOLDS.satisfaction} is the binding condition; outside 55-70 it is either free or impossible`);
-  assert.ok(GATE_THRESHOLDS.satisfactionDays >= 5,
-    'holding it for fewer than five days would make the gate a lucky afternoon');
+  // The band moved deliberately. It used to be 55-70, on the reasoning
+  // that above 70 was impossible -- but 70 was ALSO what the money
+  // optimum produced, so every threshold inside that band was satisfied
+  // for free by playing greedily and the gate opened on day 13.
+  //
+  // Measured on the current frontier, the money optimum sits at
+  // satisfaction 69 and buying 76 costs roughly half the profit. So the
+  // line belongs just above the optimum: high enough that clearing it
+  // means deliberately leaving money on the table, low enough that the
+  // money condition is still reachable while you do.
+  assert.ok(GATE_THRESHOLDS.satisfaction > 70,
+    `satisfaction ${GATE_THRESHOLDS.satisfaction} is at or below the money optimum, so it costs nothing to clear`);
+  assert.ok(GATE_THRESHOLDS.satisfaction <= 78,
+    `satisfaction ${GATE_THRESHOLDS.satisfaction} is above what any profitable line reaches`);
+  assert.ok(GATE_THRESHOLDS.satisfactionDays >= 7,
+    'holding it briefly would make the gate a lucky week');
   assert.equal(GATE_THRESHOLDS.holesOpen, 9,
     'Act I must not get harder because Act II laid out a back nine');
 });

@@ -48,9 +48,23 @@ export function courseRating(holes, turfQuality, crowd = null) {
 /**
  * Prestige is a slow exponential average, deliberately: a player should not
  * be able to buy their way out of a bad course with one good day.
+ *
+ * And it is **asymmetric**. A reputation falls faster than it climbs,
+ * which is both how reputations actually behave and the mechanism that
+ * gives a mistake a cost worth avoiding. Before this, prestige moved at
+ * one rate in both directions, so a bad week was undone by a good one and
+ * there was no state a player could get into that was genuinely hard to
+ * get out of. Ruining the turf outright and leaving $5,000 in the bank
+ * bottomed out at $3,210 and was back to $125,340 thirty days later.
+ *
+ * The ratio is a little over two to one: roughly a fortnight to climb
+ * what a week of neglect costs.
  */
+export const PRESTIGE_RATE_UP = 0.06;
+export const PRESTIGE_RATE_DOWN = 0.13;
+
 export function nextPrestige(current, rating, averageSatisfaction) {
   const target = rating * 0.45 + averageSatisfaction * 0.55;
-  const RATE = 0.08;
-  return clamp(current + (target - current) * RATE, 0, 100);
+  const rate = target >= current ? PRESTIGE_RATE_UP : PRESTIGE_RATE_DOWN;
+  return clamp(current + (target - current) * rate, 0, 100);
 }

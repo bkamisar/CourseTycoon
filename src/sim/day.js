@@ -213,8 +213,15 @@ export function runDay(state, seed) {
         scenery: averageScenery,
         turfQuality: next.turfQuality,
         hasRooms,
+        rooms: next.resort.rooms,
       })
-    : { total: 0, share: Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0])) };
+    : {
+        total: 0,
+        share: Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0])),
+        ceiling: 0,
+        wanted: 0,
+        limitedBy: 'demand',
+      };
   // A short course takes the beginners and the families off the main
   // course. The only thing in the game that helps pace by subtraction —
   // everything else draws a crowd onto a course that then has to flow.
@@ -430,9 +437,21 @@ export function runDay(state, seed) {
 
   const profit = revenue.total - costs.total;
 
-  // Turf: one groundskeeper holds roughly three holes steady.
+  /**
+   * Turf: one groundskeeper holds roughly three holes steady, plus the
+   * traffic of a modest day.
+   *
+   * Play used to wear the course at 0.12 per group against 1.4 per hole,
+   * so at a busy optimum all the golfers in the world accounted for 2.8
+   * of 15.4 wear and the rest was just having holes. Golf did not damage
+   * a golf course, which left Act I with no cost that grows as the resort
+   * succeeds -- the thing that makes a busy day a decision rather than a
+   * reward. Traffic now costs about as much as the course does at a full
+   * tee sheet, so a crowd you cannot afford to maintain is a crowd that
+   * ruins the greens, and the greens are what the crowd came for.
+   */
   const keepers = next.resort.staff.filter((m) => m.role === 'groundskeeper').length;
-  const wear = holes.length * 1.4 + groupCount * 0.12;
+  const wear = holes.length * 1.4 + groupCount * 0.45;
   const care = keepers * 6.8;
   // Rain waters the course for free; a run of clear days bakes it. A wet
   // week costs money and leaves the turf better than it found it, which

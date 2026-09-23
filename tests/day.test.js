@@ -784,7 +784,13 @@ test('room money reaches the bank, and overbuilding bleeds it', () => {
   const bloated = nightly({ standard: 160, suite: 80 });
 
   assert.ok(rightSized.net > 0, 'a hotel you can fill must pay');
-  assert.ok(rightSized.rate > 0.9, 'and it should actually be full');
+  // 0.9 dated from before `src/sim/catchment.js` put a ceiling on how
+  // many golfers exist to be had. A sixty-room hotel on this crowd now
+  // runs at 62%, which is what a real hotel runs at; the claim worth
+  // testing is that it fills enough to pay for itself, not that it sells
+  // out every night.
+  assert.ok(rightSized.rate > 0.5,
+    `a right-sized hotel ran at ${(rightSized.rate * 100).toFixed(0)}%, too empty to be worth building`);
   assert.ok(bloated.net < 0, 'a hotel four times too big must bleed');
   assert.ok(bloated.rate < 0.5, 'and it should visibly stand empty');
 });

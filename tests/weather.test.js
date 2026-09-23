@@ -115,11 +115,23 @@ test('weather actually moves the day', () => {
   function play(weatherSeed) {
     let state = newGame(21);
     state.weatherSeed = weatherSeed;
-    let total = 0;
-    for (let d = 0; d < 30; d++) { const r = runDay(state, 500 + d); state = r.state; total += r.report.groupsPlayed; }
-    return total;
+    const daily = [];
+    for (let d = 0; d < 30; d++) {
+      const r = runDay(state, 500 + d);
+      state = r.state;
+      daily.push(r.report.groupsPlayed);
+    }
+    return daily;
   }
   const a = play(1);
   const b = play(2);
-  assert.notEqual(a, b, 'two different climates should produce different seasons');
+  // Compared day by day rather than as two season totals. The totals
+  // version of this test failed once with both seasons summing to 394
+  // while the days underneath were 12,16,17,17,18... against
+  // 10,16,16,17,18... -- completely different weather, one number, a
+  // coincidence indistinguishable from a broken variance source.
+  assert.notDeepEqual(a, b, 'two different climates should produce different seasons');
+  const differingDays = a.filter((v, i) => v !== b[i]).length;
+  assert.ok(differingDays >= 5,
+    `only ${differingDays} of 30 days differed between two climates`);
 });

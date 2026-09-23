@@ -1,5 +1,6 @@
 import { maxGroupsForDay } from './schedule.js';
 import { clamp } from './hole.js';
+import { catchmentGroups } from './catchment.js';
 import { crowdMix, SEGMENT_KEYS } from './segments.js';
 import { MENU_SLOTS, menuPull, menuBasket, menuCogs } from './menu.js';
 
@@ -156,7 +157,7 @@ export function demandGroups({
   courseRating, prestige, amenities, greenFee, teeInterval,
   recentSatisfaction = 50, holesOpen = FULL_COURSE_HOLES, weather = 1,
   courseDifficulty = 50, scenery = 50, turfQuality = 50, amenityScore,
-  hasRooms = false,
+  hasRooms = false, rooms = null,
 }) {
   const value = perceivedValue({ courseRating, prestige, amenities, holesOpen });
   // 1.0 when priced at value; segmentAppeal's own priceFit is what makes
@@ -207,10 +208,43 @@ export function demandGroups({
     rawTotal += raw;
   }
 
-  const total = clamp(Math.round(rawTotal), 0, capacity);
+  /**
+   * Two ceilings, and which one binds is the whole decision.
+   *
+   * `capacity` is how many groups the tee sheet holds — the player's
+   * choice of interval against the length of a day. `ceiling` is how many
+   * golfers exist to be had, which reputation widens and which no tee
+   * sheet can conjure.
+   *
+   * Only the first of these used to exist, so demand was strictly
+   * proportional to the tee sheet and a wider interval produced
+   * proportionally more golfers on top of the satisfaction it bought.
+   * That loop had nothing pushing back on it: the optimum passed the Act
+   * I gate on day 13 and finished ninety days with ten times the money
+   * the gate asked for. See `src/sim/catchment.js`.
+   */
+  const ceiling = catchmentGroups(prestige, rooms);
+  const wanted = Math.round(rawTotal);
+  // Floored, because a catchment is a real number and a group of golfers
+  // is not: clamping straight to it produced 21.49 groups, which then
+  // failed to equal the sum of the whole-numbered per-segment split.
+  const limit = Math.max(0, Math.floor(Math.min(capacity, ceiling)));
+  const total = clamp(wanted, 0, limit);
   const bySegment = allocateByWeight(total, rawBySegment);
 
-  return { total, bySegment, share };
+  return {
+    total,
+    bySegment,
+    share,
+    // What stopped more people playing today. The evening report needs
+    // this to tell the player whether to print more tee times or go and
+    // earn a reputation, which are opposite actions.
+    ceiling,
+    wanted,
+    limitedBy: wanted <= limit
+      ? 'demand'
+      : (ceiling < capacity ? 'catchment' : 'teeSheet'),
+  };
 }
 
 export function dailyRevenue({

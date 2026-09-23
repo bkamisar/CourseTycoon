@@ -1,10 +1,34 @@
 /** Act I gate thresholds. Tuned later by tools/balance.js. */
+/**
+ * Act I gate thresholds.
+ *
+ * Set against a measured frontier rather than picked, and re-set once the
+ * catchment ceiling and turf wear landed, because those moved every
+ * number underneath them. On a finished nine with four groundskeepers,
+ * thirty days, two seeds:
+ *
+ *                 fee $40      $60        $80       $100
+ *     20 min    78/  $246  73/$2,146  69/$3,766  69/$2,057
+ *     24 min    81/  $174  76/$2,046  71/$3,430  70/$1,037
+ *     28 min    81/ -$263  76/$1,438  71/$2,571  70/  $303
+ *
+ * The money optimum sits at satisfaction 69. Everything above that costs
+ * profit, and roughly half of it by satisfaction 76. So the satisfaction
+ * line is set **above the money optimum on purpose**: clearing it means
+ * deliberately leaving money on the table, which is the decision this act
+ * is supposed to be about and which it did not previously ask for at all.
+ *
+ * The old thresholds asked for nothing the money optimum did not already
+ * hand over -- satisfaction 60 against an optimum that produced 70 -- so
+ * all four conditions fell out of playing greedily, and the gate opened on
+ * day 13.
+ */
 export const GATE_THRESHOLDS = {
   holesOpen: 9,
-  money: 50000,
-  prestige: 40,
-  satisfaction: 60,
-  satisfactionDays: 7,
+  money: 75000,
+  prestige: 50,
+  satisfaction: 72,
+  satisfactionDays: 10,
 };
 
 /**

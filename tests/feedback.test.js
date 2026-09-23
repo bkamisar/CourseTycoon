@@ -31,6 +31,17 @@ test('a poor-satisfaction resort does not grow its group count over ten days', (
   // for the whole run regardless of how the game's default pricing is tuned.
   let state = newGame(21);
   state.resort.pricing.teeInterval = 6;
+  // Started at a reputation the resort has actually earned, rather than
+  // newGame's 12.
+  //
+  // From 12, a mediocre course still climbs -- prestige went 14 -> 29
+  // over these ten days and turnout grew with it, because "mediocre" is
+  // an improvement on "nobody has heard of this place" and the catchment
+  // widens as word gets out. That is correct, and it drowns out the thing
+  // this test is about. From 50 the same run has prestige falling 49 ->
+  // 45 and turnout falling 22 -> 18, which is the feedback loop actually
+  // being measured.
+  state.prestige = 50;
   const groupsByDay = [];
   const satisfactionByDay = [];
   for (let i = 0; i < 10; i++) {
