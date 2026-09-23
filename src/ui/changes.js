@@ -31,13 +31,19 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23c';
+export const BUILD = '2026-09-23d';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23d',
+    notes: [
+      'You can build the back nine. Reaching Act II now shows a "Back 9" button that takes you to nine more plots. It was supposed to work all along and never has: the button only appeared once you had built a hole back there, and the only way to build one was through the button.',
+    ],
+  },
   {
     version: '2026-09-23c',
     notes: [

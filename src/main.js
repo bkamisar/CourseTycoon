@@ -304,7 +304,21 @@ const nineToggle = toolbarButton('Back 9', () => {
   nineToggle.textContent = shownNine === 0 ? 'Back 9' : 'Front 9';
 });
 nineToggle.update = () => {
-  nineToggle.hidden = !hasBackNine(state);
+  // Act II unlocks the back nine, and until this line existed nobody
+  // could ever reach it.
+  //
+  // The rule used to be `hasBackNine(state)` alone -- show the toggle
+  // once something is built back there. But the only way to build a hole
+  // is to tap it on the grid, and the only way to reach that grid is this
+  // toggle. So the toggle needed a built hole, building a hole needed the
+  // toggle, and eighteen holes sat in the data model, drawn correctly by
+  // a renderer that supported them, permanently out of reach. It is also
+  // why the measurement fixtures quietly had eighteen: the operator
+  // builds them by writing to state, which is a thing no player can do.
+  //
+  // `hasBackNine` stays in the condition so that a save which somehow
+  // carries back-nine holes can always see them, whatever act it is in.
+  nineToggle.hidden = (state?.act ?? 1) < 2 && !hasBackNine(state);
 };
 
 overviewToolbar.append(
