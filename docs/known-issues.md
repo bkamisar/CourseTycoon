@@ -39,6 +39,39 @@ investor target is what the player is now playing to.
 (`formatTarget` in `src/ui/report.js`) — the goals surface needs to switch
 to it rather than showing both.
 
+### Act I is narrower than it was, and wide tee intervals cannot survive
+
+**Found:** 2026-09-23, by the first balance sweep run after the rebalance.
+**Open, and the most important thing outstanding.**
+
+After the rebalance and the three fixes that followed it, a competent
+operator over 150 days from day one:
+
+    cheap and busy   $65/14min   1/8 reach Act II   0/8 bankrupt
+    balanced         $80/14min   5/8 reach Act II   0/8 bankrupt
+    quiet and pricey $80/18min   0/8               6/8 bankrupt
+    premium          $95/18min   0/8               8/8 bankrupt
+    bargain basement $50/12min   0/8               3/8 bankrupt
+    luxury          $110/20min   0/8               8/8 bankrupt
+
+One strategy works. Before the rebalance there were four. The gate is not
+the problem -- the money optimum sits at satisfaction 70 and the gate asks
+for 72, which is the intended squeeze -- the problem is that wide tee
+intervals cannot earn enough to survive the build-out.
+
+The cause looks structural and predates the rebalance: in
+`demandGroups`, `raw = capacity * appeal * pull`, so **demand is
+proportional to the size of the tee sheet**. A 20-minute interval has 40%
+fewer slots than a 12-minute one and therefore 40% less demand before
+anything else is considered. Wide intervals used to compensate through
+word of mouth, but that term is clamped at 1.25, and the catchment
+ceiling now caps the compensation again.
+
+Fixing it properly means separating "how many people want to come" from
+"how many tee times exist" -- the ceiling should come from the catchment
+and the tee sheet should only decide how many of those can be seated.
+That is a real change to the demand model and wants its own session.
+
 ### Act I's central tension may have gone
 
 **Found:** 2026-09-23, while fixing the measurement fixtures. **Open —

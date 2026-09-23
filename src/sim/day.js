@@ -492,7 +492,28 @@ export function runDay(state, seed) {
    * ruins the greens, and the greens are what the crowd came for.
    */
   const keepers = next.resort.staff.filter((m) => m.role === 'groundskeeper').length;
-  const wear = holes.length * 1.4 + groupCount * 0.45;
+
+  /**
+   * Wear scales with how much turf there is left to wear.
+   *
+   * Without this the whole system was a step function. `care` is flat and
+   * the wear rate is near-constant, so the daily net was either positive
+   * or negative and the turf ran to one end or the other: measured, two
+   * groundskeepers on a nine gave turf 1 and three gave turf 100, with
+   * nothing in between at any tee interval. A balance sweep found every
+   * strategy bankrupt or stalled with mean final turf of 0.1, because the
+   * operator's hiring rule sat on the wrong side of a cliff it could not
+   * see.
+   *
+   * Bare ground cannot be worn out further, so damage tapers as the
+   * course degrades and the turf settles at a level instead of crashing.
+   * That turns "how many groundskeepers" from a threshold into a dial:
+   * each one is worth roughly thirty points of equilibrium turf, and the
+   * player can read the answer off the number rather than discovering a
+   * cliff edge by falling off it.
+   */
+  const wearRate = holes.length * 1.4 + groupCount * 0.45;
+  const wear = wearRate * (next.turfQuality / 100);
   const care = keepers * 6.8;
   // Rain waters the course for free; a run of clear days bakes it. A wet
   // week costs money and leaves the turf better than it found it, which

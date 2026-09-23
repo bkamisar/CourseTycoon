@@ -31,13 +31,22 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23i';
+export const BUILD = '2026-09-23j';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23j',
+    notes: [
+      'Yesterday’s changes made Act I unwinnable and I am sorry. The greens collapsed to nothing on every course, which took satisfaction, then reputation, then the bank with them. If your resort has been dying for no reason you could see, that was why, and it is fixed.',
+      'Worn ground can no longer be worn out further, so your greens now settle at a level that depends on how many groundskeepers you employ rather than collapsing to bare dirt. Roughly: one keeper holds a busy nine at 45, two at 80, three at 95.',
+      'Reputation climbs at the speed it used to again. It still falls faster than it climbs — that part was meant.',
+      'A pleasant, expensive course is still much harder to run than a busy cheap one, and that is not yet where it should be. It is the next thing being worked on.',
+    ],
+  },
   {
     version: '2026-09-23i',
     notes: [

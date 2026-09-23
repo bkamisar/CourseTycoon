@@ -59,9 +59,17 @@ export function courseRating(holes, turfQuality, crowd = null) {
  *
  * The ratio is a little over two to one: roughly a fortnight to climb
  * what a week of neglect costs.
+ *
+ * The asymmetry is in the DOWN rate, not the up one. The first cut slowed
+ * the climb to 0.06 as well, which starved the opening course: prestige
+ * had just become the thing that decides how far people will travel (see
+ * catchment.js), so making it slower to earn while also making it matter
+ * more was two penalties on the one phase of the game that has no
+ * reputation yet. A balance sweep found wide tee intervals losing money
+ * before a single hole was built.
  */
-export const PRESTIGE_RATE_UP = 0.06;
-export const PRESTIGE_RATE_DOWN = 0.13;
+export const PRESTIGE_RATE_UP = 0.08;
+export const PRESTIGE_RATE_DOWN = 0.17;
 
 export function nextPrestige(current, rating, averageSatisfaction) {
   const target = rating * 0.45 + averageSatisfaction * 0.55;

@@ -20,7 +20,8 @@
  *
  * The policy, in order of priority each morning:
  *
- *   1. Keep the turf alive. One groundskeeper per three open holes.
+ *   1. Keep the turf alive. Enough groundskeepers to cover the wear the
+ *      course is actually taking, which depends on how busy it is.
  *   1b. Keep the course moving. Marshals while rounds run long — this was
  *      missing from the first version of this operator, and its absence
  *      produced a confident, wrong report that Act I had exactly one
@@ -109,9 +110,22 @@ function spendTheMorning(state, { greenFee, teeInterval }) {
 
   // 1. Turf first. A course that falls apart takes every other number
   //    down with it, and groundskeepers are the cheapest insurance.
+  //
+  //    Staffed against TRAFFIC, not just hole count. The rule used to be
+  //    one keeper per three open holes, which was right when play barely
+  //    wore the course and wrong the moment it did: wear is now
+  //    `holes * 1.4 + groups * 0.45`, so a busy nine needs materially
+  //    more care than a quiet one and the old rule had no way to notice.
+  //    A balance sweep with it in place reported every strategy bankrupt
+  //    or stalled with mean final turf of 0.1 -- which is a fact about
+  //    this function, not about the game. The operator could not pull a
+  //    lever the game had started to require, exactly as it once could
+  //    not hire marshals.
   const holes = openCount(state);
-  if (countRole(state, 'groundskeeper') < Math.ceil(holes / 3)
-    && state.money > BUFFER) {
+  const groups = state.history.at(-1)?.groupsPlayed ?? 0;
+  const wearRate = holes * 1.4 + groups * 0.45;
+  const needed = Math.max(1, Math.ceil(wearRate / 6.8));
+  if (countRole(state, 'groundskeeper') < needed && state.money > BUFFER) {
     state.resort.staff.push({ role: 'groundskeeper' });
     return;
   }
