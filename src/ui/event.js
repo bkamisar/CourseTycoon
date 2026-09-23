@@ -201,7 +201,11 @@ export function mountEventCard(root, { event, onChoose } = {}) {
 
   const kicker = document.createElement('p');
   kicker.className = 'event-kicker';
-  kicker.textContent = 'Your call';
+  // The investors borrow this card for their own moments, and some of
+  // those are announcements rather than decisions. "Your call" over a
+  // card with one button reading "Understood" would be the interface
+  // claiming a choice the player does not have.
+  kicker.textContent = event.kicker ?? 'Your call';
 
   const speaker = document.createElement('p');
   speaker.className = 'event-speaker';
@@ -244,8 +248,9 @@ export function mountEventCard(root, { event, onChoose } = {}) {
     cost.textContent = choice.cost;
 
     button.append(label, cost);
+    if (choice.disabled) button.disabled = true;
     button.addEventListener('click', () => {
-      if (answered) return;
+      if (answered || choice.disabled) return;
       answered = true;
       onChoose?.(index);
     });

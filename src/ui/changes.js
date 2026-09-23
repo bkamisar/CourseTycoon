@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23b';
+export const BUILD = '2026-09-23c';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23c',
+    notes: [
+      'The investors now turn up, deliver their verdict and call their money in on a proper card, rather than in small grey lines on the evening report. Their fortnightly review is a moment now, which is what it should have been all along.',
+      'When they offer to sell you their stake, or want their money back, you can settle it straight from that card as well as from the Hotel screen.',
+      'And the evening they arrive, the report now actually describes them. It used to be the one evening it said nothing, so their first target went unannounced until the following day.',
+    ],
+  },
   {
     version: '2026-09-23b',
     notes: [

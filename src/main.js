@@ -25,6 +25,8 @@ import { openGlossarySheet } from './ui/glossary.js';
 import { mountReport } from './ui/report.js';
 import { mountNarrationCard } from './ui/narration.js';
 import { mountEventCard } from './ui/event.js';
+import { investorCards } from './ui/investorCard.js';
+import { payBuyout } from './sim/investors.js';
 import { mountChanges, liveVersion } from './ui/changes.js';
 import { openHotelSheet } from './ui/hotel.js';
 import { mountStartScreen, startNewGame, applySaveCode } from './ui/start.js';
@@ -573,6 +575,46 @@ function enterReport() {
  * that arrived first would be a decision made blind.
  */
 function onReportContinue() {
+  // The investors first, because their card is about the day just played
+  // and the decision event is about tomorrow. A day can earn more than
+  // one -- a review and a demand land together when confidence runs out
+  // at a review -- so they queue rather than compete.
+  const investor = investorCards(dayResult.report, dayResult.state);
+  if (investor.length > 0) {
+    showInvestorCards(investor);
+    return;
+  }
+  showPendingEventOrCommit();
+}
+
+/**
+ * Plays the investors' cards one at a time, then hands over to whatever
+ * the evening had planned.
+ *
+ * The only card with a real choice is the settlement, and its "pay now"
+ * button goes through the same `payBuyout` the hotel sheet uses -- which
+ * refuses rather than overdrawing, so a state that comes back unchanged
+ * means it was not paid and nothing is committed as though it were.
+ */
+function showInvestorCards(queue) {
+  const [card, ...rest] = queue;
+  narrationRoot.replaceChildren();
+  mountEventCard(eventRoot, {
+    event: card,
+    onChoose: (index) => {
+      const choice = card.choices[index];
+      if (choice?.effect === 'payBuyout') {
+        const paid = payBuyout(dayResult.state);
+        if (paid.investors?.bought) dayResult.state = paid;
+      }
+      eventRoot.replaceChildren();
+      if (rest.length > 0) showInvestorCards(rest);
+      else showPendingEventOrCommit();
+    },
+  });
+}
+
+function showPendingEventOrCommit() {
   const pending = dayResult.report.pendingEvent;
   if (pending) {
     // The narration card would otherwise float on top of the decision,

@@ -587,6 +587,10 @@ export function runDay(state, seed) {
     const settlement = settlementDue(next.investors, next.day);
     if (settlement && !next.investors.buyoutDemand) {
       next.investors.buyoutDemand = settlement;
+      // The day it is raised, as opposed to the fortnight it then stands
+      // for. The card that announces it must fire once, not every
+      // morning until the deadline.
+      report.investors.demandRaised = settlement.kind;
     }
 
     // And the deadline actually arriving.
@@ -610,6 +614,7 @@ export function runDay(state, seed) {
         next.resort.rooms = after.resort.rooms;
         next.money = after.money;
         next.investors = after.investors;
+        next.investors.buyoutAnnounced = true;
         report.investors.liquidated = true;
       } else {
         next.investors.buyoutDemand = null;
@@ -623,9 +628,25 @@ export function runDay(state, seed) {
     report.investors.buyoutDemand = next.investors.buyoutDemand ?? null;
     report.investors.bought = next.investors.bought ?? false;
   } else {
-    report.investors = next.investors?.bought
-      ? { target: null, reviewed: null, confidence: 100, bought: true }
-      : null;
+    // Already bought out. The purchase itself happens on the hotel sheet,
+    // outside a day, so this is where the game first gets a chance to
+    // notice it and say something -- once, hence the flag kept on the
+    // state rather than a comparison against yesterday.
+    if (next.investors?.bought) {
+      const firstTime = !next.investors.buyoutAnnounced;
+      if (firstTime) next.investors.buyoutAnnounced = true;
+      report.investors = {
+        target: null,
+        reviewed: null,
+        confidence: 100,
+        bought: true,
+        // Liquidation announces itself on the day it happens, in the
+        // branch above; this is only for a buyout the player paid for.
+        boughtToday: firstTime && !next.investors.liquidated,
+      };
+    } else {
+      report.investors = null;
+    }
   }
 
   next.history.push(report);
@@ -640,6 +661,20 @@ export function runDay(state, seed) {
     if (!next.investors) {
       next.investors = startingInvestors(next, rng);
       report.investorsArrived = true;
+      // And the report has to describe them, not just note that they
+      // turned up. They did not exist while the day ran, so the block
+      // above left `report.investors` null -- which meant the evening
+      // they arrived was the one evening the report said nothing about
+      // them, and their first target went unannounced until the next
+      // day. A report describes the state at the end of the day, and at
+      // the end of this one they are here with a target already set.
+      report.investors = {
+        target: next.investors.nextTarget,
+        reviewed: null,
+        confidence: next.investors.confidence,
+        buyoutDemand: null,
+        bought: false,
+      };
     }
   }
 
