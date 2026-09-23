@@ -24,12 +24,30 @@ export function actOneGate({ holesOpen, money, prestige, satisfactionHistory }) 
    * The checklist used to show only a target and a tick, which is enough
    * when a condition is a matter of time and useless when it is a matter
    * of strategy. Measured, three of these four are met comfortably by any
-   * competent operator by about day 60 — this gate is really the
-   * satisfaction line, and a player optimising for profit will never
-   * cross it. At a tight tee interval a finished nine runs at about 35
-   * satisfaction and makes more money per day than one at 69; without
-   * being told, the natural read is that the door is broken rather than
-   * that the strategy is wrong.
+   * competent operator by about day 60, so this gate is really the
+   * satisfaction line.
+   *
+   * It used to say here that a packed course out-earns a pleasant one, so
+   * a player optimising for profit would never cross this line. **That is
+   * no longer true, and it is not clear it ever was.** The figure behind
+   * it ("about 35 satisfaction") was taken on a fixture that claimed to
+   * be a nine and built eighteen, and it predates the word-of-mouth
+   * change that made a good reputation compound. Re-measured on a real
+   * nine, fifteen days, one seed:
+   *
+   *     tee every  6 min -> satisfaction 30, profit   $918/day
+   *     tee every  8 min -> satisfaction 34, profit   $470/day
+   *     tee every 13 min -> satisfaction 42, profit   $598/day
+   *     tee every 20 min -> satisfaction 69, profit $4,097/day
+   *
+   * The pleasant course is now both the happiest and comfortably the
+   * richest, which means the tension this gate was built around may have
+   * gone. One seed on one fixture with no operator is a signal and not a
+   * conclusion -- `tools/balance.js` is what settles it -- but nothing
+   * here should be read as established until it does.
+   *
+   * `now` says how close you are and `hint` says what to do about it,
+   * which is worth having either way.
    *
    * So `now` says how close you are, and `hint` says what to do about it.
    */

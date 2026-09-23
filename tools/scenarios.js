@@ -34,17 +34,41 @@
  * three-hole course.** It has no congestion, no clientele and no
  * amenities, so every hire and every building measures as worthless on
  * it. That configuration produced four of the six errors above.
+ *
+ * A seventh, found later and worth its own paragraph because it happened
+ * *in this file*: every fixture below was named "Nine" and built
+ * eighteen. `newGame` lays out eighteen hole slots -- the data model was
+ * widened for Act II's back nine long before Act II existed -- and
+ * `finishTheCourse` opened all of them. The difference is not cosmetic:
+ *
+ *     nine holes    +$598/day profit   satisfaction 41   round 181 min
+ *     eighteen      -$2,072/day        satisfaction 33   round 356 min
+ *
+ * So every amenity price in `tools/effects.js` was set against a
+ * loss-making resort with a six-hour round, and the "a finished nine runs
+ * at about 35 satisfaction" quoted in `src/sim/acts.js` is the eighteen's
+ * number. A fixture that lies in its own name is worse than one with
+ * documented limits, because nobody thinks to check it.
  */
 import { newGame, amenity } from '../src/sim/state.js';
 import { makeHole } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { menuPrep } from '../src/sim/menu.js';
 import { BASE_CAPACITY, PER_COOK } from '../src/sim/kitchen.js';
+import { GATE_THRESHOLDS } from '../src/sim/acts.js';
 
-/** Builds every hole out and opens it. */
-function finishTheCourse(state) {
+/**
+ * Builds and opens the first `count` holes, leaving the rest as stubs.
+ *
+ * Defaults to a nine, taken from the gate itself rather than from a
+ * literal or from the renderer's grid -- the gate is what defines a
+ * finished Act I course, so a fixture claiming to be one should be
+ * whatever the gate currently asks for. It used to build every slot
+ * `newGame` lays out, which is eighteen.
+ */
+function finishTheCourse(state, count = GATE_THRESHOLDS.holesOpen) {
   const holes = state.resort.courses[0].holes;
-  for (let i = 0; i < holes.length; i++) {
+  for (let i = 0; i < Math.min(count, holes.length); i++) {
     holes[i] = { ...makeHole(TEMPLATE_NAMES[i % TEMPLATE_NAMES.length], holes[i].id), open: true };
   }
   return state;
