@@ -100,7 +100,10 @@ test('effects only use money, prestige, turf, goodwill and a condition', () => {
   // `condition` is the fifth axis, added when events gained the ability
   // to leave something still wrong next week rather than only subtracting
   // a number once. See src/sim/conditions.js.
-  const allowedTop = new Set(['money', 'prestige', 'turf', 'goodwill', 'condition']);
+  // `fallout` is the chance the choice comes back to bite, rolled once at
+  // the moment it is made. It is not a number the day applies, so it does
+  // not belong on an axis -- but it does have to be allowed here.
+  const allowedTop = new Set(['money', 'prestige', 'turf', 'goodwill', 'condition', 'fallout']);
   for (const event of EVENTS) {
     for (const choice of event.choices) {
       for (const key of Object.keys(choice.effects)) {
@@ -249,54 +252,102 @@ test('every condition an event imposes is one the simulation can apply', () => {
 
 // --- Events that follow from earlier events ----------------------------
 
-test('a follow-up only reaches the resort that earned it', () => {
-  // The first mechanic in the game where an event exists because of a
-  // choice rather than a number. Three ways it can go wrong and all three
-  // are silent: it never fires, it fires for everybody, or it fires over
-  // and over. None would fail any other test in this file.
-  const base = { day: 40, act: 2, prestige: 60, holesOpen: 9, groups: 15, turf: 80, satisfaction: 60, rating: 70, slow: false, hasCart: false, money: 100000 };
-  const ctx = (made, day = 40) => ({
-    ...base,
-    day,
-    chose(id, index, afterDays = 0) {
-      const r = made[id];
-      if (!r) return false;
-      if (index !== undefined && r.index !== index) return false;
-      return day - r.day >= afterDays;
-    },
+/** A stand-in for the real event context's memory of past decisions. */
+function madeContext(made, day = 40) {
+  const look = (id, index, afterDays, needHaunted) => {
+    const r = made[id];
+    if (!r) return false;
+    if (needHaunted && !r.haunted) return false;
+    if (index !== undefined && r.index !== index) return false;
+    return day - r.day >= (afterDays ?? 0);
+  };
+  return {
+    day, act: 2, prestige: 60, holesOpen: 9, groups: 15, turf: 80,
+    satisfaction: 60, rating: 70, slow: false, hasCart: true, money: 100000,
+    chose: (id, i, after) => look(id, i, after, false),
+    haunted: (id, i, after) => look(id, i, after, true),
     answered: (id) => Boolean(made[id]),
-  });
+  };
+}
 
-  const followUps = EVENTS.filter((e) => /-fallout$|-returns$|-after$/.test(e.id));
-  assert.ok(followUps.length > 0, 'there should be some follow-up events to check');
+/** Every event that exists because of an earlier one. */
+const FOLLOW_UPS = EVENTS.filter((e) => /-fallout$|-returns$|-after$/.test(e.id));
 
-  for (const event of followUps) {
-    assert.equal(event.when(ctx({})), false,
+test('a follow-up only reaches the resort that earned it', () => {
+  // Four ways this mechanic can go wrong and all four are silent: it
+  // never fires, it fires for everybody, it fires over and over, or it
+  // fires for a player whose roll went their way. None of them would fail
+  // any other test in this file.
+  assert.ok(FOLLOW_UPS.length >= 5, `only ${FOLLOW_UPS.length} follow-ups found`);
+
+  for (const event of FOLLOW_UPS) {
+    assert.equal(event.when(madeContext({})), false,
       `${event.id} fires for a resort that never made the choice`);
-    assert.equal(event.when(ctx({ [event.id]: { index: 0, day: 20 } })), false,
-      `${event.id} fires again after it has already been answered`);
+    assert.equal(
+      event.when(madeContext({ [event.id]: { index: 0, day: 20, haunted: true } })),
+      false,
+      `${event.id} fires again after it has already been answered`,
+    );
+  }
+});
+
+test('a follow-up needs the roll to have gone against the player', () => {
+  // The whole point of the probability. A cheap fix that always comes
+  // back is not a gamble, it is a wrong answer with a longer
+  // explanation -- so every one of these must be reachable ONLY through
+  // `haunted`, never through `chose` alone.
+  for (const event of FOLLOW_UPS) {
+    const lucky = {};
+    for (let index = 0; index < 3; index++) {
+      for (const parent of EVENTS) {
+        lucky[parent.id] = { index, day: 1, haunted: false };
+      }
+      delete lucky[event.id];
+      assert.equal(event.when(madeContext(lucky)), false,
+        `${event.id} fires even though the roll went the player's way`);
+    }
   }
 });
 
 test('the snorkelling programme comes back only for the resort that said yes', () => {
   const event = EVENTS.find((e) => e.id === 'snorkel-fallout');
   assert.ok(event, 'the fallout event should exist');
-  const ctx = (made, day) => ({
-    day, act: 2,
-    chose(id, index, afterDays = 0) {
-      const r = made[id];
-      if (!r) return false;
-      if (index !== undefined && r.index !== index) return false;
-      return day - r.day >= afterDays;
-    },
-    answered: (id) => Boolean(made[id]),
-  });
 
-  const accepted = { 'snorkel-programme': { index: 0, day: 10 } };
-  const declined = { 'snorkel-programme': { index: 2, day: 10 } };
+  const accepted = { 'snorkel-programme': { index: 0, day: 10, haunted: true } };
+  const declined = { 'snorkel-programme': { index: 2, day: 10, haunted: true } };
+  const gotAway = { 'snorkel-programme': { index: 0, day: 10, haunted: false } };
 
-  assert.equal(event.when(ctx(accepted, 12)), false, 'it must not land the same week');
-  assert.equal(event.when(ctx(accepted, 30)), true, 'it must land once enough time has passed');
-  assert.equal(event.when(ctx(declined, 30)), false,
+  assert.equal(event.when(madeContext(accepted, 12)), false, 'it must not land the same week');
+  assert.equal(event.when(madeContext(accepted, 30)), true, 'it must land once enough time has passed');
+  assert.equal(event.when(madeContext(declined, 30)), false,
     'a resort that turned him down must never see the reckoning');
+  assert.equal(event.when(madeContext(gotAway, 30)), false,
+    'and some who said yes get away with it');
+});
+
+test('every risky choice can actually be haunted, and every follow-up has a parent', () => {
+  // Two halves of the same wiring, and both fail silently. A `fallout` on
+  // a choice no follow-up watches for is a die rolled for nothing; a
+  // follow-up watching a choice that carries no `fallout` can never fire
+  // at all.
+  const risky = new Set();
+  for (const event of EVENTS) {
+    for (const choice of event.choices) {
+      if ((choice.effects?.fallout ?? 0) > 0) risky.add(event.id);
+    }
+  }
+  assert.ok(risky.size >= 5, `only ${risky.size} events carry any risk`);
+
+  for (const event of FOLLOW_UPS) {
+    const watched = [...risky].filter((parentId) => {
+      const made = { [parentId]: { index: 0, day: 1, haunted: true } };
+      for (let i = 0; i < 3; i++) {
+        made[parentId] = { index: i, day: 1, haunted: true };
+        if (event.when(madeContext(made))) return true;
+      }
+      return false;
+    });
+    assert.ok(watched.length > 0,
+      `${event.id} watches no choice that carries a fallout chance, so it can never fire`);
+  }
 });

@@ -31,6 +31,11 @@ function stripComments(source) {
     .replace(/\/\/.*$/gm, '');
 }
 
+// Note for whoever trips this next: the check is a regex over source
+// text, so PROSE can set it off. An event whose prompt was about a
+// neighbour's broken windows failed on /window/ once. The guard is
+// deliberately not clever about string literals -- the rule it protects
+// matters more than the occasional reworded sentence.
 test('no simulation module breaks purity', async () => {
   const files = (await readdir(SIM_DIR)).filter((f) => f.endsWith('.js'));
   assert.ok(files.length > 0, 'expected simulation modules to exist');

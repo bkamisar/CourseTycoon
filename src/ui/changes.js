@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23h';
+export const BUILD = '2026-09-23i';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23i',
+    notes: [
+      'Taking the cheap way out of a problem now carries a risk rather than a certainty. Patch the drainage instead of digging it out, wait a week for the standard mower part, buy the cheap batch of seed, pay the neighbour off instead of netting the boundary — most of the time you get away with it, and sometimes you do not.',
+      'Fourteen choices across the game now carry that risk, between a third and two thirds each, and nine of them have a proper reckoning waiting on the other side. When one lands it is always more expensive than doing it right would have been, and it always still gives you a way to handle it well.',
+      'Over ninety days a player who takes every cheap option meets about four of these gambles and loses roughly one and a half of them.',
+    ],
+  },
   {
     version: '2026-09-23h',
     notes: [

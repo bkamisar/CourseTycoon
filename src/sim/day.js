@@ -802,9 +802,35 @@ export function applyEventChoice(state, eventId, choiceIndex) {
    * distance: the events that read this ask for it weeks afterwards, when
    * the money has been spent and the choice feels settled.
    */
+  /**
+   * And whether it is going to come back.
+   *
+   * Rolled here, at the moment of the choice, rather than weeks later
+   * when the follow-up asks. That keeps `when` a pure predicate over
+   * state -- it reads a fact rather than rolling a die every time the
+   * event pool is filtered, which would make a reckoning that appears and
+   * disappears from one day to the next.
+   *
+   * Seeded off the save, the day and the event, so a replayed game plays
+   * out the same way. `Math.random` has never been called in src/sim and
+   * is not going to start here.
+   *
+   * A cheap fix that ALWAYS comes back is not a gamble, it is a wrong
+   * answer with a longer explanation. The probability is what makes
+   * taking the cheap way a judgement about odds rather than a mistake.
+   */
+  const risk = choice.effects?.fallout ?? 0;
+  let haunted = false;
+  if (risk > 0) {
+    let hash = 0;
+    for (let i = 0; i < eventId.length; i++) hash = (hash * 31 + eventId.charCodeAt(i)) >>> 0;
+    const rng = makeRng((next.seed ?? 1) * 7919 + (next.day ?? 0) * 104729 + hash + choiceIndex);
+    haunted = rng.chance(risk);
+  }
+
   next.choicesMade = {
     ...(next.choicesMade ?? {}),
-    [eventId]: { index: choiceIndex, day: next.day ?? 0 },
+    [eventId]: { index: choiceIndex, day: next.day ?? 0, haunted },
   };
   return next;
 }

@@ -130,6 +130,18 @@ export function eventContext({ report, previousReport, state }) {
     answered(eventId) {
       return Boolean(made[eventId]);
     },
+    /**
+     * Like `chose`, but also requires the roll taken at the time to have
+     * gone against the player. This is what a follow-up asks: not "did
+     * they take the cheap option" but "did the cheap option catch up with
+     * them", which is only sometimes.
+     */
+    haunted(eventId, index, afterDays = 0) {
+      const record = made[eventId];
+      if (!record?.haunted) return false;
+      if (index !== undefined && record.index !== index) return false;
+      return (state.day ?? 0) - record.day >= afterDays;
+    },
   };
 }
 
@@ -204,7 +216,7 @@ export const EVENTS = [
         stance: 'thrifty',
         label: 'Wait a week for the standard part',
         cost: 'Free, but the crew falls behind hand-cutting and turf takes a 10-point hit; prestige dips 2 as the course starts to show it.',
-        effects: { turf: -10, prestige: -2 },
+        effects: { turf: -10, prestige: -2, fallout: 0.45 },
       },
     ],
   },
@@ -270,13 +282,13 @@ export const EVENTS = [
         stance: 'pragmatic',
         label: 'Pay them off for now',
         cost: '$500 today, with no guarantee it does not come up again next month.',
-        effects: { money: -500 },
+        effects: { money: -500, fallout: 0.5 },
       },
       {
         stance: 'defiant',
         label: 'Do nothing',
         cost: 'Free, but Gus says they are now talking to a solicitor — prestige takes a 5-point hit.',
-        effects: { prestige: -5 },
+        effects: { prestige: -5, fallout: 0.6 },
       },
     ],
   },
@@ -322,7 +334,7 @@ export const EVENTS = [
         stance: 'pragmatic',
         label: 'Offer a one-time bonus instead',
         cost: '$300 now, with no change to the weekly rate.',
-        effects: { money: -300, turf: 1 },
+        effects: { money: -300, turf: 1, fallout: 0.5 },
       },
       {
         stance: 'defiant',
@@ -342,7 +354,7 @@ export const EVENTS = [
         stance: 'thrifty',
         label: 'Buy the cheap batch',
         cost: '$400, and the greenkeeper isn\'t thrilled about the consistency — prestige takes a 1-point knock.',
-        effects: { money: -400, turf: 3, prestige: -1 },
+        effects: { money: -400, turf: 3, prestige: -1, fallout: 0.5 },
       },
       {
         stance: 'thorough',
@@ -406,7 +418,7 @@ export const EVENTS = [
         stance: 'defiant',
         label: 'Apologise, nothing more',
         cost: 'Free, but Gus says those three groups are not rushing back.',
-        effects: { goodwill: { locals: -6, serious: -4 } },
+        effects: { goodwill: { locals: -6, serious: -4 }, fallout: 0.55 },
       },
     ],
   },
@@ -426,7 +438,7 @@ export const EVENTS = [
         stance: 'pragmatic',
         label: "Pay Gus overtime to patrol",
         cost: '$600 for a week of extra night rounds.',
-        effects: { money: -600, goodwill: { locals: 2 } },
+        effects: { money: -600, goodwill: { locals: 2 }, fallout: 0.4 },
       },
       {
         stance: 'defiant',
@@ -504,7 +516,7 @@ export const EVENTS = [
         stance: 'pragmatic',
         label: 'Patch job',
         cost: '$600, but it will not survive the next heavy rain.',
-        effects: { money: -600, turf: 2 },
+        effects: { money: -600, turf: 2, fallout: 0.4 },
       },
       {
         stance: 'defiant',
@@ -579,6 +591,7 @@ export const EVENTS = [
         label: 'Pump it when it floods',
         cost: 'Nothing today. The ground stays sour for 16 days and the greens lose about 3.4 points a day while it does.',
         effects: {
+          fallout: 0.6,
           condition: {
             id: 'sour-ground', label: 'Sour ground',
             note: 'Water sitting in the hollow. The turf loses ground daily.',
@@ -592,6 +605,7 @@ export const EVENTS = [
         cost: '$5,000 and 9 days of slower recovery, which is neither fix nor disaster.',
         effects: {
           money: -5000,
+          fallout: 0.35,
           condition: {
             id: 'sour-ground', label: 'Soft ground',
             note: 'Patched, not solved. The turf recovers slowly.',
@@ -654,6 +668,7 @@ export const EVENTS = [
         cost: 'Nothing today. The notice stays on the door 12 days and turnout runs about a third down while it does.',
         effects: {
           prestige: -3,
+          fallout: 0.5,
           condition: {
             id: 'health-notice', label: 'Notice on the door',
             note: 'An appeal pending, in public. People read the notice, not the appeal.',
@@ -844,6 +859,7 @@ export const EVENTS = [
         cost: '$4,000, and the rest of it spreads for 16 days at about 3.6 points a day.',
         effects: {
           money: -4000,
+          fallout: 0.55,
           condition: {
             id: 'blight', label: 'Blight spreading',
             note: 'Treated in patches, which is another way of saying untreated.',
@@ -1120,6 +1136,7 @@ export const EVENTS = [
         cost: '$1,800 for a wetsuit and a permit, and every ball he brings up gets sold again — $340 a day for 18 days. Nobody has asked what the hole in the résumé was.',
         effects: {
           money: -1800,
+          fallout: 0.7,
           goodwill: { serious: -4, locals: 5 },
           condition: {
             id: 'pond-diving', label: 'Snorkelling programme',
@@ -1145,12 +1162,13 @@ export const EVENTS = [
 
   {
     id: 'snorkel-fallout',
+    followUp: true,
     speaker: 'hotelHand',
     // Only for a resort that said yes, and only once enough time has
     // passed that the money feels like it was always yours. This is the
     // first event in the game that exists because of an earlier one --
     // see `chose` in eventContext above.
-    when: (c) => c.chose('snorkel-programme', 0, 16) && !c.answered('snorkel-fallout'),
+    when: (c) => c.haunted('snorkel-programme', 0, 12) && !c.answered('snorkel-fallout'),
     prompt: "Somebody finally ran the checks on the porter with the snorkelling programme, and the hole in the résumé turns out to have a shape. He is gone by lunchtime. The question is what happens to the several thousand dollars of other people's golf balls he sold on your behalf.",
     choices: [
       {
@@ -1202,6 +1220,7 @@ export const EVENTS = [
         cost: '$48,000 now. Two holes are a building site for 12 days, and eleven back gardens along the 4th and 5th is not what anyone drove out here for.',
         effects: {
           money: 48000,
+          fallout: 0.5,
           prestige: -7,
           goodwill: { serious: -10, destination: -6, locals: 4 },
           condition: {
@@ -1317,6 +1336,7 @@ export const EVENTS = [
         effects: {
           prestige: -3,
           goodwill: { locals: -5 },
+          fallout: 0.55,
           condition: {
             id: 'unpoliced', label: 'Nobody stops anything',
             note: 'Two more since the 14th. Charles did 40 more pull ups.',
@@ -1342,10 +1362,11 @@ export const EVENTS = [
 
   {
     id: 'drainage-returns',
+    followUp: true,
     speaker: 'keeper',
     // Follows either of the two ways of not fixing it properly. Long
     // enough afterwards that the patch felt like it had worked.
-    when: (c) => (c.chose('drainage-failure', 1, 20) || c.chose('drainage-failure', 2, 20))
+    when: (c) => (c.haunted('drainage-failure', 1, 14) || c.haunted('drainage-failure', 2, 14))
       && !c.answered('drainage-returns'),
     prompt: "The hollow has gone again, and this time it has taken the bank with it. I did say. I am not going to keep saying it, but I did say.",
     choices: [
@@ -1379,9 +1400,10 @@ export const EVENTS = [
 
   {
     id: 'charles-after',
+    followUp: true,
     speaker: 'security',
     // Only for the resort that left him to it.
-    when: (c) => c.chose('charles-on-security', 2, 14) && !c.answered('charles-after'),
+    when: (c) => c.haunted('charles-on-security', 2, 10) && !c.answered('charles-after'),
     prompt: "There was an ambulance on the 14th on Saturday. Charles has written it up as a disagreement. The incident book now has three entries, and one of them is still about pull ups.",
     choices: [
       {
@@ -1431,9 +1453,10 @@ export const EVENTS = [
 
   {
     id: 'jay-after',
+    followUp: true,
     speaker: 'realtor',
     // Only for the resort that sold him the land.
-    when: (c) => c.chose('jay-the-realtor', 0, 18) && !c.answered('jay-after'),
+    when: (c) => c.haunted('jay-the-realtor', 0, 13) && !c.answered('jay-after'),
     prompt: "The eleven houses are up and sold, and eleven households have discovered what a golf course is. Jay, who no longer lives in any of the photographs, has given them your number.",
     choices: [
       {
@@ -1471,6 +1494,318 @@ export const EVENTS = [
     ],
   },
 
+
+  // --- What the cheap fix sometimes costs -------------------------------
+  //
+  // Five more reckonings, hung off the mediocre options on the events that
+  // were here first. Each is gated on `haunted` rather than `chose`, so it
+  // only arrives for the share of players whose roll went against them —
+  // a cheap fix that always comes back is not a gamble, it is a wrong
+  // answer with a longer explanation.
+
+  {
+    id: 'mower-after',
+    followUp: true,
+    speaker: 'keeper',
+    when: (c) => c.haunted('mower-failure', 1, 9) && !c.answered('mower-after'),
+    prompt: "The standard part arrived and went in, and the deck it went into gave up nine days later. That is the whole mower now, not the part.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Buy the machine outright',
+        cost: '$16,000, which is four times the rush part would have been.',
+        effects: { money: -16000, turf: 4 },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Hire one by the week',
+        cost: '$540 a day for 16 days, and it is the wrong width for the approaches.',
+        effects: {
+          condition: {
+            id: 'hired-mower', label: 'Hired mower',
+            note: 'Wrong width, by the week, at a rate that adds up.',
+            days: 16, dailyMoney: 540, turfPerDay: -0.8,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'cheap-supplier-after',
+    followUp: true,
+    speaker: 'supplierRep',
+    when: (c) => c.haunted('cheap-supplier', 0, 10) && !c.answered('cheap-supplier-after'),
+    prompt: "About that batch. There is a reason it was $700 cheaper, and it is currently coming up through the 2nd, the 6th and the practice green.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Strip and re-seed the three',
+        cost: '$13,500 and about 3 points of turf a day for 11 days while it takes.',
+        effects: {
+          money: -13500,
+          condition: {
+            id: 'reseeding', label: 'Re-seeding three greens',
+            note: 'Stripped back and starting again.',
+            days: 11, turfPerDay: -3,
+          },
+        },
+      },
+      {
+        stance: 'commercial',
+        label: 'Chase the supplier for it',
+        cost: 'Free, and they do pay up eventually — $210 a day back for 18 days. Meanwhile it keeps spreading at about 2 points a day.',
+        effects: {
+          condition: {
+            id: 'bad-batch', label: 'The cheap batch',
+            note: 'Still coming up through the 2nd, the 6th and the practice green.',
+            days: 18, dailyMoney: -210, turfPerDay: -2,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'bunker-after',
+    followUp: true,
+    speaker: 'keeper',
+    when: (c) => c.haunted('storm-bunker-damage', 1, 11) && !c.answered('bunker-after'),
+    prompt: "The patched bunkers have washed out again, and this time the faces have gone with them. The sand is in the pond, which is at least tidy of it.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Rebuild them properly now',
+        cost: '$7,900, and two holes shut for 6 days.',
+        effects: {
+          money: -7900,
+          turf: 4,
+          condition: {
+            id: 'bunker-rebuild', label: 'Bunkers rebuilt',
+            note: 'Two holes shut while the faces go back in.',
+            days: 6, holesClosed: 2,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'Play them as ground under repair',
+        cost: 'Free, and serious golfers have opinions about that for 14 days. Turnout about 12% down.',
+        effects: {
+          goodwill: { serious: -11 },
+          condition: {
+            id: 'gur-bunkers', label: 'Bunkers under repair',
+            note: 'Roped off, indefinitely, on a course people paid to play.',
+            days: 14, demandFactor: 0.88,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'vandalism-after',
+    followUp: true,
+    speaker: 'starter',
+    when: (c) => c.haunted('night-vandalism', 1, 9) && !c.answered('vandalism-after'),
+    prompt: "Gus is sixty-four and they came back with four of them. He is fine. He is also not doing that again, and he is right not to.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Lighting and a proper firm',
+        cost: '$9,800 and it is genuinely finished. Locals goodwill +6.',
+        effects: { money: -9800, goodwill: { locals: 6 }, prestige: 2 },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Leave the gate open and hope',
+        cost: 'Free. They keep coming for 15 days, taking about 2.5 points of turf a night.',
+        effects: {
+          goodwill: { locals: -6 },
+          condition: {
+            id: 'repeat-vandalism', label: 'They keep coming back',
+            note: 'Nothing stopped them the first time, or the second.',
+            days: 15, turfPerDay: -2.5,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'staff-raise-after',
+    followUp: true,
+    speaker: 'keeper',
+    when: (c) => c.haunted('staff-raise-request', 1, 10) && !c.answered('staff-raise-after'),
+    prompt: "The bonus was spent by the Friday and the conversation it was meant to end is back. Two of them have been to see the club down the road.",
+    choices: [
+      {
+        stance: 'principled',
+        label: 'Give them the raise you should have',
+        cost: '$310 a day for 18 days, which is more than it would have cost a fortnight ago.',
+        effects: {
+          goodwill: { locals: 4 },
+          condition: {
+            id: 'late-raise', label: 'The raise, late',
+            note: 'Granted eventually, at the price of having waited.',
+            days: 18, dailyMoney: 310,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Let them go',
+        cost: 'Free, and the greens go with them: about 3 points a day for 13 days until whoever is left works it out.',
+        effects: {
+          condition: {
+            id: 'crew-gone', label: 'Half the crew gone',
+            note: 'Nobody left who knows the ground, and the ground knows it.',
+            days: 13, turfPerDay: -3,
+          },
+        },
+      },
+    ],
+  },
+
+
+  // --- Four more, because the mechanic was too rare to notice ----------
+  //
+  // Measured, a player taking every cheap option across ninety days met
+  // 2.2 risky choices and 0.6 reckonings. A consequence most playthroughs
+  // never see is not a consequence, and the bottleneck was not the odds
+  // or the waiting -- it was how few choices carried any risk at all.
+
+  {
+    id: 'neighbour-returns',
+    speaker: 'neighbor',
+    followUp: true,
+    when: (c) => (c.haunted('neighbour-complaint', 1, 10) || c.haunted('neighbour-complaint', 2, 10))
+      && !c.answered('neighbour-returns'),
+    prompt: "The $500 covered the first pane of glass. It did not cover the second, the car, or the afternoon my wife spent picking it out of the lawn. We are past panes of glass now.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Net it, properly, this week',
+        cost: '$11,200 — nearly four times the netting would have cost first time — and it ends there.',
+        effects: { money: -11200, goodwill: { locals: 3 } },
+      },
+      {
+        stance: 'defiant',
+        label: 'Let it go to the solicitors',
+        cost: 'Free today. $520 a day for 16 days once it starts — cheaper than the netting, and the local paper enjoys every week of it.',
+        effects: {
+          prestige: -5,
+          goodwill: { locals: -9 },
+          condition: {
+            id: 'neighbour-suit-live', label: 'Solicitors involved',
+            note: 'A neighbour, a solicitor, and a stack of photographs of a conservatory.',
+            days: 16, dailyMoney: 520, demandFactor: 0.93,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'pace-complaints-after',
+    speaker: 'gazette',
+    followUp: true,
+    when: (c) => c.haunted('pace-complaints', 2, 9) && !c.answered('pace-complaints-after'),
+    prompt: "The groups you apologised to have found each other online, and between them they have written rather more than an apology would have cost.",
+    choices: [
+      {
+        stance: 'principled',
+        label: 'Refund every one of them now',
+        cost: '$3,800 — four times the original refunds — and it stops there. Locals goodwill +7.',
+        effects: { money: -3800, goodwill: { locals: 7, serious: 4 } },
+      },
+      {
+        stance: 'commercial',
+        label: 'Ride it out',
+        cost: 'Free, and turnout runs about a quarter down for 12 days while it circulates.',
+        effects: {
+          prestige: -4,
+          condition: {
+            id: 'pace-pile-on', label: 'Word is out on the pace',
+            note: 'Eleven of them, all saying the same thing, in the same place.',
+            days: 12, demandFactor: 0.76,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'kitchen-appeal-after',
+    speaker: 'cityRep',
+    followUp: true,
+    when: (c) => c.haunted('kitchen-inspection', 1, 10) && !c.answered('kitchen-appeal-after'),
+    prompt: "The appeal was heard and the appeal was refused. The refit you were avoiding is now a refit with a deadline attached to it.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Do the refit',
+        cost: '$11,900 — $3,400 more than it was — and nobody eats here for 5 days.',
+        effects: {
+          money: -11900,
+          condition: {
+            id: 'kitchen-shut', label: 'Kitchen closed',
+            note: 'The refit, finally, with an inspector waiting on it.',
+            days: 5, demandFactor: 0.82,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'Keep the kitchen shut instead',
+        cost: 'Free, and the kitchen stays closed for 18 days. Everything a golfer might have eaten here, they eat somewhere else.',
+        effects: {
+          goodwill: { locals: -7, destination: -5 },
+          condition: {
+            id: 'kitchen-closed-long', label: 'Kitchen closed indefinitely',
+            note: 'Cheaper than the refit, and everybody can see the shutters.',
+            days: 18, demandFactor: 0.8,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'blight-after',
+    speaker: 'keeper',
+    followUp: true,
+    when: (c) => c.haunted('greens-blight', 1, 10) && !c.answered('blight-after'),
+    prompt: "The three we treated are fine. It is in the other six now, and in the practice green, and I would like it noted that I said which ones it was in at the time.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Treat everything, properly',
+        cost: '$17,000 — more than doing all nine would have been — and about 2 points of turf a day for 9 days while it takes.',
+        effects: {
+          money: -17000,
+          condition: {
+            id: 'blight-treatment', label: 'Whole course under treatment',
+            note: 'All nine and the practice green, at last.',
+            days: 9, turfPerDay: -2,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Live with it',
+        cost: 'Free. About 3.2 points of turf a day for 20 days, which is most of a course.',
+        effects: {
+          condition: {
+            id: 'blight-everywhere', label: 'Blight, everywhere',
+            note: 'Nine greens and the practice green, untreated, in summer.',
+            days: 20, turfPerDay: -3.2,
+          },
+        },
+      },
+    ],
+  },
+
 ];
 
 /** How many recently-offered events to remember before recycling. Smaller
@@ -1493,7 +1828,26 @@ export function pickEvent(context, rng, recentIds = []) {
   });
   if (eligible.length === 0) return null;
 
+  /**
+   * A reckoning jumps the queue.
+   *
+   * Follow-ups compete with everything else for a slot, and there are
+   * forty-odd events to compete with. Measured before this existed, a
+   * player who took every cheap option across ninety days saw 2.2 risky
+   * choices and **0.2 reckonings** -- the consequence was eligible and
+   * then simply never got picked, which is indistinguishable from the
+   * mechanic not working.
+   *
+   * So anything marked `followUp` is drawn from first. It is already rare
+   * by construction: it needs the parent event to have fired, the cheap
+   * option to have been taken, the roll to have gone against the player,
+   * and a fortnight to have passed. Making it also win a lottery against
+   * every other event was one gate too many.
+   */
   const recent = new Set(recentIds);
+  const reckonings = eligible.filter((event) => event.followUp);
+  if (reckonings.length > 0) return reckonings[rng.int(reckonings.length)];
+
   const unseen = eligible.filter((event) => !recent.has(event.id));
   const pool = unseen.length > 0 ? unseen : eligible;
 
