@@ -222,8 +222,11 @@ test('the pricing sheet says plainly whether the course will back up, naming the
 
   intervalSlider.value = '30'; // the slider's own maximum — should be clear
   intervalSlider.fireInput();
-  const clear = host.body.findAll((n) => n.textContent === 'No backup expected.')[0];
-  assert.ok(clear, 'expected "No backup expected." at the longest possible interval');
+  // Matched rather than compared exactly: the line now also names how
+  // long the slowest hole takes, so that a marshal moving it by a minute
+  // is visible. The verdict is still the part being asserted here.
+  const clear = host.body.findAll((n) => n.textContent.includes('No backup expected.'))[0];
+  assert.ok(clear, 'expected a "No backup expected." verdict at the longest possible interval');
 });
 
 test('the green fee ceiling follows what a round is worth', () => {
@@ -303,4 +306,54 @@ test('the "full" line updates live when the green fee slider moves, not just the
 
   const full = host.body.findAll((n) => n.textContent.includes('full'));
   assert.ok(full.length > 0, 'dropping the fee alone should be enough to fill the tee sheet');
+});
+
+// --- The pace line has to move when the pace does ----------------------
+
+/**
+ * Reported from play: "the marshal lowers pace but doesn't change logic
+ * on the screen where you pick your timing."
+ *
+ * The marshal factor WAS being applied to the forecast. The problem was
+ * what the screen did with it: `paceConsequence` returns `backup` as
+ * `interval < slowestMinutes`, a boolean, and on the opening course the
+ * slowest hole runs 18.2 minutes against a tee interval in single
+ * figures. So `backup` was true at nought marshals and true at three,
+ * the sentence was word-for-word identical, and the 2.2 minutes the
+ * marshals actually took off the hole appeared nowhere.
+ *
+ * A correct number that never reaches the screen is indistinguishable
+ * from a broken one. The figure is now named.
+ */
+function pricingText(state) {
+  const host = fakeSheetHost();
+  openPricingSheet(host, { state, onChange: () => {} });
+  return host.body.textContent;
+}
+
+test('the pricing sheet names how long the slowest hole takes', () => {
+  const text = pricingText(newGame(1));
+  assert.match(text, /\d+\.\d min/,
+    'the forecast has to show a figure, not just whether it bites');
+});
+
+test('hiring marshals visibly changes the pace forecast', () => {
+  const bare = newGame(1);
+  const staffed = newGame(1);
+  staffed.resort.staff.push({ role: 'marshal' }, { role: 'marshal' });
+
+  const before = pricingText(bare);
+  const after = pricingText(staffed);
+  assert.notEqual(before, after,
+    'two marshals change the day and must change the screen that forecasts it');
+  assert.match(after, /marshals are already holding that down/,
+    'and the sheet should say what they are doing for it');
+});
+
+test('paceConsequence reports the minutes, not only the verdict', () => {
+  const result = paceConsequence(8, [7.5, 12.25, 9]);
+  assert.equal(result.slowestMinutes, 12.25,
+    'the figure has to survive to the caller or no screen can show it');
+  assert.equal(result.slowestIndex, 1);
+  assert.equal(result.backup, true);
 });

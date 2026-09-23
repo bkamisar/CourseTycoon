@@ -16,7 +16,7 @@
  */
 import { PALETTE } from '../render/palette.js';
 import { CONDITIONS } from '../sim/weather.js';
-import { MEASURE_LABEL } from '../sim/investors.js';
+import { MEASURE_LABEL, measureNow } from '../sim/investors.js';
 
 /** A target, in the units the measure is actually in. An occupancy of
  * 0.62 shown as "0.62" is the interface handing the player a ratio when
@@ -142,6 +142,85 @@ function breakdownSection(parent, heading, figures, labels, totalLabel) {
   breakdownRow(parent, totalLabel, figures.total, { total: true });
 }
 
+/** A 0..1 bar. Used for both the target gauge and confidence, so the two
+ * read as the same kind of thing: something with a level. */
+function meter(fraction, { danger = false } = {}) {
+  const track = document.createElement('div');
+  track.className = 'report-meter';
+  const fill = document.createElement('div');
+  fill.className = danger ? 'report-meter-fill report-meter-fill--bad' : 'report-meter-fill';
+  fill.style.width = `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
+  track.appendChild(fill);
+  return track;
+}
+
+/**
+ * The standing target, stated as loudly as it deserves.
+ *
+ * `progress` may be null on an old save whose report predates it, in
+ * which case this falls back to the sentence that was there before rather
+ * than rendering a gauge with nothing in it.
+ */
+function targetBlock(target, progress) {
+  const block = document.createElement('div');
+  block.className = 'report-target';
+
+  const kicker = document.createElement('div');
+  kicker.className = 'report-target-kicker';
+  kicker.textContent = 'WHAT THE INVESTORS WANT';
+
+  const headline = document.createElement('div');
+  headline.className = 'report-target-headline';
+  headline.textContent =
+    `${MEASURE_LABEL[target.measure]} of ${formatTarget(target.measure, target.threshold)}`;
+
+  block.append(kicker, headline);
+
+  if (!progress) {
+    const plain = document.createElement('div');
+    plain.className = 'report-target-stand';
+    plain.textContent = `By day ${target.dueDay}.`;
+    block.appendChild(plain);
+    return block;
+  }
+
+  const share = progress.threshold > 0 ? progress.now / progress.threshold : 1;
+  const met = progress.now >= progress.threshold;
+
+  block.appendChild(meter(share, { danger: !met && progress.daysLeft <= 3 }));
+
+  const stand = document.createElement('div');
+  stand.className = met ? 'report-target-stand report-target-stand--met' : 'report-target-stand';
+  stand.textContent = met
+    ? `You are at ${formatTarget(progress.measure, progress.now)} — clear of it.`
+    : `You are at ${formatTarget(progress.measure, progress.now)} — short.`;
+
+  const clock = document.createElement('div');
+  clock.className = 'report-target-clock';
+  clock.textContent = progress.daysLeft === 0
+    ? `Reviewed today, on day ${progress.dueDay}.`
+    : `${progress.daysLeft} ${progress.daysLeft === 1 ? 'day' : 'days'} to go — reviewed on day ${progress.dueDay}.`;
+
+  block.append(stand, clock);
+  return block;
+}
+
+/** Confidence, as a level rather than a number in a sentence. */
+function confidenceBlock(confidence) {
+  const block = document.createElement('div');
+  block.className = 'report-confidence';
+  const row = document.createElement('div');
+  row.className = 'report-confidence-row';
+  const label = document.createElement('span');
+  label.textContent = 'Investor confidence';
+  const value = document.createElement('span');
+  value.className = 'report-confidence-value';
+  value.textContent = `${Math.round(confidence)} / 100`;
+  row.append(label, value);
+  block.append(row, meter(confidence / 100, { danger: confidence < 35 }));
+  return block;
+}
+
 export function crowdRows(report, previous) {
   const total = SEGMENT_KEYS.reduce((s, key) => s + report.crowd[key].count, 0);
   const prevTotal = previous
@@ -247,6 +326,24 @@ export function computeReportData(state, report) {
     weather: report.weather,
     hotel: report.hotel,
     investors: report.investors,
+    // Where the resort actually stands against the target it was given.
+    //
+    // The target was stated and the player's position against it was not,
+    // so "prestige of at least 53 by day 15" was a demand with no gauge
+    // attached -- the same gap the hotel's money had. `measureNow` is the
+    // function the review itself will use, so this cannot read one number
+    // while the investors judge another.
+    targetProgress: (() => {
+      const target = report.investors?.target;
+      if (!target) return null;
+      return {
+        measure: target.measure,
+        threshold: target.threshold,
+        now: measureNow(target.measure, { report, state }),
+        dueDay: target.dueDay,
+        daysLeft: Math.max(0, target.dueDay - state.day),
+      };
+    })(),
     act: state.act ?? 1,
     investorsArrived: report.investorsArrived ?? false,
     gate: {
@@ -452,6 +549,34 @@ function injectStyles() {
     }
     .report-hotel-occ { color: ${PALETTE.WHITE}; font-size: 14px; }
     .report-hotel-target { color: ${PALETTE.ACCENT}; }
+    .report-target {
+      margin-top: 10px;
+      padding: 10px;
+      border-left: 3px solid ${PALETTE.ACCENT};
+      background: ${PALETTE.UI_DARK};
+      border-radius: 0 6px 6px 0;
+    }
+    .report-target-kicker {
+      color: ${PALETTE.ACCENT}; font-size: 9px; letter-spacing: 1.5px;
+    }
+    .report-target-headline {
+      color: ${PALETTE.WHITE}; font-size: 17px; margin-top: 3px;
+    }
+    .report-target-stand { color: ${PALETTE.SAND}; font-size: 12px; margin-top: 5px; }
+    .report-target-stand--met { color: ${PALETTE.FAIRWAY}; }
+    .report-target-clock { color: ${PALETTE.UI_LIGHT}; font-size: 11px; margin-top: 2px; }
+    .report-meter {
+      height: 8px; margin-top: 8px; border-radius: 4px; overflow: hidden;
+      background: ${PALETTE.OUTLINE};
+    }
+    .report-meter-fill { display: block; height: 100%; background: ${PALETTE.ACCENT}; }
+    .report-meter-fill--bad { background: ${PALETTE.SAND}; }
+    .report-confidence { margin-top: 10px; }
+    .report-confidence-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      color: ${PALETTE.UI_LIGHT}; font-size: 12px;
+    }
+    .report-confidence-value { color: ${PALETTE.WHITE}; }
     .report-hotel-conf { color: ${PALETTE.UI_LIGHT}; }
     .report-hotel-good { color: ${PALETTE.FAIRWAY}; }
     .report-hotel-bad { color: ${PALETTE.SAND}; }
@@ -628,19 +753,19 @@ export function mountReport(root, { state, report, onContinue } = {}) {
     if (inv?.target) {
       // The promise the whole design rests on: you are told the target at
       // the start of the period it covers, never at the review.
-      const ahead = document.createElement('div');
-      ahead.className = 'report-hotel-target';
-      ahead.textContent =
-        `Next: ${MEASURE_LABEL[inv.target.measure]} of at least `
-        + `${formatTarget(inv.target.measure, inv.target.threshold)} by day ${inv.target.dueDay}.`;
-      hotel.appendChild(ahead);
+      //
+      // It used to be one grey line -- "Next: prestige of at least 53 by
+      // day 15" -- for the thing the entire act is about, and it stated
+      // the demand without saying where the resort stood against it.
+      // Reported from play as "hotel goals need to be more explicit, it's
+      // just a little line at the top". It is now the loudest thing on
+      // the block, with a gauge, because a target with no gauge is a
+      // number to be surprised by rather than played toward.
+      hotel.appendChild(targetBlock(inv.target, data.targetProgress));
     }
 
     if (inv && typeof inv.confidence === 'number' && !inv.bought) {
-      const conf = document.createElement('div');
-      conf.className = 'report-hotel-conf';
-      conf.textContent = `Investor confidence ${Math.round(inv.confidence)} of 100`;
-      hotel.appendChild(conf);
+      hotel.appendChild(confidenceBlock(inv.confidence));
     }
 
     if (inv?.buyoutDemand) {

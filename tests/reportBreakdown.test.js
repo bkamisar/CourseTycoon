@@ -6,7 +6,8 @@ import { runDay } from '../src/sim/day.js';
 import { startingInvestors } from '../src/sim/investors.js';
 import { makeRng } from '../src/sim/rng.js';
 
-const { mountReport } = await import('../src/ui/report.js');
+const { mountReport, computeReportData } = await import('../src/ui/report.js');
+const { measureNow } = await import('../src/sim/investors.js');
 const { FakeNode } = await import('./helpers/fakeDom.js');
 
 /**
@@ -164,4 +165,56 @@ test('the day Act I is completed still says so', () => {
   const titles = sectionTitles(state, report);
   assert.ok(titles.some((t) => /Complete/.test(t)),
     `the day the gate is passed must be celebrated; got ${titles.join(' / ')}`);
+});
+
+// --- The investors' target, stated loudly enough -----------------------
+
+/**
+ * Reported from play: "hotel goals need to be more explicit, it's just a
+ * little line at the top. If they're the whole point of act 2 then we
+ * should be calling it out more dramatically."
+ *
+ * Fair, and there was a second problem underneath the presentation one:
+ * the line stated the demand and never said where the resort stood
+ * against it. "Prestige of at least 53 by day 15" is a number to be
+ * surprised by rather than a thing to play toward. The gauge reads from
+ * `measureNow`, which is the same function the review itself uses, so the
+ * screen cannot show one number while the investors judge another.
+ */
+test('the recap says where the resort stands against the target, not just the target', () => {
+  const { state, report } = act2Day();
+  assert.ok(report.investors?.target, 'sanity: this resort has a standing target');
+
+  const data = computeReportData(state, report);
+  assert.ok(data.targetProgress, 'progress toward the target has to be computed');
+  assert.equal(data.targetProgress.measure, report.investors.target.measure);
+  assert.equal(data.targetProgress.threshold, report.investors.target.threshold);
+
+  const root = new FakeNode('div');
+  mountReport(root, { state, report, onContinue() {} });
+  const text = root.textContent;
+  assert.match(text, /You are at /,
+    'the screen has to say where you stand, or the target is just a demand');
+  assert.match(text, /to go|Reviewed today/,
+    'and how long is left to do something about it');
+});
+
+test('the target gauge reads the same number the review will', () => {
+  // The disagreement this project produces more than any other. The
+  // review calls measureNow; if the gauge computed its own version the
+  // player could be shown 60% and judged on something else.
+  const { state, report } = act2Day();
+  const data = computeReportData(state, report);
+  const judged = measureNow(report.investors.target.measure, { report, state });
+  assert.equal(data.targetProgress.now, judged,
+    'the gauge and the review must be reading the same function');
+});
+
+test('confidence is shown as a level, not buried in a sentence', () => {
+  const { state, report } = act2Day();
+  const root = new FakeNode('div');
+  mountReport(root, { state, report, onContinue() {} });
+  const meters = root.findAll((n) => n.className === 'report-meter');
+  assert.ok(meters.length >= 2,
+    'both the target and confidence should read as something with a level');
 });

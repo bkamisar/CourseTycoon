@@ -187,6 +187,12 @@ function injectStyles() {
     .panel-consequence strong {
       color: ${PALETTE.WHITE};
     }
+    .panel-consequence-note {
+      color: ${PALETTE.ACCENT};
+      font-size: 11px;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -786,16 +792,52 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
           )
         );
 
+        // The slowest hole's time is named, not just whether it bites.
+        //
+        // This line used to be a yes/no: `backup` is `interval <
+        // slowestMinutes`, so hiring a marshal moved the slowest hole
+        // from (say) 9.4 minutes to 8.6 and the sentence did not change
+        // unless the tee interval happened to sit between the two. The
+        // marshal factor was applied correctly and was invisible, which
+        // to a player is indistinguishable from it not working -- and is
+        // what they reported. Showing the figure makes every marshal, and
+        // every edit to a slow hole, move something on screen.
         const pace = paceConsequence(interval, holeMinutesByIndex);
         const paceLine = document.createElement('div');
-        if (!pace.backup) {
-          paceLine.textContent = 'No backup expected.';
+        const slowest = pace.slowestMinutes.toFixed(1);
+        if (pace.slowestIndex === null) {
+          paceLine.textContent = 'No holes open yet.';
+        } else if (!pace.backup) {
+          const strongMin = document.createElement('strong');
+          strongMin.textContent = `${slowest} min`;
+          paceLine.append(
+            'Your slowest hole takes ', strongMin,
+            `, inside the ${interval}-minute gap. No backup expected.`,
+          );
         } else {
+          const strongMin = document.createElement('strong');
+          strongMin.textContent = `${slowest} min`;
           const strongHole = document.createElement('strong');
           strongHole.textContent = ordinal(pace.slowestIndex + 1);
-          paceLine.append('Groups will back up on the ', strongHole, '.');
+          paceLine.append(
+            'The ', strongHole, ' takes ', strongMin,
+            ` and you are teeing every ${interval}. Groups will back up there.`,
+          );
         }
         intervalConsequence.appendChild(paceLine);
+
+        // What the marshals are already doing for that figure, so the
+        // hire has a visible price and a visible effect in the same
+        // sentence.
+        if (marshals > 0) {
+          const help = document.createElement('div');
+          help.className = 'panel-consequence-note';
+          const without = pace.slowestMinutes / paceFactor;
+          help.textContent =
+            `${marshals} ${marshals === 1 ? 'marshal is' : 'marshals are'} already holding that down `
+            + `from ${without.toFixed(1)} min.`;
+          intervalConsequence.appendChild(help);
+        }
 
         // The one moment more perceived value (a new amenity, a lower
         // fee) stops helping: the tee sheet is already full. Below this,

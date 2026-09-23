@@ -31,13 +31,20 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23a';
+export const BUILD = '2026-09-23b';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23b',
+    notes: [
+      'The investors’ target is now the loudest thing on the evening report, with a gauge showing where you actually stand against it and how long is left. It used to state the demand and never say whether you were near it.',
+      'The tee-time screen now tells you how long your slowest hole takes, rather than only whether it will back up. Marshals were always shortening it and the sentence never changed — on the opening course they take it from 18.2 minutes to 16.0 and you could not see any of that.',
+    ],
+  },
   {
     version: '2026-09-23a',
     notes: [
