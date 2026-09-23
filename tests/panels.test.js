@@ -294,7 +294,11 @@ test('the "full" line updates live when the green fee slider moves, not just the
   // An eighteen-hole course at prestige 95 with every amenity is worth a
   // great deal more than the nine this fixture used to build, so the fee
   // that suppresses demand below capacity had to rise with it.
-  state.resort.pricing.greenFee = 320;
+  // Demand no longer scales with the size of the tee sheet (see
+  // INTEREST_SCALE in economy.js), so a busy fixture stays busy at a fee
+  // that used to empty it. Raised to a price that genuinely suppresses
+  // this crowd rather than one that used to.
+  state.resort.pricing.greenFee = 520;
   const host = fakeSheetHost();
   openPricingSheet(host, { state, onChange: () => {} });
   assert.equal(host.body.findAll((n) => n.textContent.includes('full')).length, 0, 'high fee should keep demand under capacity');

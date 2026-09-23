@@ -22,13 +22,20 @@
  * hand over -- satisfaction 60 against an optimum that produced 70 -- so
  * all four conditions fell out of playing greedily, and the gate opened on
  * day 13.
+ *
+ * The satisfaction line is the one doing the work and is the one that
+ * stays. Money, prestige and the holding period were all cut roughly in
+ * half afterwards, because an act that takes a competent operator eighty
+ * to a hundred days to finish is not difficult, it is long -- and length
+ * is a worse problem than ease, since the player experiences it before
+ * they experience anything else.
  */
 export const GATE_THRESHOLDS = {
   holesOpen: 9,
-  money: 75000,
-  prestige: 50,
+  money: 40000,
+  prestige: 42,
   satisfaction: 72,
-  satisfactionDays: 10,
+  satisfactionDays: 7,
 };
 
 /**

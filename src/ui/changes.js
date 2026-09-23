@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23j';
+export const BUILD = '2026-09-23k';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23k',
+    notes: [
+      'How many people want to play here no longer depends on how many tee times you print. Your reputation decides how many want to come; your tee sheet only decides how many of them get on. A quiet, unhurried course was being punished twice before — once for selling fewer rounds and again for being less wanted because it sold fewer rounds — and it is now the fastest way to reach Act II rather than a way to go broke.',
+      'Holes cost $8,500 instead of $12,000, so building the course out is no longer most of the act.',
+      'There is more than one right answer again. A pleasant expensive course, a busy cheap one and a middle road all work, on different timescales. Going too cheap or too expensive still does not.',
+    ],
+  },
   {
     version: '2026-09-23j',
     notes: [

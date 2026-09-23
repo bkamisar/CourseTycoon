@@ -46,6 +46,7 @@ import { runDay, applyEventChoice } from '../src/sim/day.js';
 import { makeHole } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { AMENITIES, BUILD_COSTS } from '../src/sim/economy.js';
+import { GATE_THRESHOLDS } from '../src/sim/acts.js';
 import { EVENTS } from '../src/sim/events.js';
 import { menuPrep } from '../src/sim/menu.js';
 import { kitchenCapacity, kitchenLoad } from '../src/sim/kitchen.js';
@@ -157,9 +158,19 @@ function spendTheMorning(state, { greenFee, teeInterval }) {
     return;
   }
 
-  // 3. Finish the course.
+  // 3. Finish the course — the FRONT nine, and no further.
+  //
+  // This used to build every stub `newGame` lays out, which is eighteen.
+  // The Act I gate asks for nine, and the back nine is an Act II unlock
+  // that no player could even reach until today; building it doubles
+  // upkeep and doubles the traffic wearing the course, for nothing. It
+  // showed up as soon as holes got cheaper: the operator simply
+  // over-built faster and the busy strategies went from surviving to
+  // bankrupt in five or six seeds out of eight. A tool that spends money
+  // no player would spend is not measuring the game.
   const stubs = state.resort.courses[0].holes;
-  const nextStub = stubs.findIndex((h) => !h.corridor || h.corridor.length < 2);
+  const buildLimit = (state.act ?? 1) >= 2 ? stubs.length : GATE_THRESHOLDS.holesOpen;
+  const nextStub = stubs.findIndex((h, i) => i < buildLimit && (!h.corridor || h.corridor.length < 2));
   if (nextStub >= 0 && state.money > BUILD_COSTS.hole + BUFFER) {
     state.money -= BUILD_COSTS.hole;
     stubs[nextStub] = {

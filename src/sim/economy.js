@@ -1,6 +1,14 @@
 import { maxGroupsForDay } from './schedule.js';
 import { clamp } from './hole.js';
 import { catchmentGroups } from './catchment.js';
+
+/**
+ * How close a resort with everything going for it gets to filling its
+ * catchment. Above 1 because `appeal` and `pull` rarely both sit near
+ * their maximum, and a good resort on a good day should be able to run
+ * out of tee times rather than run out of people.
+ */
+const INTEREST_SCALE = 2.1;
 import { crowdMix, SEGMENT_KEYS } from './segments.js';
 import { MENU_SLOTS, menuPull, menuBasket, menuCogs } from './menu.js';
 
@@ -203,11 +211,31 @@ export function demandGroups({
   const pull = reputationPull * wordOfMouth * weather * conditionFactor;
 
   const capacity = maxGroupsForDay(teeInterval);
+  const ceiling = catchmentGroups(prestige, rooms);
 
+  /**
+   * How many people WANT to come, which is not a fact about the tee
+   * sheet.
+   *
+   * This used to be `capacity * appeal * pull` — demand strictly
+   * proportional to the number of tee times printed. A 20-minute interval
+   * has 40% fewer slots than a 12-minute one and therefore generated 40%
+   * fewer golfers before anything else was considered, so a pleasant,
+   * unhurried course was punished twice: once for selling fewer rounds
+   * and again for being less wanted because it sold fewer rounds. Wide
+   * intervals went bankrupt in 6 to 8 seeds out of 8 and Act I had one
+   * viable line.
+   *
+   * Interest now comes from the catchment — the people who exist and how
+   * far your reputation reaches — and the tee sheet only decides how many
+   * of them can be seated. That makes the interval an honest trade: a
+   * narrow one seats more of the crowd and makes every one of them wait,
+   * a wide one turns some away and sends the rest home happy.
+   */
   const rawBySegment = {};
   let rawTotal = 0;
   for (const key of SEGMENT_KEYS) {
-    const raw = capacity * appeal[key] * pull;
+    const raw = ceiling * appeal[key] * pull * INTEREST_SCALE;
     rawBySegment[key] = raw;
     rawTotal += raw;
   }
@@ -218,16 +246,11 @@ export function demandGroups({
    * `capacity` is how many groups the tee sheet holds — the player's
    * choice of interval against the length of a day. `ceiling` is how many
    * golfers exist to be had, which reputation widens and which no tee
-   * sheet can conjure.
-   *
-   * Only the first of these used to exist, so demand was strictly
-   * proportional to the tee sheet and a wider interval produced
-   * proportionally more golfers on top of the satisfaction it bought.
-   * That loop had nothing pushing back on it: the optimum passed the Act
-   * I gate on day 13 and finished ninety days with ten times the money
-   * the gate asked for. See `src/sim/catchment.js`.
+   * sheet can conjure. A screen that cannot tell the player which of
+   * these is binding is telling them nothing, because "you are turning
+   * people away" and "nobody else is coming" call for opposite
+   * decisions — see `limitedBy` below.
    */
-  const ceiling = catchmentGroups(prestige, rooms);
   const wanted = Math.round(rawTotal);
   // Floored, because a catchment is a real number and a group of golfers
   // is not: clamping straight to it produced 21.49 groups, which then
@@ -371,8 +394,28 @@ export function demolitionRefund(type) {
   return Math.round((AMENITIES[type]?.build ?? 0) * DEMOLITION_REFUND);
 }
 
+/**
+ * `hole` was 12,000, and six of them is the whole of Act I.
+ *
+ * Measured, a competent operator took 65 to 96 days to reach Act II, and
+ * almost none of that was the gate -- halving the gate's money, prestige
+ * and holding period moved the best strategy by fourteen days. What it
+ * was actually doing was saving up: $72,000 of building funded by the
+ * income of a three-hole course, one hole at a time.
+ *
+ * An act whose length is set by an accumulation rate is long rather than
+ * hard, and the player meets its length before they meet anything else in
+ * it.
+ *
+ * The floor is set by something three files away: `rebuildCost` in
+ * `src/ui/editor.js` is this figure minus whatever the hole's hazards are
+ * worth, and the most any template has invested is $7,857. Drop below
+ * that and a heavily bunkered hole can be rebuilt for nothing, or for a
+ * payout -- build hazards, rebuild, collect. A first attempt at 6,500 did
+ * exactly that, and only an existing test caught it.
+ */
 export const BUILD_COSTS = Object.freeze({
-  hole: 12000,
+  hole: 8500,
   bunker: 800,
   pond: 2500,
   trees: 300,

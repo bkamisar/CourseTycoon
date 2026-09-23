@@ -42,7 +42,7 @@ import { clamp } from './hole.js';
  * earn the same money to the dollar. A ceiling is meant to stop a good
  * resort compounding without limit, not to stop a new one growing at all.
  */
-export const LOCAL_GROUPS = 13;
+export const LOCAL_GROUPS = 18;
 
 /**
  * How many more groups a perfect reputation can reach, on top of the
