@@ -39,6 +39,27 @@ investor target is what the player is now playing to.
 (`formatTarget` in `src/ui/report.js`) — the goals surface needs to switch
 to it rather than showing both.
 
+### Act I's central tension may have gone
+
+**Found:** 2026-09-23, while fixing the measurement fixtures. **Open —
+needs a balance run before anything is changed.**
+
+The Act I gate is built on the premise that a packed, unpleasant course
+out-earns a pleasant one, so a player optimising for money will never
+cross the satisfaction line. Re-measured on a course that is actually
+nine holes, that is backwards by about four times:
+
+    tee every  6 min -> satisfaction 30, profit   $918/day
+    tee every 20 min -> satisfaction 69, profit $4,097/day
+
+The old figure was taken on a fixture that claimed to be a nine and built
+eighteen, and it predates the word-of-mouth change that made a good
+reputation compound. One seed, one fixture, no operator — a signal, not a
+conclusion. `tools/balance.js` is what settles it. The reasoning in
+`src/sim/acts.js` now carries these numbers and says so.
+
+If it holds, Act I is too easy and the gate is not really a gate.
+
 ### Hotel amenities not visible
 
 **Found:** first Act II playthrough, 2026-09-21. **Probably not a bug.**
