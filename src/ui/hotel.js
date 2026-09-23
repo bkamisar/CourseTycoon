@@ -23,6 +23,7 @@ import {
   HOTEL_AMENITIES, HOTEL_AMENITY_IDS, hotelUpkeep,
 } from '../sim/hotelAmenities.js';
 import { amenity } from '../sim/state.js';
+import { payBuyout } from '../sim/investors.js';
 
 /** What demolishing anything returns, matching the Act I amenity panel
  * and the room steppers below: a mistake should cost something without
@@ -80,6 +81,32 @@ function injectStyles() {
     .hotel-slider { width: 100%; height: 44px; }
     .hotel-suite-rate { color: ${PALETTE.UI_LIGHT}; font-size: 11px; margin-top: 2px; }
 
+    .hotel-settle {
+      border: 1px solid ${PALETTE.SAND};
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-family: monospace;
+      background: ${PALETTE.UI_DARK};
+    }
+    .hotel-settle-kicker {
+      color: ${PALETTE.SAND}; font-size: 10px; letter-spacing: 1px;
+    }
+    .hotel-settle-title { color: ${PALETTE.WHITE}; font-size: 15px; margin-top: 4px; }
+    .hotel-settle-body {
+      color: ${PALETTE.UI_LIGHT}; font-size: 12px; line-height: 1.6; margin-top: 6px;
+    }
+    .hotel-settle-clock { color: ${PALETTE.SAND}; font-size: 12px; margin-top: 6px; }
+    .hotel-settle-btn {
+      margin-top: 10px; width: 100%; min-height: 44px;
+      background: ${PALETTE.ACCENT}; color: ${PALETTE.OUTLINE};
+      border: none; border-radius: 8px;
+      font-family: monospace; font-size: 14px; cursor: pointer;
+    }
+    .hotel-settle-btn:disabled {
+      background: none; color: ${PALETTE.UI_LIGHT};
+      border: 1px solid ${PALETTE.UI_LIGHT}; cursor: default;
+    }
     .hotel-heading {
       color: ${PALETTE.WHITE}; font-family: monospace; font-size: 14px;
       margin: 18px 0 2px;
@@ -145,6 +172,72 @@ function occupancyLine(report) {
     ? ` ${turnedAway} more wanted a bed and could not get one.`
     : '';
   return `Last night: ${sold} of ${capacity} rooms filled (${pct}%).${turned}`;
+}
+
+/**
+ * The investors' standing demand, and the button that settles it.
+ *
+ * Both endings of Act II ran through `payBuyout` and `forceLiquidation`,
+ * and neither was called from anywhere. The demand was announced on the
+ * day recap and then stood forever with nothing the player could do about
+ * it. This is the missing half: the report says it has happened, and this
+ * is where it is acted on, reachable on any day rather than only on the
+ * morning it was raised.
+ *
+ * The two kinds read completely differently on purpose. One is a debt
+ * being called in; the other is the resort earning the right to own
+ * itself.
+ */
+function settlementCard(state, commit) {
+  const demand = state.investors?.buyoutDemand;
+  if (!demand) return null;
+
+  const offer = demand.kind === 'offer';
+  const card = document.createElement('div');
+  card.className = 'hotel-settle';
+
+  const kicker = document.createElement('div');
+  kicker.className = 'hotel-settle-kicker';
+  kicker.textContent = offer ? 'AN OFFER' : 'THEY WANT OUT';
+
+  const title = document.createElement('div');
+  title.className = 'hotel-settle-title';
+  title.textContent = offer
+    ? `Buy them out for $${demand.amount.toLocaleString()}`
+    : `They want $${demand.amount.toLocaleString()} back`;
+
+  const body = document.createElement('div');
+  body.className = 'hotel-settle-body';
+  body.textContent = offer
+    ? 'The hotel has done well enough for long enough that they will sell you their stake. Pay it and the place is yours: no more reviews, no more targets, no more confidence to keep up.'
+    : 'Confidence ran out. Pay them off and the hotel is yours anyway. Let the deadline pass and they will sell rooms out from under you to get their money back.';
+
+  const left = demand.dueDay - (state.day ?? 0);
+  const clock = document.createElement('div');
+  clock.className = 'hotel-settle-clock';
+  clock.textContent = left <= 0
+    ? 'Due today.'
+    : `${left} ${left === 1 ? 'day' : 'days'} left — due on day ${demand.dueDay}.`;
+
+  card.append(kicker, title, body, clock);
+
+  const pay = document.createElement('button');
+  pay.type = 'button';
+  pay.className = 'hotel-settle-btn';
+  const affordable = (state.money ?? 0) >= demand.amount;
+  pay.disabled = !affordable;
+  pay.textContent = affordable
+    ? `Pay $${demand.amount.toLocaleString()}`
+    : `$${(demand.amount - (state.money ?? 0)).toLocaleString()} short`;
+  pay.addEventListener('click', () => {
+    // payBuyout refuses rather than overdrawing, so a state that comes
+    // back unchanged means it was not affordable after all. Committing it
+    // anyway would leave the screen claiming a sale that did not happen.
+    const next = payBuyout(state);
+    if (next.investors?.bought) commit(next);
+  });
+  card.appendChild(pay);
+  return card;
 }
 
 /** Who an amenity is for, in the fewest words that fit on a badge. */
@@ -301,6 +394,15 @@ export function openHotelSheet(sheetHost, { state, onChange }) {
     render(body) {
       function rerender() {
         body.replaceChildren();
+
+        // First, because a fortnight's deadline outranks a room count.
+        const settle = settlementCard(current, (next) => {
+          current = next;
+          onChange(current);
+          rerender();
+        });
+        if (settle) body.appendChild(settle);
+
         const counts = roomCounts(current.resort.rooms);
         const rate = current.resort.pricing.roomRate ?? 0;
 

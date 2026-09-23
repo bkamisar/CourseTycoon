@@ -31,13 +31,20 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-21e';
+export const BUILD = '2026-09-23a';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23a',
+    notes: [
+      'Act II has an ending now. When the investors offer to sell you their stake, or demand their money back, there is a button on the Hotel screen to actually settle it — there was not one before, so the demand simply stood there forever.',
+      'And the deadline is real. Let a demand run out and they will sell rooms to get their money back. An offer that runs out only lapses: a hotel good enough to be offered a buyout will not be broken up for failing to have the cash that fortnight, and the offer comes round again if you keep the reviews good.',
+    ],
+  },
   {
     version: '2026-09-21e',
     notes: [

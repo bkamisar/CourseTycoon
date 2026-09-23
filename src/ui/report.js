@@ -645,11 +645,43 @@ export function mountReport(root, { state, report, onContinue } = {}) {
 
     if (inv?.buyoutDemand) {
       const demand = document.createElement('div');
-      demand.className = 'report-hotel-bad';
+      demand.className = inv.buyoutDemand.kind === 'offer'
+        ? 'report-hotel-good' : 'report-hotel-bad';
       demand.textContent = inv.buyoutDemand.kind === 'offer'
         ? `They will sell you their stake for $${inv.buyoutDemand.amount.toLocaleString()}, by day ${inv.buyoutDemand.dueDay}.`
         : `They want their money back: $${inv.buyoutDemand.amount.toLocaleString()} by day ${inv.buyoutDemand.dueDay}.`;
       hotel.appendChild(demand);
+
+      // Where to act on it. The recap is a one-shot and the deadline is a
+      // fortnight long, so the announcement has to say where the button
+      // lives or the player is told something they cannot do anything
+      // about -- which is what this screen did for the whole of Act II
+      // until now.
+      const where = document.createElement('div');
+      where.className = 'report-hotel-conf';
+      where.textContent = 'Settle it on the Hotel screen.';
+      hotel.appendChild(where);
+    }
+
+    // Both endings, once they have actually happened.
+    if (inv?.liquidated) {
+      const gone = document.createElement('div');
+      gone.className = 'report-hotel-bad';
+      gone.textContent =
+        'The deadline passed. They sold rooms to get their money back and walked away. '
+        + 'What is left of the hotel is yours.';
+      hotel.appendChild(gone);
+    } else if (inv?.offerLapsed) {
+      const lapsed = document.createElement('div');
+      lapsed.className = 'report-hotel-conf';
+      lapsed.textContent =
+        'Their offer lapsed -- you did not take it up in time. Keep the reviews good and it will come round again.';
+      hotel.appendChild(lapsed);
+    } else if (inv?.bought && !inv.buyoutDemand) {
+      const yours = document.createElement('div');
+      yours.className = 'report-hotel-good';
+      yours.textContent = 'The investors are gone. The hotel is yours.';
+      hotel.appendChild(yours);
     }
 
     screen.appendChild(hotel);

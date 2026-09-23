@@ -19,6 +19,7 @@ import { weatherOn, forecast, effectsOf } from './weather.js';
 import {
   REVIEW_EVERY, MEASURES, OFFER_CONFIDENCE,
   assessTarget, confidenceChange, nextTargetFor, measureNow, settlementDue,
+  forceLiquidation,
   startingInvestors,
 } from './investors.js';
 import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue } from './rooms.js';
@@ -587,7 +588,40 @@ export function runDay(state, seed) {
     if (settlement && !next.investors.buyoutDemand) {
       next.investors.buyoutDemand = settlement;
     }
+
+    // And the deadline actually arriving.
+    //
+    // Without this the act had no ending at all: `settlementDue` raised a
+    // demand, the report announced it, and then the day it was due came
+    // and went with nothing on either side of it. `payBuyout` and
+    // `forceLiquidation` were both written and tested and neither was
+    // ever called.
+    //
+    // The two kinds are not symmetrical and must not be treated as one.
+    // A `demand` is the investors pulling out, and letting it lapse sells
+    // rooms to pay them. An `offer` is them agreeing to sell their stake
+    // to a resort that has earned it, and the penalty for not having the
+    // cash to hand cannot be losing the hotel — it simply lapses, and a
+    // continued run of good reviews will raise it again.
+    const standing = next.investors.buyoutDemand;
+    if (standing && next.day >= standing.dueDay) {
+      if (standing.kind === 'demand') {
+        const after = forceLiquidation(next);
+        next.resort.rooms = after.resort.rooms;
+        next.money = after.money;
+        next.investors = after.investors;
+        report.investors.liquidated = true;
+      } else {
+        next.investors.buyoutDemand = null;
+        // The streak has to restart, or the offer returns the next
+        // morning and the deadline means nothing.
+        next.investors.goodReviews = 0;
+        report.investors.offerLapsed = true;
+      }
+    }
+
     report.investors.buyoutDemand = next.investors.buyoutDemand ?? null;
+    report.investors.bought = next.investors.bought ?? false;
   } else {
     report.investors = next.investors?.bought
       ? { target: null, reviewed: null, confidence: 100, bought: true }
