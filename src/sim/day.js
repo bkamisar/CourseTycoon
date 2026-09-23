@@ -787,6 +787,25 @@ export function applyEventChoice(state, eventId, choiceIndex) {
   if (effects.condition) {
     next.conditions = addCondition(next.conditions ?? [], effects.condition);
   }
+
+  /**
+   * And a record of having decided, so a later event can be about it.
+   *
+   * Every event until now stood alone: it could read the resort's numbers
+   * but never what the player had actually chosen, so nothing could ever
+   * come back. A decision that cannot come back is an incident rather
+   * than a decision, and the cheerful ones are exactly where that shows
+   * -- saying yes to something ill-advised should be able to cost you
+   * later rather than only at the moment you say it.
+   *
+   * The day is kept alongside the index because a reckoning wants
+   * distance: the events that read this ask for it weeks afterwards, when
+   * the money has been spent and the choice feels settled.
+   */
+  next.choicesMade = {
+    ...(next.choicesMade ?? {}),
+    [eventId]: { index: choiceIndex, day: next.day ?? 0 },
+  };
   return next;
 }
 

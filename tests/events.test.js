@@ -246,3 +246,57 @@ test('every condition an event imposes is one the simulation can apply', () => {
     }
   }
 });
+
+// --- Events that follow from earlier events ----------------------------
+
+test('a follow-up only reaches the resort that earned it', () => {
+  // The first mechanic in the game where an event exists because of a
+  // choice rather than a number. Three ways it can go wrong and all three
+  // are silent: it never fires, it fires for everybody, or it fires over
+  // and over. None would fail any other test in this file.
+  const base = { day: 40, act: 2, prestige: 60, holesOpen: 9, groups: 15, turf: 80, satisfaction: 60, rating: 70, slow: false, hasCart: false, money: 100000 };
+  const ctx = (made, day = 40) => ({
+    ...base,
+    day,
+    chose(id, index, afterDays = 0) {
+      const r = made[id];
+      if (!r) return false;
+      if (index !== undefined && r.index !== index) return false;
+      return day - r.day >= afterDays;
+    },
+    answered: (id) => Boolean(made[id]),
+  });
+
+  const followUps = EVENTS.filter((e) => /-fallout$|-returns$|-after$/.test(e.id));
+  assert.ok(followUps.length > 0, 'there should be some follow-up events to check');
+
+  for (const event of followUps) {
+    assert.equal(event.when(ctx({})), false,
+      `${event.id} fires for a resort that never made the choice`);
+    assert.equal(event.when(ctx({ [event.id]: { index: 0, day: 20 } })), false,
+      `${event.id} fires again after it has already been answered`);
+  }
+});
+
+test('the snorkelling programme comes back only for the resort that said yes', () => {
+  const event = EVENTS.find((e) => e.id === 'snorkel-fallout');
+  assert.ok(event, 'the fallout event should exist');
+  const ctx = (made, day) => ({
+    day, act: 2,
+    chose(id, index, afterDays = 0) {
+      const r = made[id];
+      if (!r) return false;
+      if (index !== undefined && r.index !== index) return false;
+      return day - r.day >= afterDays;
+    },
+    answered: (id) => Boolean(made[id]),
+  });
+
+  const accepted = { 'snorkel-programme': { index: 0, day: 10 } };
+  const declined = { 'snorkel-programme': { index: 2, day: 10 } };
+
+  assert.equal(event.when(ctx(accepted, 12)), false, 'it must not land the same week');
+  assert.equal(event.when(ctx(accepted, 30)), true, 'it must land once enough time has passed');
+  assert.equal(event.when(ctx(declined, 30)), false,
+    'a resort that turned him down must never see the reckoning');
+});

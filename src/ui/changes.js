@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23g';
+export const BUILD = '2026-09-23h';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23h',
+    notes: [
+      'Decisions remember. Some of what you agree to now will come back in two or three weeks with a second decision attached, and taking the cheap way out of the first one is usually what brings the second.',
+      'Five of these exist so far. The drainage you patched rather than fixed, the security guard you left to it, the land you sold along the 4th, and the snorkelling programme you were so pleased about.',
+      'None of them is unanswerable. There is always a way to handle it well, and it always costs more than doing it right the first time would have.',
+    ],
+  },
   {
     version: '2026-09-23g',
     notes: [

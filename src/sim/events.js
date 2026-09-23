@@ -110,7 +110,27 @@ export function effectAxes(effects = {}) {
  */
 export function eventContext({ report, previousReport, state }) {
   const base = narrationContext({ report, previousReport, state });
-  return { ...base, money: state.money, act: state.act };
+  const made = state.choicesMade ?? {};
+  return {
+    ...base,
+    money: state.money,
+    act: state.act,
+    /**
+     * What the player has already decided, so an event can be about an
+     * earlier one. `chose('some-event', 0, 14)` is "they picked the first
+     * option, at least a fortnight ago".
+     */
+    chose(eventId, index, afterDays = 0) {
+      const record = made[eventId];
+      if (!record) return false;
+      if (index !== undefined && record.index !== index) return false;
+      return (state.day ?? 0) - record.day >= afterDays;
+    },
+    /** Whether an event has been answered at all, either way. */
+    answered(eventId) {
+      return Boolean(made[eventId]);
+    },
+  };
 }
 
 /**
@@ -1097,32 +1117,75 @@ export const EVENTS = [
       {
         stance: 'commercial',
         label: 'Let him dive the ponds',
-        cost: '$1,800 for a wetsuit and a permit. Every ball he brings up gets sold again — $310 a day for 18 days — and the pond on the 7th looks like a building site the whole time.',
+        cost: '$1,800 for a wetsuit and a permit, and every ball he brings up gets sold again — $340 a day for 18 days. Nobody has asked what the hole in the résumé was.',
         effects: {
           money: -1800,
           goodwill: { serious: -4, locals: 5 },
           condition: {
             id: 'pond-diving', label: 'Snorkelling programme',
             note: 'A porter in a wetsuit, in the pond, during play.',
-            days: 18, dailyMoney: -310, demandFactor: 0.96,
+            days: 18, dailyMoney: -340, demandFactor: 0.96,
           },
         },
       },
       {
-        stance: 'ambitious',
-        label: 'Make it a guest activity',
-        cost: '$7,400 for gear, signage and someone insured to supervise. Destination guests love it (+10) and nobody serious can look at it.',
-        effects: {
-          money: -7400,
-          prestige: 3,
-          goodwill: { destination: 10, serious: -9 },
-        },
+        stance: 'thorough',
+        label: 'Ask what the hole was first',
+        cost: 'Free, and he does not come back. The pond keeps its golf balls.',
+        effects: { goodwill: { locals: -2 } },
       },
       {
         stance: 'thrifty',
         label: 'The pond is not a reef',
         cost: 'Free. He takes it well, which is somehow worse.',
-        effects: { goodwill: { locals: -2 } },
+        effects: { goodwill: { locals: -3 } },
+      },
+    ],
+  },
+
+  {
+    id: 'snorkel-fallout',
+    speaker: 'hotelHand',
+    // Only for a resort that said yes, and only once enough time has
+    // passed that the money feels like it was always yours. This is the
+    // first event in the game that exists because of an earlier one --
+    // see `chose` in eventContext above.
+    when: (c) => c.chose('snorkel-programme', 0, 16) && !c.answered('snorkel-fallout'),
+    prompt: "Somebody finally ran the checks on the porter with the snorkelling programme, and the hole in the résumé turns out to have a shape. He is gone by lunchtime. The question is what happens to the several thousand dollars of other people's golf balls he sold on your behalf.",
+    choices: [
+      {
+        stance: 'principled',
+        label: 'Donate every penny of it',
+        cost: '$6,100 to the hospice, publicly, and a line in the Gazette about how you handled it. Prestige +6.',
+        effects: {
+          money: -6100,
+          prestige: 6,
+          goodwill: { locals: 9, serious: 5, destination: 4 },
+        },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Donate the last month of it',
+        cost: '$2,200 to the hospice and no announcement. It is not nothing, and everybody can tell it is not everything.',
+        effects: {
+          money: -2200,
+          prestige: 1,
+          goodwill: { locals: 2 },
+        },
+      },
+      {
+        stance: 'commercial',
+        label: 'It was the club’s money',
+        cost: 'Keeps the $6,100. It gets out anyway, and turnout runs a quarter down for 13 days while it does.',
+        effects: {
+          prestige: -8,
+          goodwill: { locals: -12, serious: -6, destination: -6 },
+          condition: {
+            id: 'snorkel-scandal', label: 'The porter story',
+            note: 'Everyone has heard which part of it you kept.',
+            days: 13, demandFactor: 0.75,
+          },
+        },
       },
     ],
   },
@@ -1149,15 +1212,17 @@ export const EVENTS = [
         },
       },
       {
-        stance: 'pragmatic',
-        label: 'Just the filming rights',
-        cost: 'He pays $240 a day for 18 days to shoot here. He is on the 4th tee at seven in the morning talking to a phone on a stick.',
+        stance: 'ambitious',
+        label: 'Go in on the campaign with him',
+        cost: '$4,200 for a promotional partnership. He has four hundred followers and three of them are his mother. Buys nothing.',
         effects: {
-          goodwill: { serious: -4, locals: 3 },
+          money: -4200,
+          goodwill: { serious: -4, locals: 2 },
           condition: {
             id: 'jay-filming', label: 'Jay is filming',
-            note: 'A phone on a stick, on the 4th tee, most mornings.',
-            days: 18, dailyMoney: -240,
+            note: 'A phone on a stick, on the 4th tee, most mornings. Reaching nobody.',
+            days: 18,
+            demandFactor: 0.97,
           },
         },
       },
@@ -1256,6 +1321,150 @@ export const EVENTS = [
             id: 'unpoliced', label: 'Nobody stops anything',
             note: 'Two more since the 14th. Charles did 40 more pull ups.',
             days: 11, demandFactor: 0.8,
+          },
+        },
+      },
+    ],
+  },
+
+
+  // --- The rest of the reckonings --------------------------------------
+  //
+  // Each of these exists because of a choice made weeks earlier, and each
+  // follows the cheap option rather than the expensive one. That is the
+  // point: paying properly the first time should be the thing that buys
+  // you a quiet month, and the game had no way to express that until
+  // events could remember.
+  //
+  // They are deliberately not pure punishment. Every one still offers a
+  // way to handle it well, because a reckoning you cannot answer is a
+  // cutscene with a bill attached.
+
+  {
+    id: 'drainage-returns',
+    speaker: 'keeper',
+    // Follows either of the two ways of not fixing it properly. Long
+    // enough afterwards that the patch felt like it had worked.
+    when: (c) => (c.chose('drainage-failure', 1, 20) || c.chose('drainage-failure', 2, 20))
+      && !c.answered('drainage-returns'),
+    prompt: "The hollow has gone again, and this time it has taken the bank with it. I did say. I am not going to keep saying it, but I did say.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Do the whole job this time',
+        cost: '$23,000 \\u2014 more than the $14,000 it would have been \\u2014 and three holes shut for 9 days.',
+        effects: {
+          money: -23000,
+          condition: {
+            id: 'drainage-works', label: 'Major drainage works',
+            note: 'Three holes shut. The job that should have been done first.',
+            days: 9, holesClosed: 3,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Rope off the hollow and carry on',
+        cost: 'Free. One hole out of play for 20 days and the ground either side of it goes with it at about 2 points a day.',
+        effects: {
+          condition: {
+            id: 'collapsed-hollow', label: 'The hollow has gone',
+            note: 'Roped off, sinking, and taking the ground beside it.',
+            days: 20, holesClosed: 1, turfPerDay: -2,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'charles-after',
+    speaker: 'security',
+    // Only for the resort that left him to it.
+    when: (c) => c.chose('charles-on-security', 2, 14) && !c.answered('charles-after'),
+    prompt: "There was an ambulance on the 14th on Saturday. Charles has written it up as a disagreement. The incident book now has three entries, and one of them is still about pull ups.",
+    choices: [
+      {
+        stance: 'principled',
+        label: 'Close for a day and sort it properly',
+        cost: 'A day shut and $9,400 on a real firm. It ends here, and the town notices that it did. Prestige +4.',
+        effects: {
+          money: -9400,
+          prestige: 4,
+          goodwill: { locals: 10, serious: 6 },
+          condition: {
+            id: 'closed-day', label: 'Closed for the day',
+            note: 'Shut while somebody competent walks the course.',
+            days: 1, demandFactor: 0.15,
+          },
+        },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Quietly replace him',
+        cost: '$5,100 and no announcement. It stops, and nobody is sure you did anything, so turnout stays 12% down for 9 days.',
+        effects: {
+          money: -5100,
+          condition: {
+            id: 'quiet-fix', label: 'Nothing said publicly',
+            note: 'It has stopped. Nobody outside the club knows that.',
+            days: 9, demandFactor: 0.88,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'Still guy stuff',
+        cost: 'Free. The Gazette runs the ambulance, turnout halves for 16 days, and prestige drops 12.',
+        effects: {
+          prestige: -12,
+          goodwill: { locals: -15, serious: -10, destination: -10 },
+          condition: {
+            id: 'the-ambulance', label: 'The ambulance story',
+            note: 'A photograph of the 14th, and a quote from Charles.',
+            days: 16, demandFactor: 0.5,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'jay-after',
+    speaker: 'realtor',
+    // Only for the resort that sold him the land.
+    when: (c) => c.chose('jay-the-realtor', 0, 18) && !c.answered('jay-after'),
+    prompt: "The eleven houses are up and sold, and eleven households have discovered what a golf course is. Jay, who no longer lives in any of the photographs, has given them your number.",
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Net and replant the whole boundary',
+        cost: '$16,500, and it is genuinely the end of it.',
+        effects: { money: -16500, goodwill: { locals: 5 } },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Move the 4th tee thirty yards',
+        cost: '$6,000 and the 4th is shut for 5 days. It helps. It does not fix the 5th.',
+        effects: {
+          money: -6000,
+          condition: {
+            id: 'tee-move', label: 'Moving the 4th tee',
+            note: 'One hole shut while the tee goes back thirty yards.',
+            days: 5, holesClosed: 1,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'They bought a house on a golf course',
+        cost: 'Free, and true, and it does not help. Eleven households and a residents\\u2019 association for 18 days, at $260 a day and a tenth off the gate.',
+        effects: {
+          goodwill: { locals: -8 },
+          condition: {
+            id: 'residents-association', label: 'Residents\\u2019 association',
+            note: 'Eleven households who have read the deeds and have questions.',
+            days: 18, dailyMoney: 260, demandFactor: 0.9,
           },
         },
       },
