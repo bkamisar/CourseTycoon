@@ -325,6 +325,7 @@ export function computeReportData(state, report) {
     complaints: report.complaints,
     weather: report.weather,
     hotel: report.hotel,
+    conditions: report.conditions ?? [],
     investors: report.investors,
     // Where the resort actually stands against the target it was given.
     //
@@ -549,6 +550,20 @@ function injectStyles() {
     }
     .report-hotel-occ { color: ${PALETTE.WHITE}; font-size: 14px; }
     .report-hotel-target { color: ${PALETTE.ACCENT}; }
+    .report-wrong {
+      margin-top: 10px;
+      padding: 10px;
+      border-left: 3px solid ${PALETTE.SAND};
+      background: ${PALETTE.UI_DARK};
+      border-radius: 0 6px 6px 0;
+    }
+    .report-wrong-kicker { color: ${PALETTE.SAND}; font-size: 9px; letter-spacing: 1.5px; }
+    .report-wrong-row { margin-top: 6px; }
+    .report-wrong-name { color: ${PALETTE.WHITE}; font-size: 13px; }
+    .report-wrong-days { color: ${PALETTE.SAND}; font-size: 11px; }
+    .report-wrong-note {
+      color: ${PALETTE.UI_LIGHT}; font-size: 11px; line-height: 1.5; margin-top: 1px;
+    }
     .report-target {
       margin-top: 10px;
       padding: 10px;
@@ -810,6 +825,43 @@ export function mountReport(root, { state, report, onContinue } = {}) {
     }
 
     screen.appendChild(hotel);
+  }
+
+  // --- What is still wrong ----------------------------------------------
+  //
+  // A condition costs money, turf, turnout or holes every morning until
+  // it runs out. If the screen does not name it, the player watches the
+  // bank drain for reasons nothing explains -- which is this project's
+  // oldest bug wearing a new hat, and would be at its worst here, because
+  // these are the consequences of decisions they made themselves.
+  if (data.conditions.length > 0) {
+    const wrong = document.createElement('div');
+    wrong.className = 'report-wrong';
+    const kicker = document.createElement('div');
+    kicker.className = 'report-wrong-kicker';
+    kicker.textContent = 'STILL WRONG';
+    wrong.appendChild(kicker);
+
+    for (const c of data.conditions) {
+      const row = document.createElement('div');
+      row.className = 'report-wrong-row';
+      const name = document.createElement('span');
+      name.className = 'report-wrong-name';
+      name.textContent = c.label;
+      const days = document.createElement('span');
+      days.className = 'report-wrong-days';
+      days.textContent = c.daysLeft === 1
+        ? '  last day' : `  ${c.daysLeft} days left`;
+      row.append(name, days);
+      if (c.note) {
+        const note = document.createElement('div');
+        note.className = 'report-wrong-note';
+        note.textContent = c.note;
+        row.appendChild(note);
+      }
+      wrong.appendChild(row);
+    }
+    screen.appendChild(wrong);
   }
 
   // --- Revenue / cost breakdown -----------------------------------------

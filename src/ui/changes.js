@@ -31,13 +31,22 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23e';
+export const BUILD = '2026-09-23f';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23f',
+    notes: [
+      'Nearly twice as many decisions to make — fifteen new ones — and they now arrive about every four days instead of every seven.',
+      'Some of what happens to you is still happening next week. A drainage failure you patched instead of fixing, a bad write-up you did not answer, a neighbour you decided to let sue you: these run for days or weeks, and the evening report lists what is still wrong and how long is left on it.',
+      'They are deliberately different problems. A bill wants cash, a blight wants groundskeepers and time, bad press just has to be outlasted, and a shut hole changes what your course even is while it lasts. There is no one habit that answers all of them.',
+      'Taking the free option every time is a real strategy and it will bury you. Across ninety days it leaves something wrong about 70% of the time; paying properly when it matters runs at about 45%.',
+    ],
+  },
   {
     version: '2026-09-23e',
     notes: [

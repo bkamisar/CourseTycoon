@@ -70,6 +70,31 @@ export function effectAxes(effects = {}) {
   const axes = {};
   for (const key of MONEY_PRESTIGE_TURF) axes[key] = effects[key] ?? 0;
   for (const key of SEGMENT_KEYS) axes[`goodwill.${key}`] = effects.goodwill?.[key] ?? 0;
+
+  /**
+   * A condition, totalled over the days it runs.
+   *
+   * Without this the dominance check compared one-off numbers only, and
+   * every "do nothing today" choice looked strictly better than paying to
+   * fix the thing — because the month of damage it imposed was invisible
+   * to the comparison. Eleven of the new events read as having a dominant
+   * choice for exactly that reason, and none of them did.
+   *
+   * These are rough totals, not the simulation's own arithmetic. They
+   * only have to be good enough to compare two choices in the same event
+   * with each other, which is all the dominance check asks of them.
+   */
+  const c = effects.condition;
+  const days = c?.days ?? 0;
+  axes.money += (c?.dailyMoney ?? 0) * -days;
+  axes.turf += (c?.turfPerDay ?? 0) * days;
+  // Lost turnout and shut holes have no axis of their own; both are
+  // straightforwardly bad and are scored on one so a choice cannot hide a
+  // fortnight of closure behind a small cash saving.
+  axes.disruption = -(
+    (1 - (c?.demandFactor ?? 1)) * days * 100
+    + (c?.holesClosed ?? 0) * days * 8
+  );
   return axes;
 }
 
@@ -491,6 +516,559 @@ export const EVENTS = [
       },
     ],
   },
+
+  // --- Things that are still wrong next week ---------------------------
+  //
+  // Everything above this line resolves the moment it is answered. These
+  // impose a `condition` instead (see `src/sim/conditions.js`): damage
+  // with a duration, which is what makes a choice something to live with
+  // rather than a number subtracted once.
+  //
+  // They are written so the four kinds of damage are genuinely different
+  // problems. A bill wants cash, a blight wants groundskeepers and time,
+  // bad press wants outlasting, and a shut hole changes what the course
+  // is while it lasts. A player should never have one habit that answers
+  // all of them, which is why almost every choice below trades one kind
+  // of pain for another rather than offering a clean way out.
+
+  {
+    id: 'drainage-failure',
+    speaker: 'keeper',
+    prompt: "The drainage under the low end has given up. Every wet morning from here is going to sit in that hollow until someone digs it out properly.",
+    when: (c) => c.turf < 80 && c.holesOpen >= 5,
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Dig it out now',
+        cost: '$14,000, and two holes shut for a week while the machines are in.',
+        effects: {
+          money: -14000,
+          condition: {
+            id: 'drainage-works', label: 'Drainage works',
+            note: 'Two holes shut while the ground is open.',
+            days: 7, holesClosed: 2,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Pump it when it floods',
+        cost: 'Nothing today. The ground stays sour for 16 days and the greens lose about 3.4 points a day while it does.',
+        effects: {
+          condition: {
+            id: 'sour-ground', label: 'Sour ground',
+            note: 'Water sitting in the hollow. The turf loses ground daily.',
+            days: 16, turfPerDay: -3.4,
+          },
+        },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Patch the worst of it',
+        cost: '$5,000 and 9 days of slower recovery, which is neither fix nor disaster.',
+        effects: {
+          money: -5000,
+          condition: {
+            id: 'sour-ground', label: 'Soft ground',
+            note: 'Patched, not solved. The turf recovers slowly.',
+            days: 9, turfPerDay: -1.8,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'irrigation-main',
+    speaker: 'keeper',
+    prompt: "The main split overnight. We can run hoses for now, but hoses do not water a golf course, they water the bits somebody remembers.",
+    when: (c) => c.holesOpen >= 5,
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Replace the main',
+        cost: '$11,000 up front and it is done with.',
+        effects: { money: -11000 },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Run hoses',
+        cost: 'Free, and the course dries out unevenly for 12 days, losing about 2.6 points a day.',
+        effects: {
+          condition: {
+            id: 'hosing', label: 'Hand watering',
+            note: 'Hoses instead of a main. The course dries out in patches.',
+            days: 12, turfPerDay: -2.6,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'kitchen-inspection',
+    speaker: 'cityRep',
+    prompt: "Environmental health came through the kitchen this morning. The report uses the word 'immediate' twice.",
+    when: (c) => c.day >= 12,
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Close and refit',
+        cost: '$8,500, and nobody eats here for five days.',
+        effects: {
+          money: -8500,
+          condition: {
+            id: 'kitchen-shut', label: 'Kitchen closed',
+            note: 'Refit in progress. Fewer reasons to make the drive out.',
+            days: 5, demandFactor: 0.82,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'Appeal it',
+        cost: 'Nothing today. The notice stays on the door 12 days and turnout runs about a third down while it does.',
+        effects: {
+          prestige: -3,
+          condition: {
+            id: 'health-notice', label: 'Notice on the door',
+            note: 'An appeal pending, in public. People read the notice, not the appeal.',
+            days: 12, demandFactor: 0.66,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'bad-review',
+    speaker: 'press',
+    prompt: "Fairway Monthly ran eight hundred words on this place. Six hundred of them are about the wait on the first tee.",
+    when: (c) => c.satisfaction < 55 && c.day >= 15,
+    choices: [
+      {
+        stance: 'principled',
+        label: 'Write back and own it',
+        cost: 'Costs nothing and helps a little. The piece still runs, and turnout is about a third down for 9 days.',
+        effects: {
+          goodwill: { locals: 6, serious: 4 },
+          condition: {
+            id: 'bad-press', label: 'Bad write-up',
+            note: 'Eight hundred words, mostly about the queue. Turnout is down while it circulates.',
+            days: 9, demandFactor: 0.66,
+          },
+        },
+      },
+      {
+        stance: 'commercial',
+        label: 'Buy an ad in the next issue',
+        cost: '$6,000 to sit opposite the correction, which shortens it to 6 days and softens it.',
+        effects: {
+          money: -6000,
+          condition: {
+            id: 'bad-press', label: 'Bad write-up',
+            note: 'Softened by the ad opposite, but still out there.',
+            days: 6, demandFactor: 0.74,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'Say nothing',
+        cost: 'Free. It runs, it stands, and turnout is 40% down for 13 days.',
+        effects: {
+          condition: {
+            id: 'bad-press', label: 'Bad write-up',
+            note: 'Unanswered. It is the first thing anyone has heard about this place.',
+            days: 13, demandFactor: 0.6,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'keeper-poached',
+    speaker: 'keeper',
+    prompt: "The club down the road offered me a job this morning. I have not said yes. I have not said no either.",
+    when: (c) => c.day >= 20 && c.turf >= 55,
+    choices: [
+      {
+        stance: 'principled',
+        label: 'Match it',
+        cost: '$420 a day on top of the wage, for 18 days. Worth it if you have no one else who knows this ground.',
+        effects: {
+          condition: {
+            id: 'retention', label: 'Matched offer',
+            note: 'Keeping your greenkeeper costs more than it did.',
+            days: 18, dailyMoney: 420,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Wish him well',
+        cost: 'Saves the wage and costs the knowledge. The greens lose about 3.8 points a day for 12 days.',
+        effects: {
+          goodwill: { locals: -4 },
+          condition: {
+            id: 'lost-keeper', label: 'Short-handed',
+            note: 'Nobody left who knows where the wet spots are.',
+            days: 12, turfPerDay: -3.8,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'neighbour-suit',
+    speaker: 'neighbor',
+    prompt: "Four balls through the conservatory this season. My solicitor has written it all down and he would like you to read it.",
+    when: (c) => c.groups >= 14,
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Put up netting',
+        cost: '$9,500 and it never comes up again.',
+        effects: { money: -9500, goodwill: { locals: 4 } },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Settle it privately',
+        cost: '$620 a day for 13 days, and a neighbour who is only waiting for the next one.',
+        effects: {
+          condition: {
+            id: 'settlement', label: 'Settlement instalments',
+            note: 'Paying the conservatory off a bit at a time.',
+            days: 13, dailyMoney: 620,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'Let him sue',
+        cost: 'Nothing today. Then $880 a day for 18 days, and it is in the local paper the whole time.',
+        effects: {
+          prestige: -4,
+          condition: {
+            id: 'lawsuit', label: 'In court',
+            note: 'A neighbour, a solicitor, and a local paper enjoying all of it.',
+            days: 18, dailyMoney: 880, demandFactor: 0.9,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'tree-down',
+    speaker: 'starter',
+    prompt: "There is an oak lying across the fairway and about forty feet of it is where the fairway used to be.",
+    when: (c) => c.holesOpen >= 3,
+    choices: [
+      {
+        stance: 'commercial',
+        label: 'Clear it today',
+        cost: '$4,200 for a crew at short notice, and one hole shut for the afternoon.',
+        effects: {
+          money: -4200,
+          condition: {
+            id: 'tree-clearing', label: 'Hole shut',
+            note: 'A crew and a chainsaw where the fairway was.',
+            days: 2, holesClosed: 1,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Play around it',
+        cost: 'Free. The hole is unplayable for 8 days and everybody who came for the round they were promised notices.',
+        effects: {
+          condition: {
+            id: 'tree-down', label: 'Hole out of play',
+            note: 'An oak where the fairway was. Nobody is playing that hole.',
+            days: 8, holesClosed: 1,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'greens-blight',
+    speaker: 'keeper',
+    prompt: "There is something in the greens that I have seen once before, and the last time it took a season off a better course than this.",
+    when: (c) => c.turf < 70,
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Treat all nine properly',
+        cost: '$12,000 of chemistry and labour, and it is gone in a week.',
+        effects: {
+          money: -12000,
+          condition: {
+            id: 'blight-treatment', label: 'Under treatment',
+            note: 'Chemistry working. Slow going until it takes.',
+            days: 7, turfPerDay: -1.2,
+          },
+        },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Treat the worst three',
+        cost: '$4,000, and the rest of it spreads for 16 days at about 3.6 points a day.',
+        effects: {
+          money: -4000,
+          condition: {
+            id: 'blight', label: 'Blight spreading',
+            note: 'Treated in patches, which is another way of saying untreated.',
+            days: 16, turfPerDay: -3.6,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'supplier-rise',
+    speaker: 'supplierRep',
+    prompt: "Fertiliser, sand and fuel are all up. I can hold your old price for a year if you sign for the year.",
+    when: (c) => c.day >= 25,
+    choices: [
+      {
+        stance: 'commercial',
+        label: 'Sign for the year',
+        cost: '$6,200 down, and you drop the yard in town that has supplied this course for thirty years. Locals goodwill -6.',
+        effects: { money: -6200, goodwill: { locals: -6 } },
+      },
+      {
+        stance: 'populist',
+        label: 'Keep buying local',
+        cost: 'Nothing today, then $700 a day for 18 days. The yard in town notices you stayed. Locals goodwill +4.',
+        effects: {
+          goodwill: { locals: 4 },
+          condition: {
+            id: 'supply-costs', label: 'Prices up',
+            note: 'Buying at the new rate from the yard in town, one week at a time.',
+            days: 18, dailyMoney: 700,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'sponsor-offer',
+    speaker: 'cityRep',
+    prompt: "A regional brewery wants its name on the halfway house and its beer on the cart. They are offering to pay for the privilege.",
+    when: (c) => c.prestige >= 35 && c.holesOpen >= 5,
+    choices: [
+      {
+        stance: 'commercial',
+        label: 'Take the deal',
+        cost: 'They pay $620 a day for 18 days. Serious golfers think rather less of the place.',
+        effects: {
+          goodwill: { serious: -8, locals: 5 },
+          condition: {
+            id: 'sponsorship', label: 'Brewery sponsorship',
+            note: 'Their name on the halfway house, their money in the till.',
+            days: 18, dailyMoney: -620,
+          },
+        },
+      },
+      {
+        stance: 'ambitious',
+        label: 'Turn it down',
+        cost: 'Costs the money, buys the reputation. Prestige up 5.',
+        effects: { prestige: 5, goodwill: { serious: 6, locals: -3 } },
+      },
+    ],
+  },
+
+  {
+    id: 'vandalism',
+    speaker: 'starter',
+    prompt: "Somebody drove something with wheels across the fifth green last night, twice, in a figure of eight.",
+    when: (c) => c.day >= 18,
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Re-turf it and hire a night watch',
+        cost: '$6,800 now and $380 a day for 12 days, and it does not happen again.',
+        effects: {
+          money: -6800,
+          turf: -4,
+          condition: {
+            id: 'night-watch', label: 'Night watch',
+            note: 'Somebody on the gate after dark.',
+            days: 12, dailyMoney: 380,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Repair it and hope',
+        cost: '$1,500 and a 10-point hit to the turf. Whoever did it knows nothing happened.',
+        effects: {
+          money: -1500,
+          turf: -10,
+          condition: {
+            id: 'repeat-visits', label: 'They came back',
+            note: 'Nothing stopped them the first time.',
+            days: 10, turfPerDay: -2.2,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'slow-play-piece',
+    speaker: 'press',
+    prompt: "The local paper is writing about five-hour rounds in the county and somebody has given them your name.",
+    when: (c) => c.slow === true,
+    choices: [
+      {
+        stance: 'principled',
+        label: 'Invite them to walk a round',
+        cost: '$900 to comp the round and the lunch, and honest. If the course is genuinely slow they will write that, and it sticks for 8 days at about a fifth down.',
+        effects: {
+          money: -900,
+          goodwill: { locals: 5 },
+          condition: {
+            id: 'slow-piece', label: 'Named in the paper',
+            note: 'A piece about five-hour rounds, with your name in it.',
+            days: 8, demandFactor: 0.78,
+          },
+        },
+      },
+      {
+        stance: 'commercial',
+        label: 'Decline the interview',
+        cost: 'Free. They run it anyway, a refusal reads worse than an answer, and turnout is 30% down for 11 days.',
+        effects: {
+          prestige: -3,
+          condition: {
+            id: 'slow-piece', label: 'Declined to comment',
+            note: 'The three worst words to see next to your own name.',
+            days: 11, demandFactor: 0.7,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'society-block-booking',
+    speaker: 'societyRep',
+    prompt: "Forty of us, every other Saturday, for the rest of the season. We would want a rate, and we would want the first two hours of the sheet.",
+    when: (c) => c.holesOpen >= 7 && c.prestige >= 25,
+    choices: [
+      {
+        stance: 'commercial',
+        label: 'Take the block',
+        cost: 'They pay $780 a day for 18 days. Saturday mornings belong to them, and the regulars notice.',
+        effects: {
+          goodwill: { locals: -9, serious: -4 },
+          condition: {
+            id: 'society-block', label: 'Society block booking',
+            note: 'Forty of them on the sheet, and their money in it.',
+            days: 18, dailyMoney: -780,
+          },
+        },
+      },
+      {
+        stance: 'populist',
+        label: 'Offer them midweek instead',
+        cost: 'Less money and no resentment. They take it, grudgingly, at $300 a day for 18 days.',
+        effects: {
+          goodwill: { locals: 4 },
+          condition: {
+            id: 'society-block', label: 'Society midweek',
+            note: 'Midweek, which suits everybody slightly less.',
+            days: 18, dailyMoney: -300,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'No blocks',
+        cost: 'Costs the $780 a day. The regulars hear about it and like you for it — goodwill +8.',
+        effects: { goodwill: { locals: 8 } },
+      },
+    ],
+  },
+
+  {
+    id: 'cart-path-collapse',
+    speaker: 'keeper',
+    prompt: "The path along the back of the sixth has gone into the ditch it was built beside. It was always going to.",
+    when: (c) => c.hasCart === true,
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Rebuild it properly',
+        cost: '$7,600 and one hole out of play for four days.',
+        effects: {
+          money: -7600,
+          condition: {
+            id: 'path-works', label: 'Path rebuild',
+            note: 'A hole shut while the path goes back in.',
+            days: 4, holesClosed: 1,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Rope it off',
+        cost: 'Free. Carts go the long way for 13 days and the round gets slower for it.',
+        effects: {
+          condition: {
+            id: 'path-detour', label: 'Carts detoured',
+            note: 'The long way round, for everybody, all day.',
+            days: 13, demandFactor: 0.84, turfPerDay: -1.4,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'junior-programme',
+    speaker: 'juniorRep',
+    prompt: "We have twenty kids and nowhere to put them. Give us Tuesday afternoons and in ten years half of them are your members.",
+    when: (c) => c.holesOpen >= 5,
+    choices: [
+      {
+        stance: 'principled',
+        label: 'Tuesdays are yours',
+        cost: 'Costs $240 a day in lost sheet for 18 days, and buys the town outright.',
+        effects: {
+          goodwill: { locals: 12 },
+          prestige: 2,
+          condition: {
+            id: 'junior-tuesdays', label: 'Junior programme',
+            note: 'Tuesday afternoons belong to the kids.',
+            days: 18, dailyMoney: 240,
+          },
+        },
+      },
+      {
+        stance: 'commercial',
+        label: 'Charge them a rate',
+        cost: 'They pay their way, so nothing changes hands daily. Goodwill +3, and nobody is thrilled.',
+        effects: { goodwill: { locals: 3 } },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Not this season',
+        cost: 'Free, and the town remembers being told no.',
+        effects: { goodwill: { locals: -7 } },
+      },
+    ],
+  },
+
 ];
 
 /** How many recently-offered events to remember before recycling. Smaller

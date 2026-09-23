@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeRng } from '../src/sim/rng.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
+import { MAX_DURATION } from '../src/sim/conditions.js';
 import {
   EVENTS,
   SPEAKERS,
@@ -12,7 +13,13 @@ import {
   EVENT_MEMORY,
 } from '../src/sim/events.js';
 
-const AXIS_NAMES = ['money', 'prestige', 'turf', 'goodwill.locals', 'goodwill.serious', 'goodwill.destination'];
+// `disruption` folds in the two kinds of damage that have no axis of
+// their own -- lost turnout and shut holes -- so a choice cannot hide a
+// fortnight of closure behind a small cash saving. Without it here,
+// eleven events read as having a dominant choice and none of them did:
+// the check was comparing one-off numbers while the real cost of "do
+// nothing today" ran for a month where it could not see it.
+const AXIS_NAMES = ['money', 'prestige', 'turf', 'disruption', 'goodwill.locals', 'goodwill.serious', 'goodwill.destination'];
 
 function alwaysContext(overrides = {}) {
   return {
@@ -89,8 +96,11 @@ test('every stance in the table is actually used, and reads as a phrase', () => 
   }
 });
 
-test('effects only use money, prestige, turf and goodwill for real segments', () => {
-  const allowedTop = new Set(['money', 'prestige', 'turf', 'goodwill']);
+test('effects only use money, prestige, turf, goodwill and a condition', () => {
+  // `condition` is the fifth axis, added when events gained the ability
+  // to leave something still wrong next week rather than only subtracting
+  // a number once. See src/sim/conditions.js.
+  const allowedTop = new Set(['money', 'prestige', 'turf', 'goodwill', 'condition']);
   for (const event of EVENTS) {
     for (const choice of event.choices) {
       for (const key of Object.keys(choice.effects)) {
@@ -199,4 +209,40 @@ test('effectAxes fills in zero for every axis a choice does not mention', () => 
   assert.equal(axes['goodwill.locals'], 0);
   assert.equal(axes['goodwill.serious'], 0);
   assert.equal(axes['goodwill.destination'], 0);
+});
+
+
+test('every condition an event imposes is one the simulation can apply', () => {
+  // A condition with a misspelt field is a consequence that silently does
+  // nothing, which is the worst kind: the cost line promises a month of
+  // trouble and the player gets a quiet week.
+  const allowed = new Set([
+    'id', 'label', 'note', 'days',
+    'dailyMoney', 'turfPerDay', 'demandFactor', 'holesClosed',
+  ]);
+  const doesSomething = ['dailyMoney', 'turfPerDay', 'demandFactor', 'holesClosed'];
+
+  for (const event of EVENTS) {
+    for (const choice of event.choices) {
+      const condition = choice.effects?.condition;
+      if (!condition) continue;
+      const where = `${event.id}/${choice.label}`;
+
+      for (const key of Object.keys(condition)) {
+        assert.ok(allowed.has(key), `${where}: unknown condition field "${key}"`);
+      }
+      assert.ok(condition.id, `${where}: condition has no id`);
+      assert.ok(condition.label, `${where}: condition has no label to show`);
+      assert.ok(condition.note && condition.note.length > 10,
+        `${where}: condition has no note explaining what is wrong`);
+      assert.ok(condition.days >= 1 && condition.days <= MAX_DURATION,
+        `${where}: ${condition.days} days is outside 1..${MAX_DURATION}`);
+      assert.ok(doesSomething.some((k) => condition[k] !== undefined),
+        `${where}: condition lasts ${condition.days} days and does nothing`);
+      if (condition.demandFactor !== undefined) {
+        assert.ok(condition.demandFactor > 0 && condition.demandFactor <= 1,
+          `${where}: demandFactor ${condition.demandFactor} is not a suppression`);
+      }
+    }
+  }
 });

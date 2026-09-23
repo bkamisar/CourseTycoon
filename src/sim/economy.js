@@ -157,7 +157,7 @@ export function demandGroups({
   courseRating, prestige, amenities, greenFee, teeInterval,
   recentSatisfaction = 50, holesOpen = FULL_COURSE_HOLES, weather = 1,
   courseDifficulty = 50, scenery = 50, turfQuality = 50, amenityScore,
-  hasRooms = false, rooms = null,
+  hasRooms = false, rooms = null, conditionFactor = 1,
 }) {
   const value = perceivedValue({ courseRating, prestige, amenities, holesOpen });
   // 1.0 when priced at value; segmentAppeal's own priceFit is what makes
@@ -196,7 +196,11 @@ export function demandGroups({
   // Weather is the only thing here the player cannot influence at all,
   // which is exactly why it belongs: without a variance source every seed
   // plays out near-identically and bankruptcy sits at 0% forever.
-  const pull = reputationPull * wordOfMouth * weather;
+  // `conditionFactor` is whatever is currently wrong with the resort's
+  // name or its access -- see src/sim/conditions.js. It sits beside
+  // weather because it is the same kind of term: something suppressing
+  // turnout that today's decisions cannot argue with.
+  const pull = reputationPull * wordOfMouth * weather * conditionFactor;
 
   const capacity = maxGroupsForDay(teeInterval);
 

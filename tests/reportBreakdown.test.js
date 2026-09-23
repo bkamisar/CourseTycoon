@@ -218,3 +218,35 @@ test('confidence is shown as a level, not buried in a sentence', () => {
   assert.ok(meters.length >= 2,
     'both the target and confidence should read as something with a level');
 });
+
+// --- Things that are still wrong ---------------------------------------
+
+test('the recap names what is still wrong, and for how long', () => {
+  // A condition takes money, turf, turnout or holes every morning until
+  // it runs out. If the screen does not name it, the player watches the
+  // bank drain for reasons nothing explains -- and these are consequences
+  // of decisions they made themselves, which makes it worse than weather.
+  const { state, report } = act2Day();
+  report.conditions = [
+    { id: 'blight', label: 'Blight spreading', note: 'Treated in patches, which is another way of saying untreated.', daysLeft: 12 },
+    { id: 'fine', label: 'Settlement instalments', note: 'Paying the conservatory off a bit at a time.', daysLeft: 1 },
+  ];
+
+  const root = new FakeNode('div');
+  mountReport(root, { state, report, onContinue() {} });
+  const text = root.textContent;
+
+  assert.ok(text.includes('Blight spreading'), 'a standing condition must be named');
+  assert.ok(text.includes('12 days left'), 'and say how long it has to run');
+  assert.ok(text.includes('last day'), 'a condition on its final day should say so, not "1 days left"');
+  assert.ok(text.includes('Paying the conservatory off'), 'and explain what is actually wrong');
+});
+
+test('a clean resort shows no such block', () => {
+  const { state, report } = act2Day();
+  report.conditions = [];
+  const root = new FakeNode('div');
+  mountReport(root, { state, report, onContinue() {} });
+  assert.ok(!root.textContent.includes('STILL WRONG'),
+    'nothing wrong should mean nothing on screen about it');
+});

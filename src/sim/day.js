@@ -7,6 +7,9 @@ import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, menuRevenue } f
 import { guestSatisfaction, buildComplaints } from './satisfaction.js';
 import { courseRating, nextPrestige } from './ratings.js';
 import { actOneGate } from './acts.js';
+import {
+  addCondition, tickConditions, conditionEffects,
+} from './conditions.js';
 import { openHoles } from './state.js';
 import { menuBestEnergy } from './menu.js';
 import { kitchenCapacity, kitchenLoad, serviceFactor } from './kitchen.js';
@@ -32,7 +35,20 @@ const DAY_END = 1080;   // 6:00pm
 
 /** Roughly one decision event per week: a 1-in-7 chance each day, checked
  * once, so an event is never offered more than once on the same day. */
-const EVENT_CHANCE_PER_DAY = 1 / 7;
+/**
+ * How often a decision lands.
+ *
+ * Was 1/7, and measured across 2,400 days it delivered exactly that --
+ * 13.4%, one every 7.5 days. It still read as sparse in play, because a
+ * day takes half a minute and a week of them goes past in no time.
+ *
+ * Raised now rather than earlier because the library has just gone from
+ * sixteen events to thirty-one. At one in four, a ninety-day act draws
+ * about twenty-two from thirty-one, which is varied. At one in four from
+ * sixteen it would have been the same handful three times over, and a
+ * decision you have already made is not a decision.
+ */
+const EVENT_CHANCE_PER_DAY = 1 / 4;
 
 /** Warm-up benefit, in effective handicap strokes, on the first two holes. */
 const RANGE_WARMUP = -4;
@@ -131,7 +147,19 @@ export function marshalPaceFactor(marshals) {
 export function runDay(state, seed) {
   const rng = makeRng(seed);
   const next = structuredClone(state);
-  const holes = openHoles(next);
+  // What is still wrong from before today. Read once, up front, because
+  // it closes holes and that has to happen before anything measures the
+  // course. See src/sim/conditions.js.
+  next.conditions = next.conditions ?? [];
+  const wrong = conditionEffects(next.conditions);
+
+  const allOpen = openHoles(next);
+  // Closures take the last holes first, so the course shortens from the
+  // far end rather than leaving a gap in the middle that the flow-shop
+  // scheduler would have to reason about.
+  const holes = wrong.holesClosed > 0
+    ? allOpen.slice(0, Math.max(1, allOpen.length - wrong.holesClosed))
+    : allOpen;
 
   // A day's fade back toward neutral, for whichever segments a past
   // decision event has coloured. Runs every day regardless of whether one
@@ -214,6 +242,11 @@ export function runDay(state, seed) {
         turfQuality: next.turfQuality,
         hasRooms,
         rooms: next.resort.rooms,
+        // A bad write-up, an outbreak, a road shut. Folded in with the
+        // weather because it is the same kind of thing: a multiplier on
+        // how many people want to come that the player cannot argue with
+        // today, only outlast.
+        conditionFactor: wrong.demandFactor,
       })
     : {
         total: 0,
@@ -421,6 +454,14 @@ export function runDay(state, seed) {
   costs.rooms = nightlyUpkeep(next.resort.rooms) + hotelUpkeep(next.resort.amenities);
   costs.total += costs.rooms;
 
+  // Instalments on whatever went wrong. Its own line, because a player
+  // watching the bank drain deserves to see which of their problems is
+  // doing it.
+  if (wrong.dailyMoney !== 0) {
+    costs.consequences = wrong.dailyMoney;
+    costs.total += wrong.dailyMoney;
+  }
+
   // The one thing that earns on a day the course is shut. Weather takes
   // demand down to a tenth in a storm and leaves every other building
   // idle; a range under a roof takes money anyway, so it smooths the
@@ -456,7 +497,12 @@ export function runDay(state, seed) {
   // Rain waters the course for free; a run of clear days bakes it. A wet
   // week costs money and leaves the turf better than it found it, which
   // is a trade rather than a punishment.
-  next.turfQuality = clamp(next.turfQuality - wear + care + sky.turf, 0, 100);
+  // `wrong.turfPerDay` is negative for damage: drainage gone, a blight, a
+  // spill. The groundskeepers still work, they are just working uphill,
+  // so the answer is more wage for longer rather than one payment.
+  next.turfQuality = clamp(
+    next.turfQuality - wear + care + sky.turf + wrong.turfPerDay, 0, 100
+  );
 
   next.prestige = nextPrestige(next.prestige, rating, averageSatisfaction);
   next.money += profit;
@@ -668,6 +714,14 @@ export function runDay(state, seed) {
     }
   }
 
+  // Yesterday's problems are one day closer to over. Ticked after the
+  // day has been played, so a condition with one day left still does its
+  // work today and is gone tomorrow.
+  next.conditions = tickConditions(next.conditions);
+  report.conditions = next.conditions.map((c) => ({
+    id: c.id, label: c.label, note: c.note, daysLeft: c.daysLeft,
+  }));
+
   next.history.push(report);
   next.satisfactionHistory.push(averageSatisfaction);
   next.day += 1;
@@ -725,6 +779,14 @@ export function applyEventChoice(state, eventId, choiceIndex) {
   next.prestige = clamp((next.prestige ?? 0) + (effects.prestige ?? 0), 0, 100);
   next.turfQuality = clamp((next.turfQuality ?? 0) + (effects.turf ?? 0), 0, 100);
   next.goodwill = applyGoodwill(next.goodwill ?? emptyGoodwill(), effects.goodwill ?? {});
+
+  // And anything that is still wrong tomorrow. This is what makes a
+  // choice something to live with rather than a number subtracted once —
+  // see src/sim/conditions.js for why every consequence used to land in a
+  // single instant.
+  if (effects.condition) {
+    next.conditions = addCondition(next.conditions ?? [], effects.condition);
+  }
   return next;
 }
 
