@@ -31,13 +31,19 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23f';
+export const BUILD = '2026-09-23g';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-23g',
+    notes: [
+      'Four more people want something from you. One of them would like to start a snorkelling programme, and he has thought about it more than you have. They are real decisions with real costs, so read them properly before you pick.',
+    ],
+  },
   {
     version: '2026-09-23f',
     notes: [

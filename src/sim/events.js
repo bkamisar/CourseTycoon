@@ -26,6 +26,10 @@ export const SPEAKERS = {
   supplierRep: 'A turf supplier',
   touringPro: 'A touring pro',
   charityRep: 'A hospice fundraiser',
+  hotelHand: 'A hotel porter',
+  realtor: 'Jay, who sells houses',
+  weekendGuy: 'A man with a plan',
+  security: 'Charles, on security',
 };
 
 /**
@@ -1065,6 +1069,195 @@ export const EVENTS = [
         label: 'Not this season',
         cost: 'Free, and the town remembers being told no.',
         effects: { goodwill: { locals: -7 } },
+      },
+    ],
+  },
+
+
+  // --- The ones that are jokes, and also load-bearing -------------------
+  //
+  // Written to the same rules as everything above: two real choices, a
+  // concrete cost on each, no option that is simply better than the
+  // others. A joke event that cannot be got wrong is a cutscene, and the
+  // player learns to stop reading them.
+  //
+  // Each of these is also a real thing a golf course deals with. Divers
+  // genuinely do pull thousands of balls out of the ponds and sell them
+  // back. Courses genuinely do get developed right up to the fairway by
+  // somebody who wants to be in the photograph. Discount block bookings
+  // genuinely do arrive by minibus. That is what keeps them from reading
+  // as a different game briefly interrupting this one.
+
+  {
+    id: 'snorkel-programme',
+    speaker: 'hotelHand',
+    prompt: "One of the porters would like to start a snorkelling programme. Pressed on where, exactly, he gestures at the pond on the 7th. Pressed on his qualifications, he says there is a hole in his résumé and he would rather fill it than explain it.",
+    when: (c) => c.act >= 2,
+    choices: [
+      {
+        stance: 'commercial',
+        label: 'Let him dive the ponds',
+        cost: '$1,800 for a wetsuit and a permit. Every ball he brings up gets sold again — $310 a day for 18 days — and the pond on the 7th looks like a building site the whole time.',
+        effects: {
+          money: -1800,
+          goodwill: { serious: -4, locals: 5 },
+          condition: {
+            id: 'pond-diving', label: 'Snorkelling programme',
+            note: 'A porter in a wetsuit, in the pond, during play.',
+            days: 18, dailyMoney: -310, demandFactor: 0.96,
+          },
+        },
+      },
+      {
+        stance: 'ambitious',
+        label: 'Make it a guest activity',
+        cost: '$7,400 for gear, signage and someone insured to supervise. Destination guests love it (+10) and nobody serious can look at it.',
+        effects: {
+          money: -7400,
+          prestige: 3,
+          goodwill: { destination: 10, serious: -9 },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'The pond is not a reef',
+        cost: 'Free. He takes it well, which is somehow worse.',
+        effects: { goodwill: { locals: -2 } },
+      },
+    ],
+  },
+
+  {
+    id: 'jay-the-realtor',
+    speaker: 'realtor',
+    prompt: "Jay would like to put eleven houses along the 4th and the 5th. Jay would also like to be in every photograph of the houses, the fairway, the sunset, and, at one point in the presentation, this conversation.",
+    when: (c) => c.prestige >= 30 && c.holesOpen >= 5,
+    choices: [
+      {
+        stance: 'commercial',
+        label: 'Sell him the strip',
+        cost: '$48,000 now. Two holes are a building site for 12 days, and eleven back gardens along the 4th and 5th is not what anyone drove out here for.',
+        effects: {
+          money: 48000,
+          prestige: -7,
+          goodwill: { serious: -10, destination: -6, locals: 4 },
+          condition: {
+            id: 'jay-construction', label: 'Building site',
+            note: 'Eleven houses going up along the 4th and the 5th.',
+            days: 12, holesClosed: 2,
+          },
+        },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Just the filming rights',
+        cost: 'He pays $240 a day for 18 days to shoot here. He is on the 4th tee at seven in the morning talking to a phone on a stick.',
+        effects: {
+          goodwill: { serious: -4, locals: 3 },
+          condition: {
+            id: 'jay-filming', label: 'Jay is filming',
+            note: 'A phone on a stick, on the 4th tee, most mornings.',
+            days: 18, dailyMoney: -240,
+          },
+        },
+      },
+      {
+        stance: 'principled',
+        label: 'The course is not a backdrop',
+        cost: 'Costs the $48,000 and buys a course that still looks like one. Prestige +4.',
+        effects: { prestige: 4, goodwill: { serious: 7, destination: 4 } },
+      },
+    ],
+  },
+
+  {
+    id: 'guys-weekend',
+    speaker: 'weekendGuy',
+    prompt: "A man would like the club to sponsor a Guys Weekend. Sixteen of them, shuttled in from Pigeon Hollow, where he lives. The shuttle would leave from Pigeon Hollow, where he lives, at six. He has costed it out from Pigeon Hollow, where he lives, and the number only works with a major discount.",
+    when: (c) => c.holesOpen >= 5,
+    choices: [
+      {
+        stance: 'commercial',
+        label: 'Sponsor the weekend',
+        cost: '$3,200 toward the shuttle, and they pay a rate barely worth having — $180 a day for 13 days. Sixteen of them, loud, for a weekend a month.',
+        effects: {
+          money: -3200,
+          goodwill: { locals: -7, serious: -6, destination: 4 },
+          condition: {
+            id: 'guys-weekend', label: 'Guys Weekend',
+            note: 'Sixteen of them, in from Pigeon Hollow, where he lives.',
+            days: 13, dailyMoney: -180, demandFactor: 0.93,
+          },
+        },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'A rate, but not a sponsorship',
+        cost: 'Free to offer. They come anyway at $420 a day for 13 days, in their own cars, slightly wounded.',
+        effects: {
+          goodwill: { locals: -2 },
+          condition: {
+            id: 'guys-weekend', label: 'Guys Weekend',
+            note: 'They came anyway, and they are still telling you about the drive.',
+            days: 13, dailyMoney: -420, demandFactor: 0.97,
+          },
+        },
+      },
+      {
+        stance: 'defiant',
+        label: 'No discount, no shuttle',
+        cost: 'Free. He explains where Pigeon Hollow is one more time and then leaves. Locals goodwill +3.',
+        effects: { goodwill: { locals: 3 } },
+      },
+    ],
+  },
+
+  {
+    id: 'charles-on-security',
+    speaker: 'security',
+    prompt: "Charles found two grown men fighting over whose ball it was on the 14th and logged it as guy stuff. The incident book has one other entry this month, which reads: did 40 pull ups.",
+    when: (c) => c.day >= 22 && c.groups >= 10,
+    choices: [
+      {
+        stance: 'thorough',
+        label: 'Let him go, hire properly',
+        cost: '$5,600 in severance and agency fees, and nobody on the gate for 10 days while it is sorted.',
+        effects: {
+          money: -5600,
+          condition: {
+            id: 'no-security', label: 'Nobody on the gate',
+            note: 'The post is empty while the agency finds somebody.',
+            days: 10, turfPerDay: -1.8,
+          },
+        },
+      },
+      {
+        stance: 'pragmatic',
+        label: 'Send him on a course',
+        cost: '$2,400 for the training and $220 a day for 12 days of cover while he is on it. He comes back with a certificate and the same opinions.',
+        effects: {
+          money: -2400,
+          goodwill: { locals: 4 },
+          condition: {
+            id: 'charles-training', label: 'Charles on a course',
+            note: 'Cover on the gate while he learns what is not guy stuff.',
+            days: 12, dailyMoney: 220,
+          },
+        },
+      },
+      {
+        stance: 'thrifty',
+        label: 'Leave him to it',
+        cost: 'Free, and it happens again. Word gets round for 11 days that nobody here will stop anything, and turnout runs about a fifth down.',
+        effects: {
+          prestige: -3,
+          goodwill: { locals: -5 },
+          condition: {
+            id: 'unpoliced', label: 'Nobody stops anything',
+            note: 'Two more since the 14th. Charles did 40 more pull ups.',
+            days: 11, demandFactor: 0.8,
+          },
+        },
       },
     ],
   },
