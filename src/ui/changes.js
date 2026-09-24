@@ -31,13 +31,19 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24b';
+export const BUILD = '2026-09-24c';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24c',
+    notes: [
+      'The out-of-date warning now tells you how to actually clear it on a phone, in an order that does not cost you your game. Closing the tab does not do it, whatever the old wording said.',
+    ],
+  },
   {
     version: '2026-09-24b',
     notes: [
@@ -325,8 +331,14 @@ function reloadAdvice() {
   } catch { /* assume desktop */ }
 
   return touch
-    ? 'To fix it: close this tab or app completely — not just switch away from '
-      + 'it — and open the game again. Pulling to refresh is usually not enough.'
+    ? 'Closing the tab will not fix this — a phone keeps the old files anyway. '
+      + 'The only reliable way, in this order: (1) tap Carry on anyway, then '
+      + 'Copy Save Code on the start screen and paste it somewhere safe. '
+      + '(2) On iPhone: Settings, Safari, Advanced, Website Data, find this '
+      + 'site and swipe to delete it. On Android: the padlock by the address, '
+      + 'then site settings, then clear. (3) Open the game again and paste '
+      + 'your code into Load From a Save Code. Step 2 deletes your saved '
+      + 'game, which is why step 1 comes first.'
     : 'To fix it, reload the page properly: Ctrl+Shift+R on Windows, or '
       + 'Cmd+Shift+R on a Mac.';
 }
@@ -366,8 +378,8 @@ export function mountChanges(root, { serverBuild, onDismiss } = {}) {
     const warn = document.createElement('p');
     warn.className = 'changes-item';
     warn.textContent =
-      'Do not use "clear website data" to do it — your saved game lives in '
-      + 'that data and clearing it deletes the game.';
+      'Your saved game lives in that website data, so take the save code '
+      + 'first and you lose nothing. Without it, you lose the game.';
 
     card.append(kicker, title, item, how, warn);
   } else {
