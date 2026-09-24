@@ -31,13 +31,22 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24e';
+export const BUILD = '2026-09-24f';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24f',
+    notes: [
+      'Two choices said they would cost you money when they cost you nothing. Turning down the developer read as paying him $48,000, and refusing the society block read as paying out $780 a day — both are money you decline rather than money you hand over, and they now say so.',
+      'Selling the developer the land now makes clear he pays YOU, and going in on his campaign makes clear you are the one putting money in.',
+      'When the residents turn up afterwards, they now say what they are actually complaining about.',
+      'And a few lines were printing raw escape codes instead of apostrophes and dashes.',
+    ],
+  },
   {
     version: '2026-09-24e',
     notes: [

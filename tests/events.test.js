@@ -399,3 +399,74 @@ test('a follow-up only talks about things its own storyline established', () => 
     }
   }
 });
+
+test('no event shows the player an unrendered escape sequence', () => {
+  // Three event lines carried a literal backslash-u escape into the game:
+  // "residents\u2019 association" and "$23,000 \u2014 more than". They were
+  // written through a script that escaped the backslash one time too many,
+  // so what reached the player was the escape itself rather than the
+  // apostrophe or the dash it stood for.
+  //
+  // Nothing else could catch this. The strings were valid, the costs were
+  // concrete, the effects were fine — it only looks wrong when a human
+  // reads it on a screen, which is how it was found.
+  const badly = /\u[0-9a-fA-F]{4}|\n|\t/;
+  for (const event of EVENTS) {
+    const fields = [['prompt', event.prompt]];
+    for (const choice of event.choices) {
+      fields.push([`choice "${choice.label}" label`, choice.label]);
+      fields.push([`choice "${choice.label}" cost`, choice.cost]);
+      const c = choice.effects?.condition;
+      if (c) {
+        fields.push([`condition ${c.id} label`, c.label]);
+        fields.push([`condition ${c.id} note`, c.note]);
+      }
+    }
+    for (const [where, text] of fields) {
+      assert.ok(typeof text === 'string' && text.length > 0,
+        `${event.id}: ${where} is missing`);
+      assert.ok(!badly.test(text),
+        `${event.id}: ${where} shows an unrendered escape — "${text}"`);
+    }
+  }
+});
+
+test('a choice that pays the player says so, and none pretends to charge for nothing', () => {
+  // Reported from play: "why do you need to PAY the 48k if you take the
+  // principled route?" The line read "Costs the $48,000 and buys a course
+  // that still looks like one" while the money effect was zero — turning
+  // an offer down, not paying for the privilege. And the choice that
+  // genuinely paid $48,000 INTO the bank said only "$48,000 now", which
+  // reads like a charge.
+  //
+  // Direction of money is the one thing a cost line must never get wrong,
+  // because the player cannot check it against anything until after they
+  // have chosen.
+  // Broadened once already: "nets about $1,200 in guaranteed revenue" is
+  // a perfectly clear way to say a choice pays, and the first draft of
+  // this list did not know it. The test is about direction being legible,
+  // not about a house phrasing.
+  const income = /pays? you|paid|you get|into the bank|they pay|nets?|revenue|brings? in/i;
+  // Has to name an actual sum. "Saves the wage and costs the knowledge"
+  // is a choice that takes no money and says so; only a payment phrase
+  // followed by a figure is a claim about the bank.
+  const outgoing = /(costs? (the|you)|you put in|you pay)[^.]*\$[\d,]+/i;
+
+  for (const event of EVENTS) {
+    for (const choice of event.choices) {
+      const money = choice.effects?.money ?? 0;
+      const where = `${event.id}/${choice.label}`;
+
+      if (money > 0) {
+        assert.ok(income.test(choice.cost),
+          `${where} pays the player $${money} and the line does not say so — "${choice.cost}"`);
+        assert.ok(!outgoing.test(choice.cost),
+          `${where} pays the player $${money} but reads like a charge — "${choice.cost}"`);
+      }
+      if (money === 0) {
+        assert.ok(!outgoing.test(choice.cost),
+          `${where} takes no money and reads like it does — "${choice.cost}"`);
+      }
+    }
+  }
+});

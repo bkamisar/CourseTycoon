@@ -1034,7 +1034,7 @@ export const EVENTS = [
       {
         stance: 'defiant',
         label: 'No blocks',
-        cost: 'Costs the $780 a day. The regulars hear about it and like you for it — goodwill +8.',
+        cost: 'Turns down the $780 a day rather than paying it out. The regulars hear about it and like you for it — goodwill +8.',
         effects: { goodwill: { locals: 8 } },
       },
     ],
@@ -1217,7 +1217,7 @@ export const EVENTS = [
       {
         stance: 'commercial',
         label: 'Sell him the strip',
-        cost: '$48,000 now. Two holes are a building site for 12 days, and eleven back gardens along the 4th and 5th is not what anyone drove out here for.',
+        cost: 'He pays you $48,000. Two holes are a building site for 12 days, and eleven back gardens along the 4th and 5th is not what anyone drove out here for.',
         effects: {
           money: 48000,
           fallout: 0.5,
@@ -1233,7 +1233,7 @@ export const EVENTS = [
       {
         stance: 'ambitious',
         label: 'Go in on the campaign with him',
-        cost: '$4,200 for a promotional partnership. He has four hundred followers and three of them are his mother. Buys nothing.',
+        cost: 'You put in $4,200. He has four hundred followers and three of them are his mother, so it buys you nothing at all.',
         effects: {
           money: -4200,
           goodwill: { serious: -4, locals: 2 },
@@ -1248,7 +1248,11 @@ export const EVENTS = [
       {
         stance: 'principled',
         label: 'The course is not a backdrop',
-        cost: 'Costs the $48,000 and buys a course that still looks like one. Prestige +4.',
+        // "Costs the $48,000" read as paying it. Nothing changes hands
+        // here -- the money effect is zero -- so the line was telling the
+        // player they were about to be $48,000 poorer when they were
+        // simply turning the offer down.
+        cost: 'Turns down his $48,000. Nothing leaves the bank, and the course still looks like a course. Prestige +4.',
         effects: { prestige: 4, goodwill: { serious: 7, destination: 4 } },
       },
     ],
@@ -1373,7 +1377,7 @@ export const EVENTS = [
       {
         stance: 'thorough',
         label: 'Do the whole job this time',
-        cost: '$23,000 \\u2014 more than the $14,000 it would have been \\u2014 and three holes shut for 9 days.',
+        cost: '$23,000 — more than the $14,000 it would have been — and three holes shut for 9 days.',
         effects: {
           money: -23000,
           condition: {
@@ -1457,7 +1461,7 @@ export const EVENTS = [
     speaker: 'realtor',
     // Only for the resort that sold him the land.
     when: (c) => c.haunted('jay-the-realtor', 0, 13) && !c.answered('jay-after'),
-    prompt: "The eleven houses are up and sold, and eleven households have discovered what a golf course is. Jay, who no longer lives in any of the photographs, has given them your number.",
+    prompt: "The eleven houses are up and sold, and eleven households have discovered what a golf course is. Two cracked panes, a dented car, a conservatory roof and something that went through a shed, all in the first fortnight — and every one of them is your fault, apparently. Jay, who no longer lives in any of the photographs, has given them your number.",
     choices: [
       {
         stance: 'thorough',
@@ -1481,11 +1485,11 @@ export const EVENTS = [
       {
         stance: 'defiant',
         label: 'They bought a house on a golf course',
-        cost: 'Free, and true, and it does not help. Eleven households and a residents\\u2019 association for 18 days, at $260 a day and a tenth off the takings.',
+        cost: 'Free, and true, and it does not help. Eleven households and a residents’ association for 18 days, at $260 a day and a tenth off the takings.',
         effects: {
           goodwill: { locals: -8 },
           condition: {
-            id: 'residents-association', label: 'Residents\\u2019 association',
+            id: 'residents-association', label: 'Residents’ association',
             note: 'Eleven households who have read the deeds and have questions.',
             days: 18, dailyMoney: 260, demandFactor: 0.9,
           },
