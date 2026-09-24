@@ -4,100 +4,43 @@ Things found by playing that are not yet fixed. Each one is written from
 what the player saw, not from a guess about the cause — the cause is for
 whoever picks it up.
 
+Fixed entries are deleted rather than annotated. A file of mostly-solved
+problems is one nobody reads, and a stale entry here is worse than no
+entry: it sends the next session chasing something that is already done.
+
 ---
 
-## Act II
+## Open
 
-### The day recap never says what the hotel earned
+### Act II has never been measured
 
-**Found:** first Act II playthrough, 2026-09-21.
+**The most important thing outstanding.** `tools/operator.js` has no
+notion of rooms, room rates, hotel amenities or investors — it plays Act
+I and stops. So nothing is known about whether Act II is any good, only
+that its mechanics fire correctly.
 
-The report screen shows occupancy ("9 of 17 filled — 53%") and the
-investor line, but no money. There is no way to tell from the recap
-whether the rooms made anything, which means there is no way to tell
-whether the nightly rate is set anywhere near right — the one decision
-Act II asks the player to make every day.
+The questions nobody can currently answer:
 
-`roomRevenue` is computed in `src/sim/rooms.js` and folded into the day's
-revenue, and `costs.rooms` is `nightlyUpkeep(rooms) + hotelUpkeep(amenities)`
-in `src/sim/day.js`. Both numbers exist; neither reaches
-`src/ui/report.js`. Worth showing the pair, not just the total, because
-the interesting fact is the margin: a hotel can take real money across the
-desk and still lose on the night.
+- Is building rooms a ratchet? Upkeep bills whether a bed is filled or
+  not, which is supposed to be the brake, but is the optimum simply
+  "build to the catchment and coast"?
+- Are the four investor measures four problems or one? If a single way of
+  running the hotel satisfies occupancy, revenue per room, prestige and
+  satisfaction together, the fortnightly review is a formality.
+- Can a competent operator actually lose? Confidence has to be able to
+  reach zero without the player trying to fail.
+- Do the fourteen hotel amenities support more than one build?
 
-### Act II still shows Act I's goals
+Act I looked fine on spot measurements the day it shipped broken. The
+operator is the only thing that has ever caught a real balance problem on
+this project, and it has never been pointed at this act.
 
-**Found:** first Act II playthrough, 2026-09-21.
+### The turf self-heals when a resort empties out
 
-After the gate passes and the investors arrive, the goal display still
-lists the Act I gate conditions (money, prestige, holes, satisfaction held
-for N days). Those are finished and cannot be un-met; the standing
-investor target is what the player is now playing to.
+**Found:** 2026-09-23, while making play wear the course. **Known and
+accepted by the author for now.**
 
-`GATE_THRESHOLDS` and the gate readout in the HUD/overview do not check
-`state.act`. The investor target is already rendered on the report
-(`formatTarget` in `src/ui/report.js`) — the goals surface needs to switch
-to it rather than showing both.
-
-### Act I is narrower than it was, and wide tee intervals cannot survive
-
-**Found:** 2026-09-23, by the first balance sweep run after the rebalance.
-**Open, and the most important thing outstanding.**
-
-After the rebalance and the three fixes that followed it, a competent
-operator over 150 days from day one:
-
-    cheap and busy   $65/14min   1/8 reach Act II   0/8 bankrupt
-    balanced         $80/14min   5/8 reach Act II   0/8 bankrupt
-    quiet and pricey $80/18min   0/8               6/8 bankrupt
-    premium          $95/18min   0/8               8/8 bankrupt
-    bargain basement $50/12min   0/8               3/8 bankrupt
-    luxury          $110/20min   0/8               8/8 bankrupt
-
-One strategy works. Before the rebalance there were four. The gate is not
-the problem -- the money optimum sits at satisfaction 70 and the gate asks
-for 72, which is the intended squeeze -- the problem is that wide tee
-intervals cannot earn enough to survive the build-out.
-
-The cause looks structural and predates the rebalance: in
-`demandGroups`, `raw = capacity * appeal * pull`, so **demand is
-proportional to the size of the tee sheet**. A 20-minute interval has 40%
-fewer slots than a 12-minute one and therefore 40% less demand before
-anything else is considered. Wide intervals used to compensate through
-word of mouth, but that term is clamped at 1.25, and the catchment
-ceiling now caps the compensation again.
-
-Fixing it properly means separating "how many people want to come" from
-"how many tee times exist" -- the ceiling should come from the catchment
-and the tee sheet should only decide how many of those can be seated.
-That is a real change to the demand model and wants its own session.
-
-### Act I's central tension may have gone
-
-**Found:** 2026-09-23, while fixing the measurement fixtures. **Open —
-needs a balance run before anything is changed.**
-
-The Act I gate is built on the premise that a packed, unpleasant course
-out-earns a pleasant one, so a player optimising for money will never
-cross the satisfaction line. Re-measured on a course that is actually
-nine holes, that is backwards by about four times:
-
-    tee every  6 min -> satisfaction 30, profit   $918/day
-    tee every 20 min -> satisfaction 69, profit $4,097/day
-
-The old figure was taken on a fixture that claimed to be a nine and built
-eighteen, and it predates the word-of-mouth change that made a good
-reputation compound. One seed, one fixture, no operator — a signal, not a
-conclusion. `tools/balance.js` is what settles it. The reasoning in
-`src/sim/acts.js` now carries these numbers and says so.
-
-If it holds, Act I is too easy and the gate is not really a gate.
-
-### Hotel amenities not visible
-
-**Found:** first Act II playthrough, 2026-09-21. **Probably not a bug.**
-
-Reported as "I don't see the hotel amenities as something you can buy".
-The build UI landed in `adad7f1`, which was unpushed at the time, so the
-deployed build did not have it. Confirm against a pushed build before
-investigating further.
+Wear scales with traffic, so a resort that loses its golfers also stops
+damaging its greens, recovers, and draws them back. It is realistic and
+it works against "hard to dig out of". Left deliberately; revisit if a
+collapse ever feels too easy to recover from.
