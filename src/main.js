@@ -208,12 +208,69 @@ function commitState(next) {
   persist();
 }
 
-/** Writes the current game, and says so if it could not. */
+/**
+ * Writes the current game, and makes a failure impossible to miss.
+ *
+ * A failed write used to go to the console and nowhere else, which is the
+ * same as nowhere: the game carried on looking perfectly healthy while
+ * nothing was being stored, and the player found out days later when a
+ * tab reopened into the past. Silent data loss is the worst kind of bug
+ * this game can have, because every screen keeps telling the player their
+ * resort is fine.
+ */
+let saveFailureShown = false;
 function persist() {
   if (!state) return;
-  if (!adapter.save(state)) {
-    console.warn('Course Tycoon: could not save the game (every save backend failed).');
+  if (adapter.save(state)) {
+    saveFailureShown = false;
+    // A record of the write, so the start screen can prove one happened.
+    // Reading a save back is the only way to tell "saving works" from
+    // "saving looks like it works", and on a phone the difference is
+    // invisible until days later.
+    try {
+      localStorage.setItem('courseTycoon.lastWrite', JSON.stringify({
+        at: Date.now(), day: state.day, money: Math.round(state.money ?? 0),
+      }));
+    } catch { /* the stamp is a diagnostic, never a reason to fail a save */ }
+    return;
   }
+  console.warn('Course Tycoon: could not save the game (every save backend failed).');
+  if (saveFailureShown) return;
+  saveFailureShown = true;
+  showSaveFailure();
+}
+
+/**
+ * The banner. Deliberately hard to ignore and deliberately not a dialog:
+ * the player should be able to keep playing, because the game in front of
+ * them is still real even though it is no longer being written down.
+ */
+function showSaveFailure() {
+  const bar = document.createElement('div');
+  bar.setAttribute('role', 'alert');
+  bar.style.cssText = [
+    'position:fixed', 'left:0', 'right:0', 'bottom:0', 'z-index:9999',
+    'padding:12px 14px', 'font:12px/1.5 monospace',
+    `background:${PALETTE.SAND}`, `color:${PALETTE.OUTLINE}`,
+    'pointer-events:auto',
+  ].join(';');
+  bar.textContent =
+    'This game is no longer being saved — your browser refused the write. '
+    + 'Copy a save code from the start screen before you close this tab, or '
+    + 'the days from here will be lost.';
+
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.textContent = 'Dismiss';
+  dismiss.style.cssText = [
+    'margin-left:10px', 'min-height:32px', 'padding:0 10px',
+    'font:12px monospace', 'cursor:pointer',
+    `background:${PALETTE.OUTLINE}`, `color:${PALETTE.SAND}`,
+    'border:1px solid currentColor', 'border-radius:6px',
+  ].join(';');
+  dismiss.addEventListener('click', () => bar.remove());
+  bar.appendChild(dismiss);
+  document.body.appendChild(bar);
 }
 
 /**

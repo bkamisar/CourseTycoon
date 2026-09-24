@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24a';
+export const BUILD = '2026-09-24b';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24b',
+    notes: [
+      'The start screen now has a "Saving" card that reads your stored game back and tells you what is actually in it — which day and how big. If what is stored is older than what you played, it says so. If saves have been going missing, that card is what will show it.',
+      'If a save is ever refused, the game now says so on screen straight away instead of carrying on looking perfectly healthy while nothing is being written down.',
+      'The out-of-date warning finally gives advice that works on a phone. It used to suggest a keyboard shortcut.',
+    ],
+  },
   {
     version: '2026-09-24a',
     notes: [
@@ -297,6 +305,32 @@ export async function liveVersion() {
  * and new — and the only useful advice is to reload properly. If they
  * match, show the notes for this version once.
  */
+/**
+ * How to force a reload, on the device actually reading it.
+ *
+ * This said "Ctrl+Shift+R on Windows, or Cmd+Shift+R on a Mac" and
+ * nothing else, which is no help at all on a phone — where module
+ * caching bites hardest and where this game is mostly played. A player
+ * asked how to force a refresh on a phone and there was no answer in the
+ * game or out of it.
+ *
+ * Touch is detected rather than the user agent, because what matters here
+ * is whether the reader has a keyboard to press the shortcut on.
+ */
+function reloadAdvice() {
+  let touch = false;
+  try {
+    touch = window.matchMedia?.('(pointer: coarse)').matches
+      || (navigator.maxTouchPoints ?? 0) > 0;
+  } catch { /* assume desktop */ }
+
+  return touch
+    ? 'To fix it: close this tab or app completely — not just switch away from '
+      + 'it — and open the game again. Pulling to refresh is usually not enough.'
+    : 'To fix it, reload the page properly: Ctrl+Shift+R on Windows, or '
+      + 'Cmd+Shift+R on a Mac.';
+}
+
 export function mountChanges(root, { serverBuild, onDismiss } = {}) {
   injectStyles();
   root.replaceChildren();
@@ -323,9 +357,19 @@ export function mountChanges(root, { serverBuild, onDismiss } = {}) {
     item.textContent =
       'Your browser is holding onto old files, and may be mixing them with new '
       + 'ones — which can make the game behave oddly rather than simply behave '
-      + 'like an older version. Reload the page properly to fix it: '
-      + 'Ctrl+Shift+R on Windows, or Cmd+Shift+R on a Mac.';
-    card.append(kicker, title, item);
+      + 'like an older version.';
+
+    const how = document.createElement('p');
+    how.className = 'changes-item changes-stale';
+    how.textContent = reloadAdvice();
+
+    const warn = document.createElement('p');
+    warn.className = 'changes-item';
+    warn.textContent =
+      'Do not use "clear website data" to do it — your saved game lives in '
+      + 'that data and clearing it deletes the game.';
+
+    card.append(kicker, title, item, how, warn);
   } else {
     kicker.textContent = 'Since you last played';
     title.textContent = unseen.length > 1

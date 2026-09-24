@@ -256,6 +256,50 @@ function confirmNewGame(sheets, data, onConfirm) {
  * and the field is left as the player typed it; a success is left for the
  * caller to act on (this screen does not decide what happens next).
  */
+/**
+ * What storage actually contains, in words.
+ *
+ * Deliberately reads back rather than trusting the last write to have
+ * worked: a save that was refused leaves the previous one in place, and
+ * the game cannot tell the difference without looking.
+ */
+function saveHealth() {
+  let raw = null;
+  let stamp = null;
+  try {
+    raw = localStorage.getItem('course-tycoon-save');
+    const s = localStorage.getItem('courseTycoon.lastWrite');
+    stamp = s ? JSON.parse(s) : null;
+  } catch {
+    return 'This browser will not let the game use storage at all, so nothing '
+      + 'can be saved here. Copy a save code before you close the tab.';
+  }
+
+  if (!raw) return 'Nothing is stored yet. A new game will be saved as you play it.';
+
+  const kb = Math.round(raw.length / 1024);
+  let day = null;
+  try { day = JSON.parse(raw).day; } catch { /* reported below */ }
+  if (day === null || day === undefined) {
+    return `There is something in storage (${kb} KB) but it cannot be read back. `
+      + 'That is a bug worth reporting.';
+  }
+
+  const parts = [`Stored game: day ${day}, ${kb} KB.`];
+  if (stamp?.at) {
+    const mins = Math.round((Date.now() - stamp.at) / 60000);
+    const when = mins < 1 ? 'less than a minute ago'
+      : mins < 60 ? `${mins} minutes ago`
+        : `${Math.round(mins / 60)} hours ago`;
+    parts.push(`Last written ${when}, on day ${stamp.day}.`);
+    if (stamp.day !== day) {
+      parts.push('Those two days do not match, which means a write was refused '
+        + 'and what is stored is older than what was played. Please report this.');
+    }
+  }
+  return parts.join(' ');
+}
+
 export function mountStartScreen(root, { save, saveCode, sheets, topInset = 0, onContinue, onNewGame, onLoadCode } = {}) {
   injectStyles();
   const data = computeStartScreenData(save);
@@ -310,6 +354,28 @@ export function mountStartScreen(root, { save, saveCode, sheets, topInset = 0, o
   });
   newGameCard.append(newGameTitle, newGameBtn);
   screen.appendChild(newGameCard);
+
+  // --- Is this game actually being saved? --------------------------------
+  //
+  // A player reported their game reverting by dozens of days on a phone,
+  // on the current build, with nothing on screen ever suggesting anything
+  // was wrong. Every screen in this game will happily show a healthy
+  // resort that is not being written down anywhere, and there was no way
+  // for the player OR for me to tell the difference from the outside.
+  //
+  // This reads the storage back and reports what is actually in it, which
+  // is the one thing a bug report about lost saves needs and could not
+  // previously include.
+  const diag = document.createElement('div');
+  diag.className = 'start-card';
+  const diagTitle = document.createElement('p');
+  diagTitle.className = 'start-card-title';
+  diagTitle.textContent = 'Saving';
+  const diagBody = document.createElement('p');
+  diagBody.className = 'start-hint';
+  diagBody.textContent = saveHealth();
+  diag.append(diagTitle, diagBody);
+  screen.appendChild(diag);
 
   // --- What has changed --------------------------------------------------
   //
