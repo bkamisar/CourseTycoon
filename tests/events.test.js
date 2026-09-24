@@ -351,3 +351,51 @@ test('every risky choice can actually be haunted, and every follow-up has a pare
       `${event.id} watches no choice that carries a fallout chance, so it can never fire`);
   }
 });
+
+test('a follow-up only talks about things its own storyline established', () => {
+  // A player hit the vandalism reckoning — Gus confronted four of them and
+  // will not patrol again — and was offered "Leave the gate open and
+  // hope". This storyline runs lighting, Gus on overtime, or nothing;
+  // there is no gate in it. The gate belongs to the security guard's
+  // chain, and had been copied across.
+  //
+  // A choice that refers to something the player was never told about
+  // reads as broken however sensible its numbers are, and no test about
+  // effects, costs or dominance can see it. This is a crude guard for one
+  // specific class of that: a follow-up naming a prop that appears
+  // nowhere in the events it follows from.
+  // Words for physical things a choice can act on. Deliberately a short
+  // list of concrete nouns: the first draft of this test flagged "a tenth
+  // off the gate" in Jay's reckoning, which is gate RECEIPTS and perfectly
+  // correct golf usage. That line now says "takings", because a word with
+  // two senses is worth avoiding in front of a player as well as in front
+  // of a test, but the lesson stands -- keep this list to things that can
+  // only be one thing.
+  const props = ['gate', 'netting', 'shuttle', 'pond', 'bunker', 'mower'];
+
+  for (const event of FOLLOW_UPS) {
+    // Which parents can reach this follow-up at all.
+    const parents = EVENTS.filter((candidate) => {
+      if (candidate.followUp) return false;
+      for (let i = 0; i < candidate.choices.length; i++) {
+        const made = { [candidate.id]: { index: i, day: 1, haunted: true } };
+        if (event.when(madeContext(made))) return true;
+      }
+      return false;
+    });
+    if (parents.length === 0) continue;
+
+    const established = [
+      event.prompt,
+      ...parents.map((p) => `${p.prompt} ${p.choices.map((c) => `${c.label} ${c.cost}`).join(' ')}`),
+    ].join(' ').toLowerCase();
+    const offered = event.choices.map((c) => `${c.label} ${c.cost}`).join(' ').toLowerCase();
+
+    for (const prop of props) {
+      if (!offered.includes(prop)) continue;
+      assert.ok(established.includes(prop),
+        `${event.id} offers a choice about a "${prop}" that neither it nor `
+        + `${parents.map((p) => p.id).join('/')} ever mentions`);
+    }
+  }
+});

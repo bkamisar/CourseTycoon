@@ -1481,7 +1481,7 @@ export const EVENTS = [
       {
         stance: 'defiant',
         label: 'They bought a house on a golf course',
-        cost: 'Free, and true, and it does not help. Eleven households and a residents\\u2019 association for 18 days, at $260 a day and a tenth off the gate.',
+        cost: 'Free, and true, and it does not help. Eleven households and a residents\\u2019 association for 18 days, at $260 a day and a tenth off the takings.',
         effects: {
           goodwill: { locals: -8 },
           condition: {
@@ -1618,8 +1618,14 @@ export const EVENTS = [
       },
       {
         stance: 'thrifty',
-        label: 'Leave the gate open and hope',
-        cost: 'Free. They keep coming for 15 days, taking about 2.5 points of turf a night.',
+        // Was "Leave the gate open and hope", which offered a decision
+        // about a gate nobody had mentioned -- this storyline runs
+        // lighting, Gus on overtime, or nothing, and the gate belongs to
+        // the security guard's chain. A choice that references something
+        // the player was never told about reads as nonsense however
+        // sensible its numbers are, and a player said so.
+        label: 'Nobody patrols, then',
+        cost: 'Free, and nothing replaces him. They keep coming for 15 days, taking about 2.5 points of turf a night.',
         effects: {
           goodwill: { locals: -6 },
           condition: {

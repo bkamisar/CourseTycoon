@@ -31,13 +31,19 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24d';
+export const BUILD = '2026-09-24e';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24e',
+    notes: [
+      'When the vandals come back and Gus decides he has had enough, the cheap option no longer offers to "leave the gate open" — there is no gate in that story, and it read as nonsense. It now says what it actually is: nobody patrols.',
+    ],
+  },
   {
     version: '2026-09-24d',
     notes: [
