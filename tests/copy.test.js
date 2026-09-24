@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { AMENITIES, WAGES } from '../src/sim/economy.js';
-import { MENU_SLOTS } from '../src/sim/menu.js';
+import { MENU_SLOTS, itemsFor } from '../src/sim/menu.js';
+import { HOTEL_AMENITIES } from '../src/sim/hotelAmenities.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../src/sim/segments.js';
 import { buildComplaints } from '../src/sim/satisfaction.js';
 import { amenityBlurb, roleBlurb, STAFF_ROLES } from '../src/ui/panels.js';
@@ -127,9 +128,18 @@ test('every crowd the HUD shows has a name the glossary could use', () => {
 });
 
 test('every food amenity the copy can mention has slots to fill', () => {
+  // Buildable from EITHER list. The hotel's dining room, brew pub and
+  // cocktail bar sell food and drink and therefore carry menus, and they
+  // live in HOTEL_AMENITIES rather than the Act I catalogue. This guard
+  // caught them the moment they were given slots, which is exactly its
+  // job -- a venue with a menu and no way to build it would be a board
+  // the player could never see.
   for (const type of Object.keys(MENU_SLOTS)) {
-    assert.ok(AMENITIES[type], `${type} has menu slots but cannot be built`);
+    assert.ok(AMENITIES[type] || HOTEL_AMENITIES[type],
+      `${type} has menu slots but cannot be built from either catalogue`);
     assert.ok(MENU_SLOTS[type] > 0, `${type} has a menu of zero slots`);
+    assert.ok(itemsFor(type).length >= MENU_SLOTS[type],
+      `${type} has ${MENU_SLOTS[type]} slots and only ${itemsFor(type).length} things it may serve`);
   }
 });
 

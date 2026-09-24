@@ -24,6 +24,8 @@ import {
 } from '../sim/hotelAmenities.js';
 import { amenity } from '../sim/state.js';
 import { payBuyout } from '../sim/investors.js';
+import { MENU_SLOTS } from '../sim/menu.js';
+import { openMenuBoard } from './menuBoard.js';
 
 /** What demolishing anything returns, matching the Act I amenity panel
  * and the room steppers below: a mistake should cost something without
@@ -151,6 +153,12 @@ function injectStyles() {
       justify-content: space-between; gap: 8px;
     }
     .hotel-built-tag { color: ${PALETTE.ACCENT}; font-size: 12px; }
+    .hotel-menu-btn {
+      min-height: 44px; padding: 0 12px;
+      background: ${PALETTE.UI_DARK}; color: ${PALETTE.ACCENT};
+      border: 1px solid ${PALETTE.ACCENT}; border-radius: 8px;
+      font-family: monospace; font-size: 12px; cursor: pointer;
+    }
     .hotel-sell {
       min-height: 44px; padding: 0 12px;
       background: none; color: ${PALETTE.UI_LIGHT};
@@ -274,7 +282,7 @@ function effectNotes(spec) {
 }
 
 /** One building: what it costs, who wants it, and what it does. */
-function amenityRow(spec, state, commit) {
+function amenityRow(spec, state, commit, sheetHost) {
   const row = document.createElement('div');
   row.className = 'hotel-row';
 
@@ -337,6 +345,27 @@ function amenityRow(spec, state, commit) {
     const tag = document.createElement('span');
     tag.className = 'hotel-built-tag';
     tag.textContent = 'Built';
+
+    // A venue that sells food and drink needs its board reachable, or it
+    // opens with whatever the defaults chose and stays that way forever.
+    // Addressed by the amenity's own id, the way the menu board has
+    // always worked, so a second dining room would get its own board.
+    let menuButton = null;
+    if (MENU_SLOTS[spec.id]) {
+      const owned = state.resort.amenities.find((a) => a.type === spec.id);
+      const menu = document.createElement('button');
+      menu.type = 'button';
+      menu.className = 'hotel-menu-btn';
+      menu.textContent = 'Menu';
+      menu.addEventListener('click', () => {
+        openMenuBoard(sheetHost, {
+          state,
+          amenityId: owned?.id,
+          onChange: commit,
+        });
+      });
+      menuButton = menu;
+    }
     const sell = document.createElement('button');
     sell.type = 'button';
     sell.className = 'hotel-sell';
@@ -356,7 +385,8 @@ function amenityRow(spec, state, commit) {
       next.money += refund;
       commit(next);
     });
-    built.append(tag, sell);
+    // Built | Menu | Demolish, so the name of the thing comes first.
+    built.append(tag, ...(menuButton ? [menuButton] : []), sell);
     row.appendChild(built);
   } else {
     const build = document.createElement('button');
@@ -577,7 +607,7 @@ export function openHotelSheet(sheetHost, { state, onChange }) {
             current = next;
             onChange(current);
             rerender();
-          }));
+          }, sheetHost));
         }
       }
       rerender();

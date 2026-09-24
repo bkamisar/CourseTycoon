@@ -343,6 +343,14 @@ export const MENU_RATE = Object.freeze({
   halfwayHouse: 1.3,
   restaurant: 1.25,
   beverageCart: 1.3,
+  // The hotel's venues catch a smaller share of the crowd than a halfway
+  // house does -- you pass the halfway house whether you meant to or not,
+  // and you have to decide to go to the dining room. The bars sit between
+  // the two: easier to fall into than a restaurant, harder than a hut on
+  // the ninth.
+  fineDining: 0.85,
+  brewPub: 1.05,
+  cocktailBar: 0.95,
 });
 
 /**

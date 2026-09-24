@@ -1,6 +1,8 @@
 import { makeHole } from './hole.js';
 import { emptyGoodwill } from './goodwill.js';
-import { MENU_SLOTS, itemsFor, ITEMS } from './menu.js';
+import {
+  MENU_SLOTS, itemsFor, ITEMS, MENU_AUDIENCE,
+} from './menu.js';
 
 const SAVE_VERSION = 1;
 
@@ -122,9 +124,12 @@ export function amenity(type) {
 export function defaultMenuFor(type) {
   const slots = MENU_SLOTS[type];
   if (!slots) return [];
+  // Sorted by who the venue is for, not by who the first four venues
+  // happened to be for. See MENU_AUDIENCE.
+  const audience = MENU_AUDIENCE[type] ?? 'locals';
   return itemsFor(type)
     .slice()
-    .sort((a, b) => ITEMS[b].appeal.locals - ITEMS[a].appeal.locals)
+    .sort((a, b) => ITEMS[b].appeal[audience] - ITEMS[a].appeal[audience])
     .slice(0, slots);
 }
 

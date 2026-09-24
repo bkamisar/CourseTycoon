@@ -76,6 +76,14 @@ export const MENU_SLOTS = Object.freeze({
   halfwayHouse: 5,
   restaurant: 7,
   beverageCart: 4,
+  // The hotel's three. Eleven of the fourteen hotel buildings were pure
+  // appeal -- they made a crowd likelier to turn up and did nothing else
+  // -- which made the hotel a second appeal slider rather than a place
+  // with things in it. These three sell food and drink, so they get the
+  // system that already exists for selling food and drink.
+  fineDining: 5,
+  brewPub: 4,
+  cocktailBar: 4,
 });
 
 /** Which amenities serve food at all. Order matters: it is the order the
@@ -92,6 +100,20 @@ export function itemsFor(type) {
     const item = ITEMS[id];
     if (type === 'snackShack') return item.prep <= 1;
     if (type === 'beverageCart') return item.cartable;
+    // A dining room is not a place you order a hot dog, and price alone
+    // does not say so -- a $15 burger and chips clears any sane price
+    // line and does not belong. What belongs is what the people the room
+    // exists for actually want, so the test is destination appeal.
+    if (type === 'fineDining') return item.appeal.destination >= 0.7;
+    // Beer and something to eat with it. Wine and espresso belong next
+    // door; everything else a pub would pour is fair game, and the food
+    // stops where a plate starts needing a tablecloth.
+    if (type === 'brewPub') {
+      if (item.kind === 'drink') return id !== 'wineByGlass' && id !== 'espresso';
+      return item.price <= 16;
+    }
+    // Drinks only, which is the whole idea of a bar.
+    if (type === 'cocktailBar') return item.kind === 'drink';
     return true;
   });
 }
@@ -168,3 +190,22 @@ export function menuSatisfaction(menu, segment) {
   );
 }
 
+
+/**
+ * Who a venue's opening board is aimed at.
+ *
+ * Every default used to be sorted by what locals want, which is right for
+ * a hut on the ninth and wrong for a hotel dining room: a cocktail bar
+ * opened stocked with domestic cans and an arnold palmer. A board the
+ * player has to fix before it makes any sense teaches them the system is
+ * broken rather than that it is theirs to set.
+ */
+export const MENU_AUDIENCE = Object.freeze({
+  snackShack: 'locals',
+  halfwayHouse: 'locals',
+  restaurant: 'locals',
+  beverageCart: 'locals',
+  fineDining: 'destination',
+  brewPub: 'locals',
+  cocktailBar: 'destination',
+});
