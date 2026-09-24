@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { encode, decode } from '../src/save/code.js';
-import { newGame, amenity } from '../src/sim/state.js';
+import { newGame, amenity, serialize, deserialize, HISTORY_LIMIT } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { startingInvestors } from '../src/sim/investors.js';
 import { makeRng } from '../src/sim/rng.js';
@@ -122,4 +122,51 @@ test('a save code round-trips a full Act II resort, hotel and investors and all'
     'the standing target must come back, or the player loses the deadline they were playing to');
   assert.doesNotThrow(() => runDay(revived, 1101),
     'and a loaded save has to keep playing');
+});
+
+// --- A save that cannot grow forever -----------------------------------
+
+test('a long game does not grow its save without limit', () => {
+  // `history` kept every day's full report, at about 2.5 KB each: 57 KB at
+  // day 21, 155 KB at day 61, 308 KB at day 121, climbing with no limit.
+  // A write that large can fail on a phone, and when it does the game
+  // carries on in memory while the STORED save stays frozen at the last
+  // one that worked -- so reopening the tab drops the player back dozens
+  // of days with nothing corrupt and nothing said. Reported twice from
+  // mobile before this was found.
+  let state = newGame(5);
+  for (let d = 0; d < 60; d++) state = runDay(state, 5000 + d).state;
+
+  assert.ok(state.history.length <= HISTORY_LIMIT,
+    `history reached ${state.history.length} entries after 60 days`);
+  const bytes = new TextEncoder().encode(serialize(state)).length;
+  assert.ok(bytes < 120 * 1024,
+    `a 60-day save is ${(bytes / 1024).toFixed(0)} KB, which is too big to rely on writing`);
+});
+
+test('the report still has the day before last to compare against', () => {
+  // The whole reason the cap is safe. Trim below two and the evening
+  // report silently loses every up/down arrow.
+  assert.ok(HISTORY_LIMIT >= 2,
+    'the report needs yesterday AND the day before to show movement');
+  let state = newGame(6);
+  for (let d = 0; d < 20; d++) state = runDay(state, 6000 + d).state;
+  assert.ok(state.history.at(-2), 'there must still be a day before last to compare with');
+});
+
+test('an oversized save from before the cap shrinks when it is loaded', () => {
+  // Otherwise a save that is already too big to write stays too big for
+  // another fortnight, which is exactly as broken as it was.
+  let state = newGame(7);
+  for (let d = 0; d < 10; d++) state = runDay(state, 7000 + d).state;
+  const bloated = JSON.parse(serialize(state));
+  const day = bloated.history.at(-1);
+  bloated.history = Array.from({ length: 400 }, () => day);
+  bloated.satisfactionHistory = Array.from({ length: 900 }, () => 60);
+
+  const revived = deserialize(JSON.stringify(bloated));
+  assert.equal(revived.history.length, HISTORY_LIMIT,
+    'a save carrying 400 days must come back trimmed');
+  assert.ok(revived.satisfactionHistory.length <= 90);
+  assert.doesNotThrow(() => runDay(revived, 7100), 'and it has to keep playing');
 });

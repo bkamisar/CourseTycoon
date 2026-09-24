@@ -187,6 +187,51 @@ function stopEditorLoop() {
   activeEditor = null;
 }
 
+
+/**
+ * Adopts a new state AND writes it to disk.
+ *
+ * Everything the player does outside of playing a day — building a hole,
+ * hiring, changing a price, buying rooms, paying the investors off — used
+ * to do `state = next` and nothing else. The only write was `commitDay`,
+ * at the end of a played day, so all of it lived in memory until the
+ * player finished a day and clicked through the report.
+ *
+ * On a phone that is data loss rather than a delay: mobile browsers
+ * discard backgrounded tabs, and reopening the game reloads the last
+ * WRITTEN save. The player reported building things, switching apps, and
+ * coming back to an earlier resort — twice. Nothing was corrupt; the work
+ * had simply never been saved.
+ */
+function commitState(next) {
+  state = next;
+  persist();
+}
+
+/** Writes the current game, and says so if it could not. */
+function persist() {
+  if (!state) return;
+  if (!adapter.save(state)) {
+    console.warn('Course Tycoon: could not save the game (every save backend failed).');
+  }
+}
+
+/**
+ * The safety net, for everything `commitState` cannot see.
+ *
+ * The hole editor mutates its hole in place by design (see
+ * `mountHoleEditor`), so dragging a bunker never passes through any
+ * setter here. `visibilitychange` is the event mobile browsers actually
+ * deliver before discarding a tab — `beforeunload` is unreliable on iOS
+ * and `pagehide` does not always fire — so the game writes whenever it
+ * stops being on screen, and again on pagehide for the cases where it
+ * does fire.
+ */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') persist();
+});
+window.addEventListener('pagehide', persist);
+
 function openEditorFor(holeId) {
   stopEditorLoop();
   router.go('editor');
@@ -208,7 +253,7 @@ function openEditorFor(holeId) {
     // keep going — the same "confirm, then drop back to the overview" exit
     // `onDone` already uses, on the new state rather than the old one.
     onRebuild: (next) => {
-      state = next;
+      commitState(next);
       stopEditorLoop();
       router.go('overview');
     },
@@ -224,7 +269,7 @@ function onHoleTap(holeId) {
       state,
       holeId,
       onBuilt: (next) => {
-        state = next;
+        commitState(next);
         drawOverview();
       },
     });
@@ -235,7 +280,7 @@ function onAmenityTap() {
   openBuildSheet(sheets, {
     state,
     onChange: (next) => {
-      state = next;
+      commitState(next);
       drawOverview();
     },
   });
@@ -289,7 +334,7 @@ const hotelButton = toolbarButton('Hotel', () => {
   openHotelSheet(sheets, {
     state,
     onChange: (next) => {
-      state = next;
+      commitState(next);
       hud.update(state);
       amenityBar.update(state);
     },
@@ -329,7 +374,7 @@ overviewToolbar.append(
     openStaffSheet(sheets, {
       state,
       onChange: (next) => {
-        state = next;
+        commitState(next);
         drawOverview();
       },
     })
@@ -338,7 +383,7 @@ overviewToolbar.append(
     openPricingSheet(sheets, {
       state,
       onChange: (next) => {
-        state = next;
+        commitState(next);
         drawOverview();
       },
     })
@@ -665,15 +710,12 @@ function showPendingEventOrCommit() {
 /** Commits the played day: the resolved state becomes the game, it is
  * saved, and the player is back at the resort. */
 function commitDay() {
-  state = dayResult.state;
+  const played = dayResult.state;
   dayResult = null;
   clock = null;
-  const saved = adapter.save(state);
-  if (!saved) {
-    // Never silently lose a day's progress -- if every backend failed,
-    // at least say so rather than pretending the save happened.
-    console.warn('Course Tycoon: could not save the game (every save backend failed).');
-  }
+  // Never silently lose a day's progress -- `persist` says so if every
+  // backend failed rather than pretending the save happened.
+  commitState(played);
   router.go('overview');
   chiptune.playMusic('build');
 }

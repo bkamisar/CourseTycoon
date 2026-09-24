@@ -7,6 +7,7 @@ import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, menuRevenue } f
 import { guestSatisfaction, buildComplaints } from './satisfaction.js';
 import { courseRating, nextPrestige } from './ratings.js';
 import { actOneGate } from './acts.js';
+import { HISTORY_LIMIT, SATISFACTION_HISTORY_LIMIT } from './state.js';
 import {
   addCondition, tickConditions, conditionEffects,
 } from './conditions.js';
@@ -744,6 +745,15 @@ export function runDay(state, seed) {
   }));
 
   next.history.push(report);
+  // Bounded, because nothing reads further back than the day before
+  // last and an unbounded array is a save that grows forever. See
+  // HISTORY_LIMIT in state.js.
+  if (next.history.length > HISTORY_LIMIT) {
+    next.history = next.history.slice(-HISTORY_LIMIT);
+  }
+  if (next.satisfactionHistory.length > SATISFACTION_HISTORY_LIMIT) {
+    next.satisfactionHistory = next.satisfactionHistory.slice(-SATISFACTION_HISTORY_LIMIT);
+  }
   next.satisfactionHistory.push(averageSatisfaction);
   next.day += 1;
   if (gate.passed) {

@@ -7,6 +7,32 @@ const SAVE_VERSION = 1;
 /** The three holes Pinehollow already has, so day one has income to watch. */
 const STARTING_HOLES = ['shortPar3', 'straightPar4', 'doglegPar4'];
 
+/**
+ * How many days of reports a save carries.
+ *
+ * `history` used to keep every day forever, and a day's report is about
+ * 2.5 KB. Measured: 57 KB at day 21, 155 KB at day 61, 308 KB at day 121,
+ * climbing with no limit. A save that large is a write that can fail on a
+ * phone — and when the write fails the game carries on in memory while
+ * the STORED save stays frozen at the last one that worked, so reopening
+ * the tab drops the player back dozens of days. That is exactly what was
+ * reported, twice, and nothing was corrupt: the writes had simply stopped
+ * landing.
+ *
+ * Nothing reads further back than the day before last: `at(-1)` for
+ * yesterday's crowd and the HUD, `[length - 2]` for the report's deltas.
+ * Fourteen is therefore seven times more than anything needs, and caps a
+ * save at about 35 KB however long the game runs.
+ */
+export const HISTORY_LIMIT = 14;
+
+/**
+ * And the satisfaction series, which is only numbers but was also
+ * unbounded. The gate reads the last 7 and an investor review the last
+ * 14, so 90 is far more than either wants.
+ */
+export const SATISFACTION_HISTORY_LIMIT = 90;
+
 export function newGame(seed) {
   const holes = [];
   // Eighteen plots from day one, of which nine are bare ground until Act
@@ -121,6 +147,16 @@ export function deserialize(text) {
   // against a missing key.
   if (!parsed.goodwill) parsed.goodwill = emptyGoodwill();
   if (!parsed.eventsSeen) parsed.eventsSeen = [];
+  // A save written before HISTORY_LIMIT existed can carry hundreds of
+  // days and be too large to write back. Trimmed on the way in so it
+  // shrinks on the first load rather than a fortnight later.
+  if (Array.isArray(parsed.history) && parsed.history.length > HISTORY_LIMIT) {
+    parsed.history = parsed.history.slice(-HISTORY_LIMIT);
+  }
+  if (Array.isArray(parsed.satisfactionHistory)
+    && parsed.satisfactionHistory.length > SATISFACTION_HISTORY_LIMIT) {
+    parsed.satisfactionHistory = parsed.satisfactionHistory.slice(-SATISFACTION_HISTORY_LIMIT);
+  }
   // Saves from before menus existed have amenities with no board. Give
   // every one of them the default rather than leaving the field missing —
   // menuPrep and the menu board both read it, and an absent menu would

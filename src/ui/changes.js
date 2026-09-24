@@ -31,13 +31,20 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-23k';
+export const BUILD = '2026-09-24a';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24a',
+    notes: [
+      'Saves were getting lost, and if yours jumped back a long way that is why. The game kept every day you had ever played inside the save file, so it grew about 2.5 KB a day — past 300 KB by day 120. Once it got too big for the browser to write, the game carried on as normal on screen while nothing further was being stored, so closing the tab took you back to whenever the last write succeeded. It only keeps the last fortnight now, and a save that is already too big will shrink itself the first time you open it.',
+      'The game also now saves the moment you do something, rather than only when you finish a day. Building a hole, hiring, changing a price or paying the investors off used to sit in memory until the next evening, which on a phone meant losing it if you switched apps.',
+    ],
+  },
   {
     version: '2026-09-23k',
     notes: [
