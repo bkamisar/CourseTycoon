@@ -31,13 +31,19 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24c';
+export const BUILD = '2026-09-24d';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24d',
+    notes: [
+      'The investors no longer ask you to hit a target about a hotel you have not built. On the day they arrive you have no rooms and no nightly rate, which was producing "revenue per room of at least $0" — a target you meet by having no hotel at all. They now ask about your reputation or your guests until there are actually beds to judge.',
+    ],
+  },
   {
     version: '2026-09-24c',
     notes: [

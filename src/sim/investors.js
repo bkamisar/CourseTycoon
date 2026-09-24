@@ -37,6 +37,17 @@ export const REVIEW_EVERY = 14;
 /** Enough rope to hang yourself with, not enough to relax. */
 export const STARTING_CONFIDENCE = 55;
 
+/** The two that only mean anything once beds exist. */
+const HOTEL_MEASURES = new Set(['occupancy', 'revenuePerRoom']);
+
+/**
+ * The lowest nightly rate the investors will reason about, so an unset
+ * rate cannot become a target of nothing. A resort that has just reached
+ * Act II has no rooms and no rate, and `0 * anything` is a target of $0
+ * — which a resort with no hotel at all then satisfies.
+ */
+const MIN_JUDGED_RATE = 60;
+
 export const MEASURES = Object.freeze([
   'occupancy', 'revenuePerRoom', 'prestige', 'satisfaction',
 ]);
@@ -97,10 +108,16 @@ export function thresholdFor(measure, { rooms, roomRate, reviewIndex }) {
       return Math.round(clamp(
         (0.80 + step * 0.02 - Math.min(0.28, beds / 500)) * ramp, 0.45, 0.96
       ) * 100) / 100;
-    case 'revenuePerRoom':
+    case 'revenuePerRoom': {
       // A full hotel with a third of its beds in suites takes about 1.5x
       // the nightly rate per room, so anything under that is free.
-      return Math.round((roomRate ?? 0) * clamp(1.15 + step * 0.09, 1.15, 1.75) * ramp);
+      //
+      // Floored against a nightly rate of zero, which is what an unset
+      // rate is. `0 * anything` is a target of $0, and a target of $0 is
+      // met by a resort with no hotel at all.
+      const rate = Math.max(roomRate ?? 0, MIN_JUDGED_RATE);
+      return Math.round(rate * clamp(1.15 + step * 0.09, 1.15, 1.75) * ramp);
+    }
     case 'prestige':
       // A working Act II resort measures 78-82. Starting below that and
       // climbing past it is what makes the later reviews bite.
@@ -136,10 +153,12 @@ export function measureNow(measure, { report, state }) {
 /**
  * How a review went.
  *
- * A resort with no hotel is never judged on the hotel. "No rooms built"
- * is not "a hotel running at 0%", and an investor reading it as failure
- * would be the same category error as a balance harness declaring
- * marshals worthless on a three-hole course.
+ * A hotel measure standing against a resort with no rooms counts as a
+ * miss, and that is now only reachable one way: by selling every room
+ * while the target was already set. `pickMeasure` will not name a hotel
+ * measure before there is a hotel, so "no rooms built" is never asked
+ * about in the first place -- which is the distinction the old wording
+ * here claimed and the line below it did not make.
  */
 export function assessTarget(target, { report, state }) {
   const hotelMeasure = target.measure === 'occupancy' || target.measure === 'revenuePerRoom';
@@ -158,7 +177,7 @@ export function assessTarget(target, { report, state }) {
  * because being asked about occupancy four reviews in a row is a
  * mechanic that has stopped saying anything.
  */
-export function pickMeasure(rng, recent = []) {
+export function pickMeasure(rng, recent = [], { hasHotel = true } = {}) {
   // Avoids everything asked about lately, not merely the last one.
   //
   // Blocking only the previous measure was not enough: across five
@@ -167,10 +186,21 @@ export function pickMeasure(rng, recent = []) {
   // prestige is the measure that moves least and was therefore nearly
   // free three times out of five. The same no-repeat-while-unseen rule
   // narration and decision events use, applied properly.
+  //
+  // And never a hotel measure before there is a hotel. On the day the
+  // investors arrive the player has no rooms and no room rate, which made
+  // `revenuePerRoom` a threshold of `0 * something` -- a target of $0
+  // that `measureNow` then meets, handing out confidence for nothing --
+  // and made `occupancy` a guaranteed failure, since a resort with no
+  // beds cannot fill them. The first thing they ask for is now always
+  // something the resort can actually be judged on.
+  const available = MEASURES.filter((m) => hasHotel || !HOTEL_MEASURES.has(m));
   const seen = new Set(Array.isArray(recent) ? recent : [recent].filter(Boolean));
-  const unseen = MEASURES.filter((m) => !seen.has(m));
-  const pool = unseen.length > 0 ? unseen : MEASURES.filter((m) => m !== recent[recent.length - 1]);
-  return pool[rng.int(pool.length)];
+  const unseen = available.filter((m) => !seen.has(m));
+  const pool = unseen.length > 0
+    ? unseen
+    : available.filter((m) => m !== recent[recent.length - 1]);
+  return (pool.length > 0 ? pool : available)[rng.int(Math.max(1, pool.length || available.length))];
 }
 
 /**
@@ -180,7 +210,8 @@ export function pickMeasure(rng, recent = []) {
  * at the moment of assessment, which is the whole point.
  */
 export function nextTargetFor(state, rng, { recent = [], reviewIndex = 0 } = {}) {
-  const measure = pickMeasure(rng, recent);
+  const hasHotel = totalRooms(state.resort.rooms) > 0;
+  const measure = pickMeasure(rng, recent, { hasHotel });
   return {
     measure,
     threshold: thresholdFor(measure, {

@@ -4,10 +4,7 @@ import { newGame } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeRng } from '../src/sim/rng.js';
 import {
-  REVIEW_EVERY, STARTING_CONFIDENCE, MEASURES,
-  confidenceChange, thresholdFor, assessTarget, pickMeasure,
-  startingInvestors, measureNow,
-  SETTLEMENT_DAYS, buyoutPrice, payBuyout, forceLiquidation,
+  REVIEW_EVERY, STARTING_CONFIDENCE, MEASURES, confidenceChange, thresholdFor, assessTarget, pickMeasure, startingInvestors, measureNow, SETTLEMENT_DAYS, buyoutPrice, payBuyout, forceLiquidation, nextTargetFor,
 } from '../src/sim/investors.js';
 import { totalRooms } from '../src/sim/rooms.js';
 
@@ -346,5 +343,65 @@ test('CALIBRATION: targets are demanding but not absurd on a real resort', () =>
       `${measure}: an early target of ${early} is free against a real ${actual}`);
     assert.ok(late >= actual * 0.9,
       `${measure}: a late target of ${late} never catches up with ${actual} — standing still would never become failure`);
+  }
+});
+
+// --- Never judged on a hotel that does not exist -----------------------
+
+test('the first target is never about a hotel the resort has not got', () => {
+  // Reported from a first Act II playthrough: "they give me a threshold
+  // to reach of revenue per room greater than 0".
+  //
+  // On arrival there are no rooms and no nightly rate, so
+  // `revenuePerRoom` was `0 * something` -- a target of $0, which
+  // `measureNow` then meets, handing out confidence for having no hotel.
+  // Occupancy was the mirror image: a resort with no beds cannot fill
+  // them, so it was a guaranteed miss. Both are questions about something
+  // that does not exist yet.
+  for (let seed = 1; seed <= 40; seed++) {
+    const state = newGame(seed);
+    state.act = 2;
+    const investors = startingInvestors(state, makeRng(seed));
+    const target = investors.nextTarget;
+    assert.ok(target, `seed ${seed}: the investors must arrive with a target`);
+    assert.ok(!['occupancy', 'revenuePerRoom'].includes(target.measure),
+      `seed ${seed}: asked for ${target.measure} from a resort with no rooms`);
+    assert.ok(target.threshold > 0,
+      `seed ${seed}: ${target.measure} target of ${target.threshold} is no target at all`);
+  }
+});
+
+test('hotel measures come back once there is a hotel', () => {
+  // The other half: the guard must not permanently remove them.
+  const state = newGame(4);
+  state.act = 2;
+  state.resort.rooms = { standard: 10, suite: 3 };
+  state.resort.pricing.roomRate = 120;
+
+  const seen = new Set();
+  for (let i = 0; i < 30; i++) {
+    seen.add(nextTargetFor(state, makeRng(500 + i), { recent: [], reviewIndex: i }).measure);
+  }
+  assert.ok(seen.has('occupancy') || seen.has('revenuePerRoom'),
+    'a resort with rooms has to be asked about them');
+});
+
+test('no measure can ever produce a threshold of nothing', () => {
+  // Including the states a player can reach by hand: rooms sold off, or a
+  // nightly rate dragged to zero.
+  const cases = [
+    { rooms: {}, roomRate: 0 },
+    { rooms: { standard: 0, suite: 0 }, roomRate: 0 },
+    { rooms: { standard: 4, suite: 0 }, roomRate: 0 },
+    { rooms: { standard: 40, suite: 20 }, roomRate: 250 },
+  ];
+  for (const { rooms, roomRate } of cases) {
+    for (const measure of MEASURES) {
+      for (const reviewIndex of [0, 1, 4]) {
+        const threshold = thresholdFor(measure, { rooms, roomRate, reviewIndex });
+        assert.ok(threshold > 0,
+          `${measure} at rate ${roomRate} review ${reviewIndex} gave ${threshold}`);
+      }
+    }
   }
 });
