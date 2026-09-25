@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUNGS, RUNG_IDS, rungFor, eligibleFor } from '../src/sim/tournaments.js';
+import { RUNGS, RUNG_IDS, rungFor, eligibleFor, SETUP_DECAY_PER_DAY, setupClimb, nextSetup, setupDifficultyBonus, withinBand } from '../src/sim/tournaments.js';
 
 test('there are three rungs, each fully specified', () => {
   assert.equal(RUNG_IDS.length, 3);
@@ -43,4 +43,39 @@ test('eligibility needs the prestige AND the buildings', () => {
 test('rungFor tolerates nonsense', () => {
   assert.equal(rungFor('nope'), null);
   assert.equal(rungFor(undefined), null);
+});
+
+test('the grounds crew decides how fast the course hardens', () => {
+  // Groundskeepers have had one job since Act I. This is their second,
+  // and a thin crew physically cannot get a course ready in three weeks.
+  assert.equal(setupClimb(0), 0, 'nobody working means nothing happens');
+  assert.ok(setupClimb(4) > setupClimb(2), 'more staff, faster');
+  // Three weeks is the run-up, so a full crew must be able to reach a
+  // national's band inside it or the top rung is unreachable.
+  const crew = 6;
+  let setup = 0;
+  for (let d = 0; d < 21; d++) setup = nextSetup(setup, { keepers: crew, conditioning: true });
+  assert.ok(setup >= 80, `six keepers reached only ${setup.toFixed(0)} in 21 days`);
+});
+
+test('setup falls back when nobody is working on it', () => {
+  let setup = 90;
+  for (let d = 0; d < 10; d++) setup = nextSetup(setup, { keepers: 6, conditioning: false });
+  assert.ok(setup < 90, 'it has to decay');
+  assert.ok(setup >= 0, 'and never go below zero');
+  assert.equal(nextSetup(0, { keepers: 0, conditioning: false }), 0);
+});
+
+test('a hard setup makes the course play harder', () => {
+  assert.equal(setupDifficultyBonus(0), 0, 'an unconditioned course plays as itself');
+  assert.ok(setupDifficultyBonus(100) > setupDifficultyBonus(50));
+  assert.ok(setupDifficultyBonus(100) <= 30,
+    'setup must not be able to outweigh the course the player actually built');
+});
+
+test('the band is a band, not a threshold', () => {
+  assert.equal(withinBand(52, RUNGS.countyOpen.band), true);
+  assert.equal(withinBand(30, RUNGS.countyOpen.band), false, 'under-prepared');
+  assert.equal(withinBand(85, RUNGS.countyOpen.band), false,
+    'a county open tricked up like a national is also wrong');
 });

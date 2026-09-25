@@ -14,6 +14,8 @@
  * Pure. Nothing here computes with a DOM or a clock.
  */
 
+import { clamp } from './hole.js';
+
 /** The eighteen a championship needs. Named rather than inlined because
  * the Act I gate's nine and this are different numbers for different
  * reasons and should not drift into each other. */
@@ -79,4 +81,53 @@ export function eligibleFor(rungId, { prestige = 0, resort, holesOpen = 0 }) {
   if (prestige < rung.prestige) return false;
   const built = new Set((resort?.amenities ?? []).map((a) => a.type));
   return rung.requires.every((type) => built.has(type));
+}
+
+/**
+ * How much championship condition one groundskeeper adds in a day.
+ *
+ * Set so that six keepers reach a national's band (80) inside the
+ * 21-day run-up and two cannot. Conditioning is the second job this
+ * staff has ever had, which is the point: an existing lever gains a new
+ * reason to matter rather than a parallel one being invented.
+ */
+export const SETUP_PER_KEEPER = 0.72;
+
+/** And it falls back on its own, because firm greens do not stay firm. */
+export const SETUP_DECAY_PER_DAY = 3.5;
+
+/** What one day of work adds, given the crew. */
+export function setupClimb(keepers = 0) {
+  return Math.max(0, keepers) * SETUP_PER_KEEPER * 100 / 21;
+}
+
+/**
+ * Tomorrow's setup.
+ *
+ * `conditioning` is whether the resort is working toward a championship
+ * at all. When it is not, the course drifts back to being a course.
+ */
+export function nextSetup(setup = 0, { keepers = 0, conditioning = false } = {}) {
+  const moved = conditioning
+    ? setup + setupClimb(keepers)
+    : setup - SETUP_DECAY_PER_DAY;
+  return clamp(moved, 0, 100);
+}
+
+/**
+ * How much harder a conditioned course plays.
+ *
+ * Capped well below the range the player's own holes cover, because a
+ * setup dial that could outweigh the course would make two acts of hole
+ * design irrelevant in the third.
+ */
+export const MAX_SETUP_DIFFICULTY = 26;
+
+export function setupDifficultyBonus(setup = 0) {
+  return (clamp(setup, 0, 100) / 100) * MAX_SETUP_DIFFICULTY;
+}
+
+/** Whether the course is set the way this rung wants it. */
+export function withinBand(setup, band) {
+  return setup >= band.low && setup <= band.high;
 }
