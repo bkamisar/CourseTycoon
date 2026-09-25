@@ -98,6 +98,7 @@ const COST_LABELS = {
   amenityUpkeep: 'Amenity upkeep',
   foodCost: 'Food & drink stock',
   rooms: 'Hotel upkeep',
+  championshipPrep: 'Championship prep',
 };
 
 /**

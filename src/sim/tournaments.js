@@ -224,6 +224,29 @@ export function championshipRoomsSold(capacity, roomRate, valuePerRound = 60) {
   return Math.round(capacity * fit);
 }
 
+/**
+ * The daily bill for conditioning toward a rung.
+ *
+ * Total run-up cost is set to the midpoint between the base fee and the
+ * purse ceiling — (baseFee + purseCeiling) / 2 — spread evenly across
+ * `RUN_UP_DAYS`. Deriving it from the contract rather than picking a
+ * number is what makes the three promises true at every rung at once:
+ *
+ *   base fee alone:      B - (B+C)/2 = (B-C)/2   -- a loss
+ *   all four bonuses:    C - (B+C)/2 = (C-B)/2   -- the same gain, mirrored
+ *   half the bonuses:    B + (C-B)/2 = (B+C)/2   -- exactly break even
+ *
+ * It scales the ladder without retuning the tension: because the bill is
+ * a fraction of the contract rather than a flat figure, editing a rung's
+ * purse moves its bill in lockstep and the loses/breaks-even/gains shape
+ * above holds without anybody re-tuning it by hand.
+ */
+export function conditioningCostPerDay(rungId) {
+  const rung = rungFor(rungId);
+  if (!rung) return 0;
+  return (rung.baseFee + rung.purseCeiling) / 2 / RUN_UP_DAYS;
+}
+
 /** The next rung this resort is allowed to attempt, or null at the top. */
 export function nextRungFor(hosted = []) {
   const done = new Set(hosted);

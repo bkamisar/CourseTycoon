@@ -34,7 +34,7 @@ import {
 } from './hotelAmenities.js';
 import {
   nextSetup, setupDifficultyBonus, championshipRoomsSold, scoreTournament,
-  CARE_DIVERTED_WHILE_CONDITIONING,
+  CARE_DIVERTED_WHILE_CONDITIONING, conditioningCostPerDay,
 } from './tournaments.js';
 import { playField } from './field.js';
 
@@ -501,6 +501,15 @@ export function runDay(state, seed) {
   revenue.total = revenue.greenFees + revenue.merchandise + revenue.food;
   costs.foodCost = food.foodCost;
   costs.total += food.foodCost;
+
+  // Act III's run-up bill. Charged only on a day the crew is actually
+  // conditioning (see the hoisted `conditioning` above), so a resort that
+  // bids and then leaves `setupTarget` at 0 pays nothing — and stops the
+  // moment the target is reached or the tournament resolves, exactly
+  // tracking the days `conditioning` also diverts turf care for.
+  const championshipPrep = conditioning ? conditioningCostPerDay(next.tournament.rung) : 0;
+  costs.championshipPrep = championshipPrep;
+  costs.total += championshipPrep;
 
   // The hotel. Fed the same per-segment golfer counts the menus are, so
   // the two can never disagree about how many people are on the property
