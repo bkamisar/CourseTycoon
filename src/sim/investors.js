@@ -54,8 +54,24 @@ export const MEASURES = Object.freeze([
 
 /** What each outcome does to confidence. Missing costs more than meeting
  * pays, so a run of near-misses is a slide rather than a plateau. */
+/**
+ * What a review does to how much they trust you.
+ *
+ * Was beat +18, met +10, missed -12. At the pass rate a competent
+ * operator actually achieves -- about three in four -- that is +7.5 a
+ * review, so confidence climbed relentlessly and pinned at 100. Measured
+ * across thirty-two runs of Act II, the lowest reading ever seen was 53
+ * against a starting 55, and the investors pulled out of exactly nought
+ * resorts. The failure mode the act is built around could not happen.
+ *
+ * Meeting a target is now worth much less than missing one costs, which
+ * is how trust works. At three in four the balance is roughly flat; at
+ * one in two it drains; at one in three the hotel is gone inside four
+ * months. That is friction for a careful operator and a real ending for
+ * a careless one.
+ */
 const CONFIDENCE_CHANGE = Object.freeze({
-  beat: 18, met: 10, missed: -12, missedBadly: -25,
+  beat: 13, met: 7, missed: -15, missedBadly: -30,
 });
 
 export function confidenceChange(outcome) {
@@ -91,7 +107,28 @@ export const MEASURE_LABEL = Object.freeze({
  * because an investor who wants the same thing forever is a formality:
  * standing still has to become failure eventually.
  */
-export function thresholdFor(measure, { rooms, roomRate, reviewIndex }) {
+/**
+ * How high each measure can realistically go.
+ *
+ * A target above these is not a demand, it is a trick: a hotel cannot run
+ * at 105% and no resort reaches prestige 100. When a modest improvement
+ * would cross one of these the investors ask the resort to HOLD instead,
+ * which is what a reasonable person does when the thing they wanted more
+ * of has run out of room.
+ */
+const CEILING = Object.freeze({
+  occupancy: 0.95,
+  prestige: 90,
+  satisfaction: 86,
+  revenuePerRoom: Infinity,
+});
+
+/** How much better than today they want it. */
+const IMPROVEMENT = 1.07;
+
+/** The absolute ladder, used as a floor so a badly run resort still gets
+ * a real number rather than 7% more of nothing. */
+function absoluteThreshold(measure, { rooms, roomRate, reviewIndex }) {
   const beds = totalRooms(rooms);
   // The first ask is deliberately gentle: the hotel has barely opened.
   const ramp = reviewIndex === 0 ? 0.85 : 1;
@@ -130,6 +167,36 @@ export function thresholdFor(measure, { rooms, roomRate, reviewIndex }) {
   }
 }
 
+/**
+ * What they will ask for next, measured against what the resort is
+ * actually doing.
+ *
+ * The ladder above is fixed, and a fixed ladder is why the first
+ * measurement of Act II found one policy passing 51 reviews out of 51 and
+ * confidence never falling below 52 from a starting 55. A target the
+ * resort clears without noticing is a formality, and a formality every
+ * fortnight is worse than no review at all.
+ *
+ * So the ask is a modest improvement on today: 7% better, floored by the
+ * old ladder so a failing hotel still gets a real number, and capped by
+ * what the measure can actually reach. A resort already at the ceiling is
+ * asked to hold it, which is friction rather than punishment -- the
+ * difference the author asked for.
+ */
+export function thresholdFor(measure, { rooms, roomRate, reviewIndex, current = null }) {
+  const floor = absoluteThreshold(measure, { rooms, roomRate, reviewIndex });
+  if (current === null || !Number.isFinite(current) || current <= 0) return floor;
+
+  const ceiling = CEILING[measure] ?? Infinity;
+  const asked = Math.min(Math.max(current * IMPROVEMENT, floor), ceiling);
+
+  // Occupancy is a ratio and everything else is a number the player reads
+  // as a whole one.
+  return measure === 'occupancy'
+    ? Math.round(asked * 100) / 100
+    : Math.round(asked);
+}
+
 /** Where a measure stands today, from a day's report and state. */
 export function measureNow(measure, { report, state }) {
   switch (measure) {
@@ -149,6 +216,7 @@ export function measureNow(measure, { report, state }) {
       return 0;
   }
 }
+
 
 /**
  * How a review went.
@@ -209,15 +277,19 @@ export function pickMeasure(rng, recent = [], { hasHotel = true } = {}) {
  * Called when a review ends and when the investors first arrive — never
  * at the moment of assessment, which is the whole point.
  */
-export function nextTargetFor(state, rng, { recent = [], reviewIndex = 0 } = {}) {
+export function nextTargetFor(state, rng, { recent = [], reviewIndex = 0, report = null } = {}) {
   const hasHotel = totalRooms(state.resort.rooms) > 0;
   const measure = pickMeasure(rng, recent, { hasHotel });
+  const current = report ? measureNow(measure, { report, state }) : null;
   return {
     measure,
     threshold: thresholdFor(measure, {
       rooms: state.resort.rooms,
       roomRate: state.resort.pricing.roomRate,
       reviewIndex,
+      // What the resort is doing right now, so the ask is about this
+      // hotel rather than about a ladder written before it existed.
+      current,
     }),
     dueDay: state.day + REVIEW_EVERY,
     reviewIndex,

@@ -17,6 +17,7 @@
 import { PALETTE } from '../render/palette.js';
 import {
   ROOM_TYPES, ROOM_KINDS, roomCounts, totalRooms, nightlyUpkeep, nightlyRate,
+  roomLimit,
 } from '../sim/rooms.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 import {
@@ -482,10 +483,13 @@ export function openHotelSheet(sheetHost, { state, onChange }) {
           more.type = 'button';
           more.className = 'hotel-step';
           more.textContent = '+';
+          const limit = roomLimit(current.prestige ?? 0);
+          const atLimit = totalRooms(current.resort.rooms) >= limit;
           const affordable = current.money >= spec.build;
-          more.disabled = !affordable;
+          more.disabled = !affordable || atLimit;
           more.addEventListener('click', () => {
             if (current.money < spec.build) return;
+            if (totalRooms(current.resort.rooms) >= roomLimit(current.prestige ?? 0)) return;
             const next = structuredClone(current);
             next.money -= spec.build;
             next.resort.rooms[kind] += 1;
@@ -497,7 +501,17 @@ export function openHotelSheet(sheetHost, { state, onChange }) {
           controls.append(less, count, more);
           row.appendChild(controls);
 
-          if (!affordable) {
+          if (atLimit) {
+            // Said once per row rather than as a silent dead button. A
+            // control that does nothing and does not say why is the same
+            // bug as a cost line that lies.
+            const capped = document.createElement('div');
+            capped.className = 'hotel-shortfall';
+            capped.textContent =
+              `Planning permission covers ${limit} rooms. Raise the resort's `
+              + 'prestige and the council will allow more.';
+            row.appendChild(capped);
+          } else if (!affordable) {
             const short = document.createElement('div');
             short.className = 'hotel-shortfall';
             short.textContent = `$${(spec.build - current.money).toLocaleString()} short`;

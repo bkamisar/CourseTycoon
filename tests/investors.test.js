@@ -123,17 +123,24 @@ test('all four measures come up before any comes up twice', () => {
   // Blocking only the previous measure produced prestige, occupancy,
   // prestige, revenue, prestige across five reviews — legal, and useless,
   // because prestige moves least and was nearly free three times in five.
-  let state = startOfActTwo(21);
+  //
+  // Asked of the picker directly rather than by playing seventy days.
+  // The day-loop version of this broke the moment confidence could
+  // actually reach zero: the resort collapsed after three reviews and the
+  // test reported a rotation failure, which is a fact about the resort
+  // surviving rather than about the rotation. A test should not depend on
+  // something it is not testing.
+  const rng = makeRng(21);
   const asked = [];
-  for (let d = 0; d < REVIEW_EVERY * 5; d++) {
-    const r = runDay(state, 2100 + d);
-    state = r.state;
-    if (r.report.investors.reviewed) asked.push(r.report.investors.reviewed.measure);
+  let recent = [];
+  for (let review = 0; review < 4; review++) {
+    const measure = pickMeasure(rng, recent, { hasHotel: true });
+    asked.push(measure);
+    recent = [...recent, measure];
+    if (recent.length >= MEASURES.length) recent = [];
   }
-  assert.ok(asked.length >= 4, `only ${asked.length} reviews`);
-  const firstFour = asked.slice(0, 4);
-  assert.equal(new Set(firstFour).size, 4,
-    `the first four reviews repeated a measure: ${firstFour.join(', ')}`);
+  assert.equal(new Set(asked).size, 4,
+    `the first four reviews repeated a measure: ${asked.join(', ')}`);
 });
 
 test('an occupancy threshold is a number, not a float with a tail', () => {

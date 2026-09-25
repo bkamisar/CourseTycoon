@@ -55,7 +55,7 @@ import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
 import {
   HOTEL_AMENITIES, hotelUpkeep,
 } from '../src/sim/hotelAmenities.js';
-import { totalRooms, ROOM_TYPES } from '../src/sim/rooms.js';
+import { totalRooms, ROOM_TYPES, roomLimit } from '../src/sim/rooms.js';
 import { payBuyout } from '../src/sim/investors.js';
 
 /**
@@ -336,8 +336,9 @@ function spendTheHotelMorning(state, { roomRate, suiteShare }) {
   const rooms = state.resort.rooms ?? {};
   const built = totalRooms(rooms);
   const lastRate = state.history.at(-1)?.hotel?.rate ?? 1;
+  const permitted = roomLimit(state.prestige ?? 0);
   const full = built === 0 || lastRate >= EXPAND_ABOVE;
-  if (full && built < MAX_ROOMS) {
+  if (full && built < Math.min(MAX_ROOMS, permitted)) {
     const wantSuite = (rooms.suite ?? 0) < Math.round(built * suiteShare);
     const kind = wantSuite ? 'suite' : 'standard';
     const price = ROOM_TYPES[kind].build;

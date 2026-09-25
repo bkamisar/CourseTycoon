@@ -26,7 +26,7 @@ import {
   forceLiquidation,
   startingInvestors,
 } from './investors.js';
-import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue } from './rooms.js';
+import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue, serviceCost } from './rooms.js';
 import {
   hotelUpkeep, extraNightsFrom, divertedShare, HOTEL_AMENITIES,
   caddiePaceFactor, roomValueBonus, indoorTrade,
@@ -457,7 +457,11 @@ export function runDay(state, seed) {
   // or not. This is the only thing that makes occupancy a real number
   // rather than a vanity one, and the only thing that makes "build more
   // rooms" a decision rather than a ratchet.
-  costs.rooms = nightlyUpkeep(next.resort.rooms) + hotelUpkeep(next.resort.amenities);
+  // The building, whether anybody slept in it or not, plus what serving
+  // the people who did actually cost.
+  costs.rooms = nightlyUpkeep(next.resort.rooms)
+    + hotelUpkeep(next.resort.amenities)
+    + serviceCost(revenue.rooms);
   costs.total += costs.rooms;
 
   // Instalments on whatever went wrong. Its own line, because a player
@@ -658,6 +662,10 @@ export function runDay(state, seed) {
       next.investors.nextTarget = nextTargetFor(next, rng, {
         recent: next.investors.recentMeasures,
         reviewIndex: (target.reviewIndex ?? 0) + 1,
+        // The day's own report, so the next ask is measured against what
+        // this resort is actually doing rather than against a ladder
+        // written before it existed.
+        report,
       });
       report.investors.target = next.investors.nextTarget;
 

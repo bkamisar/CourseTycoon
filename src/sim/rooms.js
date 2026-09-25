@@ -80,14 +80,49 @@ export function totalRooms(rooms) {
 }
 
 /**
+ * What a room costs to run as a share of what it charges.
+ *
+ * A $280 room is not a $95 room with a bigger number on it: the linen is
+ * better, the breakfast is better, somebody turns the bed down. Upkeep
+ * used to be a flat figure per room while the rate was a free variable,
+ * which meant the cost of a night was fixed while its price was not --
+ * so the answer to "what should I charge" was "as much as they will pay",
+ * with no cost following it up.
+ *
+ * Measured before this existed: a sixty-room hotel at $280 took $20,608 a
+ * night against $3,280 of upkeep. Act I's entire golf course makes three
+ * to six thousand a day. Room revenue was not part of the economy, it
+ * was standing outside it.
+ */
+export const SERVICE_SHARE = 0.42;
+
+/**
  * What the hotel costs tonight, before anybody checks in.
  *
  * The load-bearing figure. Charged on every room built, every night, so
- * a wing nobody sleeps in is a wing that bleeds.
+ * a wing nobody sleeps in is a wing that bleeds. `roomRate` is optional
+ * so that callers asking "what does this hotel cost to stand there"
+ * without a price in mind still get the base.
  */
 export function nightlyUpkeep(rooms) {
   const counts = roomCounts(rooms);
   return ROOM_KINDS.reduce((sum, kind) => sum + counts[kind] * ROOM_TYPES[kind].upkeep, 0);
+}
+
+/**
+ * What serving tonight's guests costs, as a share of what they paid.
+ *
+ * Charged against REVENUE rather than against rooms built, because linen,
+ * breakfast and somebody turning the bed down follow the guest, not the
+ * building. Charging it on empty rooms made overpricing lose money twice
+ * -- once for the beds nobody took and again for servicing them -- which
+ * is a punishment rather than a trade.
+ *
+ * The empty-wing pressure stays where it belongs, in `nightlyUpkeep`,
+ * which bills whether anybody sleeps there or not.
+ */
+export function serviceCost(roomRevenue) {
+  return Math.round(Math.max(0, roomRevenue) * SERVICE_SHARE);
 }
 
 /** What a room of `kind` costs to build. */
@@ -184,4 +219,34 @@ export function roomRevenue({ occupancy, roomRate }) {
   const suites = occupancy.suitesSold * nightlyRate('suite', roomRate);
   const standard = occupancy.standardSold * nightlyRate('standard', roomRate);
   return Math.round(suites + standard);
+}
+
+/**
+ * How many rooms the place is allowed to have.
+ *
+ * Measured, room-building was close to a ratchet: the operator built to
+ * ninety and they still ran at 100%, because the hotel feeds itself --
+ * rooms widen the catchment, which brings more golfers, more of whom
+ * stay, while a spa and a kids' club add nights to every stay that does
+ * happen. There is a point where more rooms stop filling, but it sits far
+ * past any sensible hotel.
+ *
+ * A limit on demand would have been the obvious fix and the wrong one:
+ * building rooms is supposed to be good. This is a limit on BUILDING, in
+ * the form the world already has one -- planning permission. It starts
+ * small, and it grows with the resort's reputation, because a council
+ * grants more to a place the town is glad of. So it is a goal rather than
+ * a wall: the answer to "I want more rooms" is "be worth more rooms".
+ */
+export const ROOMS_AT_START = 26;
+export const ROOMS_AT_BEST = 72;
+
+export function roomLimit(prestige = 0) {
+  const reach = clamp(prestige, 0, 100) / 100;
+  return Math.round(ROOMS_AT_START + (ROOMS_AT_BEST - ROOMS_AT_START) * reach);
+}
+
+/** Whether another room of any kind may be built. */
+export function canBuildRoom(rooms, prestige) {
+  return totalRooms(rooms) < roomLimit(prestige);
 }
