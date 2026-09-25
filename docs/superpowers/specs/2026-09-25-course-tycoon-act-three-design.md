@@ -157,10 +157,64 @@ the difference.
    pointed at a new audience.
 4. **Crowd handled** — infrastructure adequate for the gallery the rung draws.
 
+### 6a. What the field shoots, and why it matters
+
+The tournament reports **how the course played**, not who won. This is the
+read-out for the setup dial, and without it the central decision of the act is a
+guess.
+
+The simulation already produces this. `src/sim/round.js` and `src/sim/shot.js`
+compute strokes against par for every golfer on the course; a tournament field is
+that machinery pointed at a harder course and a better standard of player. What
+comes back is a scoring picture:
+
+```
+ROUND ONE
+  The field averaged 3.4 over par.
+  Nobody broke 70. Two players broke par.
+  The 14th gave up four birdies all day and took a shot and a half
+  off everybody else.
+```
+
+**That is the feedback the band needs.** A course set soft for its rung gets shot
+to pieces and reads as a resort course that should not have bid. A course set past
+its band produces a field nobody can separate, greens that die by Saturday, and a
+write-up about a venue that tricked up a championship. Between them is a test:
+hard, fair, and survivable.
+
+It also gives the four contract conditions something to be *about*. "Setup within
+the band" as a number the player never sees the effect of is an abstraction;
+"nobody broke par and the greens are gone" is a thing that happened.
+
+Deliberately impersonal. No names, no leaderboard, no careers — the field is
+weather with a scorecard.
+
+### 6b. Weather, and what it finds out
+
 Weather applies as it does everywhere else, and cannot be controlled — but it can
 have been prepared for. A course whose drainage was patched cheaply two acts ago
-is a course that floods on television. This is the first time an Act I decision
-reaches this far forward, and it is worth having.
+is a course that floods on television.
+
+**This is a principle rather than a single joke.** Act III is the first act with a
+week that scrutinises the resort, and the things it should scrutinise are the
+decisions the player has already made and half-forgotten. Candidates, all of which
+already exist in the simulation:
+
+| Earlier decision | What the championship makes of it |
+|---|---|
+| Drainage patched rather than dug out | the hollow floods, on television |
+| The cheap batch of seed | turf that fails under four days of championship traffic |
+| Caddies and marshals | pace, which is a named contract condition |
+| The short course | somewhere for the gallery and a practice area |
+| Charles left on security | crowd control, at the worst possible moment |
+| Eleven houses sold to Jay along the 4th and 5th | eleven back gardens in every aerial shot |
+| The hospitality pavilion, or the brew pub | where the gallery eats |
+
+Not all of these need building. The point is that the act has a natural appetite
+for them, and each one turns a decision the player made for immediate reasons into
+something that reaches forward. Two acts of consequences arriving a fortnight
+later have trained the player to expect that; a championship is where a decision
+from sixty days ago arrives instead.
 
 ---
 
@@ -261,8 +315,9 @@ are trusted:
 
 ## 11. Explicitly out of scope
 
-- **Individual golfers in the field, scores, or a leaderboard.** The player runs
-  the venue; who wins is flavour. Simulating a field is a different game.
+- **Named players, a leaderboard, or who wins.** The player runs the venue.
+  Simulating careers is a different game. What the field *shoots* is very much in
+  scope — see §6a — but nobody in it has a name.
 - **The far course and shuttles.** Deferred to Act IV, where they are one
   candidate among others.
 - **A second property.** Act IV at the earliest, and the original spec's caution
