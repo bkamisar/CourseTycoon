@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUNGS, RUNG_IDS, rungFor, eligibleFor, SETUP_DECAY_PER_DAY, setupClimb, nextSetup, setupDifficultyBonus, withinBand } from '../src/sim/tournaments.js';
+import { RUNGS, RUNG_IDS, rungFor, eligibleFor, SETUP_DECAY_PER_DAY, setupClimb, nextSetup, setupDifficultyBonus, withinBand, RUN_UP_DAYS, bidFor, nextRungFor } from '../src/sim/tournaments.js';
 
 test('there are three rungs, each fully specified', () => {
   assert.equal(RUNG_IDS.length, 3);
@@ -85,4 +85,55 @@ test('the band is a band, not a threshold', () => {
   assert.equal(withinBand(30, RUNGS.countyOpen.band), false, 'under-prepared');
   assert.equal(withinBand(85, RUNGS.countyOpen.band), false,
     'a county open tricked up like a national is also wrong');
+});
+
+test('winning a bid books a date three weeks out', () => {
+  const state = {
+    day: 100, prestige: 75, act: 3, tournament: null,
+    resort: { amenities: [{ type: 'grandstands' }, { type: 'overflowParking' }] },
+    tournamentsHosted: ['countyOpen'],
+  };
+  const booked = bidFor(state, 'regional', { holesOpen: 18 });
+  assert.ok(booked, 'a resort that meets the requirements should be accepted');
+  assert.equal(booked.rung, 'regional');
+  assert.equal(booked.day, 100 + RUN_UP_DAYS);
+  assert.equal(booked.resolved, false);
+});
+
+test('a bid is refused when the requirements are not met', () => {
+  const state = {
+    day: 100, prestige: 40, act: 3, tournament: null,
+    resort: { amenities: [] }, tournamentsHosted: [],
+  };
+  assert.equal(bidFor(state, 'countyOpen', { holesOpen: 18 }), null);
+});
+
+test('rungs are climbed in order, and not skipped', () => {
+  assert.equal(nextRungFor([]), 'countyOpen');
+  assert.equal(nextRungFor(['countyOpen']), 'regional');
+  assert.equal(nextRungFor(['countyOpen', 'regional']), 'national');
+  assert.equal(nextRungFor(['countyOpen', 'regional', 'national']), null,
+    'there is nothing above a national');
+});
+
+test('a resort cannot book two championships at once', () => {
+  const state = {
+    day: 100, prestige: 90, act: 3,
+    tournament: { rung: 'countyOpen', day: 110, resolved: false },
+    resort: { amenities: [] }, tournamentsHosted: [],
+  };
+  assert.equal(bidFor(state, 'countyOpen', { holesOpen: 18 }), null,
+    'one week at a time');
+});
+
+test('a barred rung refuses the bid until the bar expires', () => {
+  const state = {
+    day: 100, prestige: 90, act: 3, tournament: null,
+    resort: { amenities: [] }, tournamentsHosted: [],
+    tournamentBars: { countyOpen: 160 },
+  };
+  assert.equal(bidFor(state, 'countyOpen', { holesOpen: 18 }), null,
+    'barred until day 160');
+  assert.ok(bidFor({ ...state, day: 161 }, 'countyOpen', { holesOpen: 18 }),
+    'and welcome again afterwards');
 });

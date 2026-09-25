@@ -133,3 +133,43 @@ export function setupDifficultyBonus(setup = 0) {
 export function withinBand(setup, band) {
   return setup >= band.low && setup <= band.high;
 }
+
+/**
+ * Days between winning a bid and the first round.
+ *
+ * Three weeks rather than the eight first sketched. A long run-up is a
+ * grind rather than a sprint, and the cost of conditioning should be
+ * visible and sharp rather than a two-month drag on the takings.
+ */
+export const RUN_UP_DAYS = 21;
+
+/** The next rung this resort is allowed to attempt, or null at the top. */
+export function nextRungFor(hosted = []) {
+  const done = new Set(hosted);
+  return RUNG_IDS.find((id) => !done.has(id)) ?? null;
+}
+
+/**
+ * Applies for a championship.
+ *
+ * Returns the booking, or null if the body says no. Refusal is never a
+ * dice roll: every reason is a condition the player can read and fix.
+ */
+export function bidFor(state, rungId, { holesOpen = 0 } = {}) {
+  const rung = rungFor(rungId);
+  if (!rung) return null;
+  // One week at a time.
+  if (state.tournament && !state.tournament.resolved) return null;
+  // Rungs are climbed, not skipped.
+  if (nextRungFor(state.tournamentsHosted ?? []) !== rungId) return null;
+  // A rung you embarrassed yourself at is given to somebody else for a while.
+  const barredUntil = state.tournamentBars?.[rungId] ?? 0;
+  if (state.day <= barredUntil) return null;
+  if (!eligibleFor(rungId, {
+    prestige: state.prestige,
+    resort: state.resort,
+    holesOpen,
+  })) return null;
+
+  return { rung: rungId, day: state.day + RUN_UP_DAYS, resolved: false };
+}
