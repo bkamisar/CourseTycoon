@@ -1293,17 +1293,22 @@ test('the HUD says nothing about tournaments when none is booked', () => {
 test('the HUD counts down to a booked championship', () => {
   const state = newGame(2);
   state.day = 40;
-  state.resort.setup = 61;
+  state.resort.setup = 70;
   state.tournament = { rung: 'regional', day: 61, resolved: false };
 
   const data = computeHudData(state);
   assert.ok(data.tournament, 'a booking has to reach the HUD');
   assert.equal(data.tournament.daysLeft, 21);
   assert.equal(data.tournament.label, 'Regional Championship');
-  assert.equal(data.tournament.setup, 61);
+  assert.equal(data.tournament.setup, 70);
   // The band is the decision. A countdown that does not show whether the
-  // course is set right is a clock, not information.
-  assert.equal(data.tournament.inBand, true, '61 is inside the regional band of 62-78?');
+  // course is set right is a clock, not information. Asserted on both
+  // sides, because a readout that always says "fine" is worse than none.
+  assert.equal(data.tournament.inBand, true, '70 is inside the regional band of 62-78');
+
+  state.resort.setup = 61;
+  assert.equal(computeHudData(state).tournament.inBand, false,
+    '61 is one under the band and must not read as ready');
 });
 
 test('the countdown says when the championship is today', () => {
@@ -1318,11 +1323,6 @@ test('the countdown says when the championship is today', () => {
 
 Run: `node --test tests/hud.test.js`
 Expected: FAIL — `data.tournament` is `undefined`
-
-Note: the second test asserts `inBand` is `true` for a setup of 61 against the
-regional band of 62–78, which is **false**. Fix the assertion to `false` and add
-a second case at 70 asserting `true` — the test is there to prove the band is
-reported, and it should prove both sides of it.
 
 - [ ] **Step 3: Write minimal implementation**
 
