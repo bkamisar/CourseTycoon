@@ -187,6 +187,9 @@ export function runDay(state, seed) {
     keepers,
     conditioning: Boolean(next.tournament && !next.tournament.resolved)
       && (next.resort.setup ?? 0) < (next.resort.setupTarget ?? 0),
+    // Passed so a big crew stops on arrival rather than overshooting the
+    // band and decaying back down through it.
+    target: next.resort.setupTarget ?? 0,
   });
 
   const allOpen = openHoles(next);

@@ -108,12 +108,26 @@ export function setupClimb(keepers = 0) {
  *
  * `conditioning` is whether the resort is working toward a championship
  * at all. When it is not, the course drifts back to being a course.
+ *
+ * A crew never conditions PAST what it was asked for. Without `target`
+ * the climb was all-or-nothing -- full rate up, or full decay down -- so
+ * a big crew slammed past the band and fell back through it, and the
+ * course sat in a saw-tooth instead of at a level. Measured on a national
+ * (band 80-92, target 86), nine groundskeepers left the course outside
+ * the band on six days in twenty: a thirty per cent chance of losing the
+ * largest bonus in the game on nothing but which day the event fell.
+ *
+ * Easing off on arrival is also what the job actually looks like. The
+ * greens are brought to a condition and held there, not overshot every
+ * Tuesday and allowed to relax back.
  */
-export function nextSetup(setup = 0, { keepers = 0, conditioning = false } = {}) {
-  const moved = conditioning
-    ? setup + setupClimb(keepers)
-    : setup - SETUP_DECAY_PER_DAY;
-  return clamp(moved, 0, 100);
+export function nextSetup(setup = 0, { keepers = 0, conditioning = false, target = 100 } = {}) {
+  if (!conditioning) return clamp(setup - SETUP_DECAY_PER_DAY, 0, 100);
+  // Never past the asking. A crew with more hands than the target needs
+  // arrives sooner and then holds, rather than overshooting by the
+  // difference.
+  const climbed = Math.min(setup + setupClimb(keepers), target);
+  return clamp(climbed, 0, 100);
 }
 
 /**

@@ -187,3 +187,50 @@ test('a good week is never barred', () => {
   });
   assert.equal(good.barDays, 0);
 });
+
+test('a crew never conditions past what it was asked for', () => {
+  // The band bonus used to be a coin flip for a well-staffed resort.
+  // Conditioning was all-or-nothing -- full climb up, full decay down --
+  // so a big crew shot past the target and fell back through the band,
+  // and whether the event landed on a good day was luck. Measured on a
+  // national before the fix, nine groundskeepers sat outside the band on
+  // six days in twenty.
+  //
+  // Swept across crew sizes rather than asserted at one, because the bug
+  // only appeared once the crew outgrew the target and a single-crew test
+  // would have passed throughout.
+  for (const [rung, target] of [['countyOpen', 52], ['regional', 70], ['national', 86]]) {
+    const band = RUNGS[rung].band;
+    for (const keepers of [5, 6, 8, 9, 12, 14]) {
+      let setup = 0;
+      for (let day = 0; day < 60; day++) {
+        setup = nextSetup(setup, { keepers, conditioning: setup < target, target });
+        assert.ok(setup <= target + 1e-9,
+          `${rung} with ${keepers} keepers overshot to ${setup.toFixed(1)} past a target of ${target}`);
+        if (day >= 40) {
+          assert.ok(setup >= band.low && setup <= band.high,
+            `${rung} with ${keepers} keepers settled at ${setup.toFixed(1)}, outside its own band ${band.low}-${band.high}`);
+        }
+      }
+    }
+  }
+});
+
+test('and a thin crew still cannot get there inside the run-up', () => {
+  // The fix must not turn "ask for 86" into "receive 86". What stops it
+  // is the clock, not decay: decay only applies when the crew is NOT
+  // conditioning, so a thin crew climbs slowly but never slides back.
+  // Two groundskeepers add 1.6 a day and simply run out of days.
+  //
+  // Written against RUN_UP_DAYS rather than a round number, so that
+  // shortening the run-up cannot quietly make this pass for the wrong
+  // reason. An earlier version of this test ran sixty days and failed:
+  // two keepers reached 84.1, because given long enough they arrive.
+  let setup = 0;
+  for (let day = 0; day < RUN_UP_DAYS; day++) {
+    setup = nextSetup(setup, { keepers: 2, conditioning: setup < 86, target: 86 });
+  }
+  assert.ok(setup < RUNGS.national.band.low,
+    `two groundskeepers reached ${setup.toFixed(1)} in ${RUN_UP_DAYS} days, so asking is all it takes`);
+  assert.ok(setup > 0, 'sanity: they did do some work');
+});
