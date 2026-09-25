@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ITEMS, ITEM_IDS, MENU_SLOTS, itemsFor, BREW_PUB_ONLY,
+  ITEMS, ITEM_IDS, MENU_SLOTS, itemsFor, BREW_PUB_ONLY, COCKTAIL_BAR_ONLY,
 } from '../src/sim/menu.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import {
@@ -75,17 +75,25 @@ test('each amenity accepts the right items', () => {
   assert.ok(shack.every((id) => ITEMS[id].prep <= 1), 'snack shack has no line cook');
   const cart = itemsFor('beverageCart');
   assert.ok(cart.every((id) => ITEMS[id].cartable), 'cart got something it cannot carry');
-  // The restaurant serves anything that is not the brew pub's own. Those
-  // nine are poured in one building and nowhere else, which is what makes
-  // the pub a place rather than a second bar.
-  const general = ITEM_IDS.filter((id) => !BREW_PUB_ONLY.has(id));
+  // The restaurant serves anything that is not somebody else's own. Two
+  // venues now have exclusive lists, and what makes each of them a place
+  // rather than a second bar is that nowhere else pours their drinks.
+  const general = ITEM_IDS.filter((id) => !BREW_PUB_ONLY.has(id) && !COCKTAIL_BAR_ONLY.has(id));
   assert.deepEqual(itemsFor('restaurant'), general,
-    'the restaurant should serve everything except the brew pub exclusives');
-  assert.ok(itemsFor('brewPub').some((id) => BREW_PUB_ONLY.has(id)),
-    'and the brew pub should be the one place that pours them');
-  for (const type of ['restaurant', 'cocktailBar', 'fineDining', 'snackShack', 'halfwayHouse', 'beverageCart']) {
-    assert.ok(!itemsFor(type).some((id) => BREW_PUB_ONLY.has(id)),
-      `${type} is pouring a beer that is supposed to be the brew pub's alone`);
+    'the restaurant should serve everything that is not exclusive to somewhere else');
+
+  const exclusives = [
+    ['brewPub', BREW_PUB_ONLY],
+    ['cocktailBar', COCKTAIL_BAR_ONLY],
+  ];
+  for (const [owner, list] of exclusives) {
+    assert.ok([...list].every((id) => itemsFor(owner).includes(id)),
+      `${owner} cannot pour something that is supposed to be its own`);
+    for (const type of Object.keys(MENU_SLOTS)) {
+      if (type === owner) continue;
+      assert.ok(!itemsFor(type).some((id) => list.has(id)),
+        `${type} is serving something that is supposed to be ${owner}'s alone`);
+    }
   }
   assert.deepEqual(itemsFor('proShop'), [], 'the pro shop sells no food');
 });

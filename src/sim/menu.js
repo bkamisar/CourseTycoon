@@ -63,6 +63,23 @@ const ITEM_LIST = [
   ['brownAle',          'Brown ale',          'drink',  8,  2.8, 0, false,  0.80, 0.70, 0.40, 3,  4],
   ['porter',            'Porter',             'drink', 10,  3.5, 0, false,  0.45, 0.75, 0.65, 3,  5],
   ['beerFlight',        'Tasting flight',     'drink', 16,  6,   0, false, 0.40, 0.70, 0.95, 4,  3],
+
+  // The cocktail list. Ten of these are the bar's alone; the Water Hazard
+  // and the John Daly are not, because they are golf drinks before they
+  // are cocktails and belong anywhere on the property that pours -- the
+  // cart included, which is why those two are the only cartable ones.
+  ['waterHazard',       'Water Hazard',       'drink', 12,  4,   0, true,  0.85, 0.70, 0.75, 4,  4],
+  ['johnDaly',          'John Daly',          'drink', 11,  3.5, 0, true,  0.90, 0.75, 0.60, 4,  5],
+  ['screwdriver',       'Screwdriver',        'drink', 10,  3,   0, false, 0.70, 0.40, 0.55, 3,  5],
+  ['ginTonic',          'Gin and tonic',      'drink', 11,  3.5, 0, false, 0.60, 0.75, 0.75, 3,  4],
+  ['azalea',            'Azalea',             'drink', 13,  4.5, 0, false, 0.30, 0.55, 0.95, 4,  4],
+  ['margarita',         'Margarita',          'drink', 13,  4.5, 0, false, 0.65, 0.50, 0.80, 4,  4],
+  ['whiskeySour',       'Whiskey sour',       'drink', 13,  4.5, 0, false, 0.55, 0.70, 0.80, 4,  4],
+  ['oldFashioned',      'Old fashioned',      'drink', 14,  5,   0, false, 0.50, 0.80, 0.85, 4,  3],
+  ['negroni',           'Negroni',            'drink', 14,  5,   0, false, 0.20, 0.60, 0.95, 4,  3],
+  ['manhattan',         'Manhattan',          'drink', 15,  5.5, 0, false, 0.35, 0.75, 0.90, 4,  3],
+  ['martini',           'Martini',            'drink', 15,  5.5, 0, false, 0.25, 0.65, 0.95, 4,  3],
+  ['espressoMartini',   'Espresso martini',   'drink', 16,  6,   1, false, 0.30, 0.55, 1.00, 4,  5],
   ['candyBar',          'Candy bar',          'food',   3,  1,   0, true,  0.80, 0.50, 0.20, 1,  6],
   ['trailMix',          'Trail mix',          'food',   5,  2,   0, true,  0.40, 0.80, 0.40, 2,  7],
   ['turkeyWrap',        'Turkey wrap',        'food',  12,  4,   0, true,  0.50, 0.80, 0.60, 3,  9],
@@ -108,7 +125,10 @@ export const MENU_SLOTS = Object.freeze({
   // against twelve styles meant most of them never got poured, and a
   // choice you make once and never revisit is not much of a choice.
   brewPub: 8,
-  cocktailBar: 4,
+  // Eight here too. Thirteen cocktails against four slots would mean most
+  // of the list never gets poured, which is the same waste the brew pub
+  // had.
+  cocktailBar: 8,
 });
 
 /** Which amenities serve food at all. Order matters: it is the order the
@@ -134,11 +154,33 @@ export const BREW_PUB_ONLY = Object.freeze(new Set([
   'hefeweizen', 'brownAle', 'porter', 'beerFlight',
 ]));
 
+/**
+ * The cocktail bar's own, on the same principle.
+ *
+ * The Water Hazard, the John Daly and the Transfusion are deliberately
+ * NOT here. They are golf drinks before they are cocktails — the sort of
+ * thing a halfway house pours and a cart carries — and locking them
+ * behind a hotel bar would take three of the best drinks in the game away
+ * from Act I entirely.
+ */
+export const COCKTAIL_BAR_ONLY = Object.freeze(new Set([
+  'screwdriver', 'ginTonic', 'azalea', 'margarita', 'whiskeySour',
+  'oldFashioned', 'negroni', 'manhattan', 'martini', 'espressoMartini',
+]));
+
+/** The list a venue owns outright, if it owns one. */
+export function exclusiveTo(type) {
+  if (type === 'brewPub') return BREW_PUB_ONLY;
+  if (type === 'cocktailBar') return COCKTAIL_BAR_ONLY;
+  return null;
+}
+
 export function itemsFor(type) {
   if (!MENU_SLOTS[type]) return [];
   return ITEM_IDS.filter((id) => {
     const item = ITEMS[id];
     if (BREW_PUB_ONLY.has(id)) return type === 'brewPub';
+    if (COCKTAIL_BAR_ONLY.has(id)) return type === 'cocktailBar';
     if (type === 'snackShack') return item.prep <= 1;
     if (type === 'beverageCart') return item.cartable;
     // A dining room is not a place you order a hot dog, and price alone

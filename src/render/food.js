@@ -40,6 +40,7 @@ export const FOOD_CHARS = {
   G: 'UI_LIGHT',        // glass, can, shell, bowl
   t: 'TEE',             // a straw
   C: 'PATH',            // coffee, iced tea, dark ale
+  q: 'WATER',           // the one blue drink on the list
 };
 
 // --- Drinks -----------------------------------------------------------
@@ -281,11 +282,108 @@ const beerFlight = [
   'BBBBBBBBBBBB', 'BbbbbbbbbbbB', 'BBBBBBBBBBBB', '............',
 ];
 
+// --- The cocktail list ------------------------------------------------
+//
+// Twelve of these beside twelve beers is the hardest the silhouette rule
+// has been pushed in this file. The beers took every kind of pint and
+// mug, so the cocktails take the shapes a pub does not own: the V of a
+// martini, the shallow bowl of a coupe, the squat rocks glass, the
+// stepped margarita, and the tall highball. Where two share a shape they
+// never share a colour, and the ones that would still collide carry a
+// garnish nothing else has -- an olive, three beans, a cherry, a lime.
+
+/** Tall, and the only blue thing in the game. The joke is the point. */
+const waterHazard = [
+  '............', '...oooooo...', '...oWWWWo...', '...oqqqqo...',
+  '...oqqqqo...', '...oqqqqo...', '...oqqqqo...', '...oqqqqo...',
+  '...oqqqqo...', '...oqqqqo...', '...oooooo...', '............',
+];
+
+/** Tea over lemonade with a lemon wheel, which is what separates it from
+ * the Arnold Palmer it is the grown-up version of. */
+const johnDaly = [
+  '...MM.......', '..MooM......', '...oooooo...', '...oCCCCo...',
+  '...oCCCCo...', '...oMMMMo...', '...oMMMMo...', '...oMMMMo...',
+  '...oMMMMo...', '...oMMMMo...', '...oooooo...', '............',
+];
+
+/** Highball, orange, no garnish. The plainest drink on the list. */
+const screwdriver = [
+  '............', '...oooooo...', '...oMMMMo...', '...oMMMMo...',
+  '...oMMMMo...', '...oMMMMo...', '...oMMMMo...', '...oMMMMo...',
+  '...oMMMMo...', '...oMMMMo...', '...oooooo...', '............',
+];
+
+/** Highball, clear, with a lime wedge on the rim. */
+const ginTonic = [
+  '....LL......', '...oooooo...', '...oWWWWo...', '...oGGGGo...',
+  '...oGGGGo...', '...oGGGGo...', '...oGGGGo...', '...oGGGGo...',
+  '...oGGGGo...', '...oGGGGo...', '...oooooo...', '............',
+];
+
+/** Coupe, pink. The Masters drink, so it gets the prettiest glass. */
+const azalea = [
+  '............', '............', '..oooooooo..', '..oRRRRRRo..',
+  '...oRRRRo...', '....oRRo....', '.....oo.....', '.....oo.....',
+  '.....oo.....', '....oooo....', '...oooooo...', '............',
+];
+
+/** The stepped bowl nothing else has, with a salt rim. */
+const margarita = [
+  '............', '.WWWWWWWWWW.', '.oooooooooo.', '..oLLLLLLo..',
+  '...oLLLLo...', '....oLLo....', '.....oo.....', '.....oo.....',
+  '.....oo.....', '....oooo....', '...oooooo...', '............',
+];
+
+/** Rocks glass under a head of foam. */
+const whiskeySour = [
+  '............', '............', '..oooooooo..', '..oWWWWWWo..',
+  '..oAAAAAAo..', '..oAAAAAAo..', '..oAAAAAAo..', '..oAAAAAAo..',
+  '..oAAAAAAo..', '..oooooooo..', '............', '............',
+];
+
+/** Rocks glass, amber, one big cherry. */
+const oldFashioned = [
+  '............', '............', '..oooooooo..', '..oAAAAAAo..',
+  '..oAARAAAo..', '..oAARAAAo..', '..oAAAAAAo..', '..oAAAAAAo..',
+  '..oAAAAAAo..', '..oooooooo..', '............', '............',
+];
+
+/** Rocks glass, red through, orange twist on top. */
+const negroni = [
+  '............', '.....MM.....', '..oooooooo..', '..oRRRRRRo..',
+  '..oRRRRRRo..', '..oRRRRRRo..', '..oRRRRRRo..', '..oRRRRRRo..',
+  '..oRRRRRRo..', '..oooooooo..', '............', '............',
+];
+
+/** Coupe, dark, cherry on a stick. */
+const manhattan = [
+  '.....R......', '.....o......', '..oooooooo..', '..oCCCCCCo..',
+  '...oCCCCo...', '....oCCo....', '.....oo.....', '.....oo.....',
+  '.....oo.....', '....oooo....', '...oooooo...', '............',
+];
+
+/** The V, with an olive. */
+const martini = [
+  '............', '.oooooooooo.', '.oWWWWWWWWo.', '..oWWLWWWo..',
+  '...oWWWWo...', '....oWWo....', '.....oo.....', '.....oo.....',
+  '.....oo.....', '....oooo....', '...oooooo...', '............',
+];
+
+/** The same V, dark, with three beans across the top. */
+const espressoMartini = [
+  '............', '.oooooooooo.', '.oCsCsCsCCo.', '..oCCCCCo...',
+  '...oCCCCo...', '....oCCo....', '.....oo.....', '.....oo.....',
+  '.....oo.....', '....oooo....', '...oooooo...', '............',
+];
+
 export const FOOD_SPRITES = {
   domesticCan, draught, craftAle, arnoldPalmer, bottledWater, transfusion,
   espresso, wineByGlass,
   pilsner, caskBitter, stout, hazyIpa, sourAle,
-  hefeweizen, brownAle, porter, beerFlight, candyBar, trailMix, turkeyWrap, chickenCaesarWrap,
+  hefeweizen, brownAle, porter, beerFlight,
+  waterHazard, johnDaly, screwdriver, ginTonic, azalea, margarita,
+  whiskeySour, oldFashioned, negroni, manhattan, martini, espressoMartini, candyBar, trailMix, turkeyWrap, chickenCaesarWrap,
   hotDog, breakfastSandwich, chiliBowl, burgerFries, clubSandwich,
   seasonalSalad, oysters, lobsterRoll, steakFrites,
 };

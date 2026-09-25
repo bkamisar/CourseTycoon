@@ -1,7 +1,7 @@
 import { makeHole } from './hole.js';
 import { emptyGoodwill } from './goodwill.js';
 import {
-  MENU_SLOTS, itemsFor, ITEMS, MENU_AUDIENCE, BREW_PUB_ONLY,
+  MENU_SLOTS, itemsFor, ITEMS, MENU_AUDIENCE, exclusiveTo,
 } from './menu.js';
 
 const SAVE_VERSION = 1;
@@ -127,6 +127,7 @@ export function defaultMenuFor(type) {
   // Sorted by who the venue is for, not by who the first four venues
   // happened to be for. See MENU_AUDIENCE.
   const audience = MENU_AUDIENCE[type] ?? 'locals';
+  const own = exclusiveTo(type);
   return itemsFor(type)
     .slice()
     .sort((a, b) => {
@@ -134,7 +135,11 @@ export function defaultMenuFor(type) {
       // audience appeal alone, the brew pub's eight slots filled with hot
       // dogs, a breakfast sandwich, chilli and a burger -- locals love
       // those, and the sort has no idea the place is called a brew pub.
-      const exclusive = Number(BREW_PUB_ONLY.has(b)) - Number(BREW_PUB_ONLY.has(a));
+      // The cocktail bar had the milder version of the same problem,
+      // opening with a glass of wine and an espresso among the cocktails.
+      const exclusive = own
+        ? Number(own.has(b)) - Number(own.has(a))
+        : 0;
       if (exclusive !== 0) return exclusive;
       return ITEMS[b].appeal[audience] - ITEMS[a].appeal[audience];
     })

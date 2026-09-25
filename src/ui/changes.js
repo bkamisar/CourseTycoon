@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24g';
+export const BUILD = '2026-09-24h';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24h',
+    notes: [
+      'The cocktail bar has eight seats on the board and thirteen drinks: a Water Hazard, a John Daly, an Azalea, an old fashioned, a screwdriver, a negroni, a manhattan, a whiskey sour, a martini, an espresso martini, a gin and tonic, a margarita, and the Transfusion.',
+      'Ten of those are the bar’s alone. The Water Hazard, the John Daly and the Transfusion are not — they are golf drinks before they are cocktails, so a halfway house can pour them and the cart can carry them.',
+      'The brew pub has eight taps now rather than four, and you can still put food on them if you want to.',
+    ],
+  },
   {
     version: '2026-09-24g',
     notes: [
