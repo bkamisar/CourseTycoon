@@ -31,13 +31,23 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24i';
+export const BUILD = '2026-09-25a';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-25a',
+    notes: [
+      'The investors ask for something different now. Instead of a fixed ladder they want a little better than whatever you are already doing — and if a number cannot go any higher they ask you to hold it rather than beat it.',
+      'Their confidence is much harder to keep. Meeting a target is worth less than missing one costs, which is how trust actually works.',
+      'If their confidence hits zero they will not take your money, however much you have. You get one last review before the deadline and you have to BEAT it, not merely meet it. Survive that and they stay, barely.',
+      'A room now costs about 42% of what it charges to service — a $280 room is not a $95 room with a bigger number on it. Charging too little now genuinely loses money, and there is a best price to find rather than just "as much as they will pay".',
+      'You can only build so many rooms. Planning permission starts at 26 and reaches 72 as your reputation grows, so the answer to wanting more rooms is being worth more rooms.',
+    ],
+  },
   {
     version: '2026-09-24i',
     notes: [
