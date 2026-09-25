@@ -8,7 +8,7 @@
 
 **Tech Stack:** ES modules, no build step, `node --test`. No new dependencies.
 
-**Out of scope for this plan** — a second plan covers the surface: contract cards, the four infrastructure buildings, the tournament report, and the setup dial's UI. This plan produces a simulation that can host a championship with no way to see it, which is verifiable by tests and by `tools/`.
+**Out of scope for this plan** — a second plan covers the surface: contract cards, the four infrastructure buildings, the tournament report, and the setup dial's own screen. The one exception is a HUD countdown (Task 9), because without something visible none of this can be played, and a plan whose output cannot be sat down with is a plan that only tests can check.
 
 ---
 
@@ -1261,6 +1261,155 @@ pass as measuring — that is how Act I ended up with a confident, wrong report.
 
 ---
 
+## Task 9: A countdown on the HUD
+
+**Files:**
+- Modify: `src/ui/hud.js`
+- Test: `tests/hud.test.js` (create if absent)
+
+Added at the author's request, and it earns its place in this plan rather than
+the next one: without something visible, none of the eight tasks above can be
+played. A countdown makes the run-up legible and turns this plan's output from
+"tests pass" into "a thing you can sit down with".
+
+Deliberately the only UI in this plan. Everything else — the contract card, the
+tournament report, the setup dial's own screen — stays in Plan 2.
+
+- [ ] **Step 1: Write the failing test**
+
+Create (or append to) `tests/hud.test.js`:
+
+```js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { newGame } from '../src/sim/state.js';
+import { computeHudData } from '../src/ui/hud.js';
+
+test('the HUD says nothing about tournaments when none is booked', () => {
+  const data = computeHudData(newGame(1));
+  assert.equal(data.tournament, null);
+});
+
+test('the HUD counts down to a booked championship', () => {
+  const state = newGame(2);
+  state.day = 40;
+  state.resort.setup = 61;
+  state.tournament = { rung: 'regional', day: 61, resolved: false };
+
+  const data = computeHudData(state);
+  assert.ok(data.tournament, 'a booking has to reach the HUD');
+  assert.equal(data.tournament.daysLeft, 21);
+  assert.equal(data.tournament.label, 'Regional Championship');
+  assert.equal(data.tournament.setup, 61);
+  // The band is the decision. A countdown that does not show whether the
+  // course is set right is a clock, not information.
+  assert.equal(data.tournament.inBand, true, '61 is inside the regional band of 62-78?');
+});
+
+test('the countdown says when the championship is today', () => {
+  const state = newGame(3);
+  state.day = 61;
+  state.tournament = { rung: 'countyOpen', day: 61, resolved: false };
+  assert.equal(computeHudData(state).tournament.daysLeft, 0);
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node --test tests/hud.test.js`
+Expected: FAIL — `data.tournament` is `undefined`
+
+Note: the second test asserts `inBand` is `true` for a setup of 61 against the
+regional band of 62–78, which is **false**. Fix the assertion to `false` and add
+a second case at 70 asserting `true` — the test is there to prove the band is
+reported, and it should prove both sides of it.
+
+- [ ] **Step 3: Write minimal implementation**
+
+In `src/ui/hud.js`, add the import:
+
+```js
+import { RUNGS, withinBand } from '../sim/tournaments.js';
+```
+
+In `computeHudData`, add to the returned object:
+
+```js
+    // Act III. Null when nothing is booked, so the HUD can simply not
+    // draw it. `inBand` is included because a countdown that does not say
+    // whether the course is set right is a clock rather than information.
+    tournament: tournamentReadout(state),
+```
+
+And above `computeHudData`, add:
+
+```js
+/** What the HUD needs to know about a booked championship, or null. */
+function tournamentReadout(state) {
+  const booked = state.tournament;
+  if (!booked || booked.resolved) return null;
+  const rung = RUNGS[booked.rung];
+  if (!rung) return null;
+  const setup = Math.round(state.resort.setup ?? 0);
+  return {
+    label: rung.label,
+    daysLeft: Math.max(0, booked.day - state.day),
+    setup,
+    inBand: withinBand(setup, rung.band),
+    band: rung.band,
+  };
+}
+```
+
+In `mountHud`, beside the other spans, add:
+
+```js
+  const tournament = document.createElement('span');
+  tournament.className = 'hud-tournament';
+```
+
+Append it to `bar` after the existing children, and in `update(state)` add:
+
+```js
+    if (data.tournament) {
+      const t = data.tournament;
+      const when = t.daysLeft === 0 ? 'today' : `${t.daysLeft}d`;
+      // The setup and the band together, because the number alone does
+      // not tell the player whether it is the right number.
+      tournament.textContent =
+        `${t.label} ${when} · setup ${t.setup} (want ${t.band.low}-${t.band.high})`;
+      tournament.hidden = false;
+      tournament.classList.toggle('hud-tournament--off', !t.inBand);
+    } else {
+      tournament.hidden = true;
+    }
+```
+
+And in `injectStyles`, add:
+
+```js
+    .hud-tournament { color: ${PALETTE.ACCENT}; }
+    .hud-tournament--off { color: ${PALETTE.SAND}; }
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node --test tests/hud.test.js`
+Expected: PASS, 3 tests
+
+Run: `node --test "tests/*.test.js"`
+Expected: all pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/ui/hud.js tests/hud.test.js
+git commit -m "Count down to the championship on the HUD, with the band it wants"
+```
+
+
+---
+
 ## Self-review against the spec
 
 | Spec section | Task |
@@ -1275,6 +1424,7 @@ pass as measuring — that is how Act I ended up with a confident, wrong report.
 | §7 The contract, base plus bonuses | Task 7 — `contractFor`, `scoreTournament` |
 | §8 Stakes, bars, the gate to Act IV | Task 7 — `barDays`; the Act IV gate itself is Plan 2 |
 | §10 What to measure | Task 8 |
+| Visible countdown (author's request, not in the spec) | Task 9 |
 
 **Known gaps, deliberately deferred to Plan 2:** the four infrastructure
 buildings; `crowdHandled` is hard-coded true until they exist; the contract card
