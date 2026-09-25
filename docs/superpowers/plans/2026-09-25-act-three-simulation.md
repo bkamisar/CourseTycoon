@@ -854,9 +854,26 @@ const FIELD_HANDICAP_HIGH = 6;
  */
 export function playField(rng, holes, { setup = 0, turfQuality = 100 } = {}) {
   const par = holes.reduce((sum, h) => sum + holeStats(h).par, 0);
-  // A conditioned course plays longer and less forgiving, and worn turf
-  // adds its own unpredictability.
-  const handicapAdjust = -setupDifficultyBonus(setup) / 10;
+  // A conditioned course plays longer and less forgiving. `playHole`
+  // adds this to the golfer's handicap, and a HIGHER handicap is a worse
+  // golfer, so a hard setup is a POSITIVE adjustment. The sign matters
+  // more than it looks: negated, setup 95 made the field shoot 0.2 UNDER
+  // par against 2.4 over at setup 0, with 29 of 60 breaking par on the
+  // hardest course in the game, because 0-6 handicaps clamp at 0.
+  //
+  // The divisor is measured, not guessed. Across seven seeds /3 gives a
+  // monotone ladder the player can actually read:
+  //
+  //   setup    0    20    45    60    70    95
+  //   avg    1.2-3.1  2.1-3.8  4.7-5.9  5.9-7.9  6.5-7.8  8.8-10.4
+  //
+  // which puts a county setup (45-60) at five or six over and a national
+  // (80-92) at nine or ten. /5 flattened it to a 4-stroke total spread;
+  // /1 had the field 22 over and nobody near par.
+  const handicapAdjust = setupDifficultyBonus(setup) / 3;
+  // Worn greens putt less true. Honestly small: measured across the whole
+  // turf range this moves the field 0.2 strokes, so it is texture rather
+  // than a lever. Turf is judged as its own contract condition instead.
   const puttAdjust = (100 - turfQuality) / 100;
 
   const toPar = [];
@@ -913,11 +930,18 @@ export function playField(rng, holes, { setup = 0, turfQuality = 100 } = {}) {
 Run: `node --test tests/field.test.js`
 Expected: PASS, 4 tests
 
-If "a harder setup produces higher scores" fails, the lever is
-`handicapAdjust`: `playHole` takes it as a modifier on the player's handicap, so
-a larger negative number makes the course play harder. Tune the divisor in
-`-setupDifficultyBonus(setup) / 10` and re-run rather than changing the test —
-the test is stating the requirement the act depends on.
+These numbers were measured against the real `playHole` before this task was
+dispatched, so they should pass as written. If "a harder setup produces higher
+scores" fails anyway, the lever is the divisor in
+`setupDifficultyBonus(setup) / 3` — a SMALLER divisor makes the course play
+harder. Tune it and re-run rather than changing the test; the test states the
+requirement the whole act depends on, which is that the player can find the
+band by reading the scores.
+
+Do not add a turf term to the scoring to make turf matter more. It was measured
+at 0.2 strokes across the entire range and that is fine — "turf still standing"
+is scored directly in Task 7, and inflating its effect here would double-count
+it.
 
 - [ ] **Step 5: Commit**
 
