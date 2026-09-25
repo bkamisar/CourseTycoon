@@ -32,7 +32,7 @@ import {
   hotelUpkeep, extraNightsFrom, divertedShare, HOTEL_AMENITIES,
   caddiePaceFactor, roomValueBonus, indoorTrade,
 } from './hotelAmenities.js';
-import { nextSetup, setupDifficultyBonus } from './tournaments.js';
+import { nextSetup, setupDifficultyBonus, championshipRoomsSold } from './tournaments.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -491,21 +491,26 @@ export function runDay(state, seed) {
   // — and so locals, who never book a room, cannot accidentally fill one.
   //
   // A championship is the one exception: the field, the press and the
-  // gallery fill every bed whether or not anybody teed off, and
-  // `crowdCount` is exactly the golfer tally this closed day has none of.
-  // Stated directly rather than derived, since there is no tee-sheet crowd
-  // to derive it from today.
+  // gallery fill beds whether or not anybody teed off, and `crowdCount` is
+  // exactly the golfer tally this closed day has none of. Sold directly
+  // rather than through `occupancyFor`, but still price-sensitive — see
+  // `championshipRoomsSold` for why a flat sellout was a blank cheque.
   const roomInventory = roomCounts(next.resort.rooms);
   const hotel = championshipToday
-    ? {
-        capacity: roomInventory.standard + roomInventory.suite,
-        sold: roomInventory.standard + roomInventory.suite,
-        suitesSold: roomInventory.suite,
-        standardSold: roomInventory.standard,
-        rate: roomInventory.standard + roomInventory.suite > 0 ? 1 : 0,
-        turnedAway: 0,
-        unmetSuiteDemand: 0,
-      }
+    ? (() => {
+        const capacity = roomInventory.standard + roomInventory.suite;
+        const sold = championshipRoomsSold(capacity, next.resort.pricing.roomRate, value);
+        const suitesSold = Math.min(roomInventory.suite, sold);
+        return {
+          capacity,
+          sold,
+          suitesSold,
+          standardSold: sold - suitesSold,
+          rate: capacity > 0 ? sold / capacity : 0,
+          turnedAway: 0,
+          unmetSuiteDemand: 0,
+        };
+      })()
     : occupancyFor({
         rooms: next.resort.rooms,
         crowd: crowdCount,

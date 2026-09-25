@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, serialize, deserialize } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
+import { makeHole } from '../src/sim/hole.js';
 
 /** A resort that has finished Act II, which is where Act III begins. */
 function actThreeResort(seed = 3) {
@@ -10,6 +11,28 @@ function actThreeResort(seed = 3) {
   state.money = 400000;
   state.prestige = 80;
   for (let i = 0; i < 6; i++) state.resort.staff.push({ role: 'groundskeeper' });
+  return state;
+}
+
+/**
+ * Opens all eighteen holes on a fresh template rotation.
+ *
+ * `newGame` starts with three built and fifteen unbuilt stubs (see
+ * state.js) — fine for tests that don't care what `perceivedValue` comes
+ * out to, but a countyOpen requires CHAMPIONSHIP_HOLES (18) to even be
+ * bid for, and `perceivedValue`'s `completeness` term is what scales a
+ * championship-night room rate's "fair" ceiling. A test asserting a rate
+ * is fair or silly has to run on a course that could plausibly host the
+ * event, not the three-hole stub `actThreeResort` leaves behind.
+ */
+const COURSE_TEMPLATES = [
+  'shortPar3', 'waterPar3', 'straightPar4', 'doglegPar4', 'longPar5', 'reachablePar5',
+];
+function openFullCourse(state) {
+  state.resort.courses[0].holes = state.resort.courses[0].holes.map((h, i) => ({
+    ...makeHole(COURSE_TEMPLATES[i % COURSE_TEMPLATES.length], i + 1),
+    open: true,
+  }));
   return state;
 }
 
@@ -99,4 +122,18 @@ test('a closed day does not break anything downstream', () => {
   assert.ok(Number.isFinite(report.averageSatisfaction));
   assert.ok(report.gate, 'the gate readout still has to exist');
   assert.doesNotThrow(() => runDay(after, 3401), 'and the next day still plays');
+});
+
+test('a championship night is a premium, not a blank cheque', () => {
+  function soldAt(roomRate) {
+    const state = openFullCourse(actThreeResort(13));
+    state.resort.rooms = { standard: 20, suite: 8 };
+    state.resort.pricing.roomRate = roomRate;
+    state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+    return runDay(state, 3600).report.hotel;
+  }
+  assert.equal(soldAt(150).sold, 28, 'a fair price fills the place');
+  assert.ok(soldAt(900).sold < 28, 'a silly price does not');
+  assert.equal(soldAt(4000).sold, 0, 'and an absurd one empties it');
+  assert.ok(soldAt(150).rate <= 1, 'rate is an occupancy ratio, not a flag');
 });

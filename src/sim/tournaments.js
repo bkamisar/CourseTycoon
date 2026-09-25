@@ -143,6 +143,34 @@ export function withinBand(setup, band) {
  */
 export const RUN_UP_DAYS = 21;
 
+/**
+ * What a championship crowd will pay for a bed, as a multiple of what an
+ * ordinary guest thinks a night here is worth.
+ *
+ * Generous — people travelling for a championship are not price-shopping
+ * the way a golfing weekend does — but finite. A flat "the hotel sells
+ * out" made the event night the only price in the game with no ceiling:
+ * $9,999 a night still filled 28 of 28 rooms and took $407,956 off a
+ * single evening.
+ */
+export const CHAMPIONSHIP_RATE_TOLERANCE = 3.2;
+
+/**
+ * Rooms sold on the night of a championship.
+ *
+ * The field, the officials, the press and the gallery are not the
+ * resort's usual crowd and do not arrive by playing a round, so this does
+ * not go through `occupancyFor` — but it keeps the same shape of price
+ * sensitivity, so charging a championship premium is a decision rather
+ * than free money.
+ */
+export function championshipRoomsSold(capacity, roomRate, valuePerRound = 60) {
+  if (capacity <= 0) return 0;
+  const fair = Math.max(1, valuePerRound * 1.6 * CHAMPIONSHIP_RATE_TOLERANCE);
+  const fit = clamp(1.3 - (roomRate / fair) * 0.55, 0, 1);
+  return Math.round(capacity * fit);
+}
+
 /** The next rung this resort is allowed to attempt, or null at the top. */
 export function nextRungFor(hosted = []) {
   const done = new Set(hosted);
