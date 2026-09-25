@@ -87,18 +87,20 @@ export function eligibleFor(rungId, { prestige = 0, resort, holesOpen = 0 }) {
  * How much championship condition one groundskeeper adds in a day.
  *
  * Set so that six keepers reach a national's band (80) inside the
- * 21-day run-up and two cannot. Conditioning is the second job this
- * staff has ever had, which is the point: an existing lever gains a new
- * reason to matter rather than a parallel one being invented.
+ * 21-day run-up and two cannot. Tuned to 0.8: six keepers add 4.8
+ * per day, reaching 100.8 over 21 days; two keepers add 1.6 per day,
+ * reaching only 33.6. Conditioning is the second job this staff has
+ * ever had, which is the point: an existing lever gains a new reason
+ * to matter rather than a parallel one being invented.
  */
-export const SETUP_PER_KEEPER = 0.72;
+export const SETUP_PER_KEEPER = 0.8;
 
 /** And it falls back on its own, because firm greens do not stay firm. */
 export const SETUP_DECAY_PER_DAY = 3.5;
 
 /** What one day of work adds, given the crew. */
 export function setupClimb(keepers = 0) {
-  return Math.max(0, keepers) * SETUP_PER_KEEPER * 100 / 21;
+  return Math.max(0, keepers) * SETUP_PER_KEEPER;
 }
 
 /**

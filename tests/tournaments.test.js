@@ -56,6 +56,13 @@ test('the grounds crew decides how fast the course hardens', () => {
   let setup = 0;
   for (let d = 0; d < 21; d++) setup = nextSetup(setup, { keepers: crew, conditioning: true });
   assert.ok(setup >= 80, `six keepers reached only ${setup.toFixed(0)} in 21 days`);
+  // And the other half, which is the half that matters: a thin crew
+  // must NOT get there. Asserting only that six keepers succeed passes
+  // happily against a formula where one keeper would also succeed.
+  let thin = 0;
+  for (let d = 0; d < 21; d++) thin = nextSetup(thin, { keepers: 2, conditioning: true });
+  assert.ok(thin < 80,
+    `two keepers reached ${thin.toFixed(0)}, so the crew size is not a real constraint`);
 });
 
 test('setup falls back when nobody is working on it', () => {
