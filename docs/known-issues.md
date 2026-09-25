@@ -100,6 +100,54 @@ County Open and then stopped, because Regional requires grandstands and
 overflow parking and those buildings do not exist until Plan 2. Nothing above
 rung one has ever been measured.
 
+### Bidding and then not preparing is the best line in Act III
+
+**Found:** 2026-09-25, after the third attempt at making the run-up cost
+something. **A live exploit, and the reason Act III is not yet a decision.**
+
+Measured over the 22-day window from bid to hosting day, money-delta ground
+truth, five seeds: bidding and leaving `setupTarget` at 0 -- never conditioning
+at all -- nets **+$10,200 to +$11,600 against never bidding, in every seed,
+with tight variance.** Properly conditioning beat the free ride in only three
+of five.
+
+**Why.** Three of the four contract conditions are satisfied by ordinary
+operation:
+
+- **turf** -- `TURF_EXPECTED` is 78 and a normally-staffed course sits near 100,
+  so it passes without preparing. Care is only diverted while conditioning, so
+  the free ride never pays even that.
+- **pace** -- met by normal flow at the default tee interval.
+- **crowd** -- hardcoded `true` pending Plan 2's buildings.
+
+Only **band** requires conditioning. So a player pays a $33,000 run-up bill for
+a single $12,000 bonus, while the free ride banks base plus three bonuses --
+$36,000 of a $48,000 ceiling -- for nothing, and the one closed day is more
+than covered by the championship night's own hotel premium.
+
+**The deeper problem, which four fixes have now failed to reach.** The contract
+is internally coherent: the run-up bill is (base + ceiling) / 2, so base alone
+loses, half breaks even and all four gains, exactly, at every rung. But that
+only makes bidding coherent, not significant. A resort arriving in Act III
+earns **$18,460 a day**. A County Open's ceiling is 2.6 days of profit and the
+entire three-rung ladder is 24.8 days. Across a 220-day run the whole act moves
+total profit by less than the noise from investor timing and decision events.
+
+And only the County Open is ever reachable: Regional needs grandstands and
+overflow parking, National a media centre and hospitality pavilion, and none of
+those buildings exist yet. So the cheapest rung is the only rung, measured
+against an economy a hundred times its size.
+
+**What this means for the design.** Act III's stakes cannot be financial at
+this scale without either purses several times larger, or the act arriving
+while the resort is much smaller. The alternative is to accept the money as
+incidental and let the real stakes be prestige and ladder position -- which is
+what was chosen when the act was brainstormed, and what the spec already
+describes in its stakes section.
+
+Do not attempt a fifth cost channel before that question is settled. Three have
+now died on the same wall.
+
 ### Conditioning a course raises average satisfaction instead of costing it
 
 **Found:** 2026-09-25, wiring setup into `runDay` (Task: wire the setup dial
