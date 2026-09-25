@@ -33,6 +33,7 @@ import {
   caddiePaceFactor, roomValueBonus, indoorTrade,
 } from './hotelAmenities.js';
 import { nextSetup, setupDifficultyBonus, championshipRoomsSold, scoreTournament } from './tournaments.js';
+import { playField } from './field.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -646,11 +647,22 @@ export function runDay(state, seed) {
   // the four conditions the contract named when it was signed, each of
   // which is something the player did rather than a hidden score.
   if (championshipToday) {
+    // The field the flow-shop scheduler was always missing: the same
+    // congestion rule that paces the resort's own tee sheet, pointed at
+    // 20 championship threeballs instead. Played on the day's own rng so
+    // a replay of this seed plays out the same tournament.
+    const field = playField(rng, holes, {
+      setup: next.resort.setup ?? 0,
+      turfQuality: next.turfQuality,
+      teeInterval,
+    });
     const result = scoreTournament(next.tournament.rung, {
       setup: next.resort.setup ?? 0,
       turfQuality: next.turfQuality,
       // Pace is the existing flow-shop target, pointed at a new audience.
-      paceOnTarget: (report.averageRoundMinutes || 0) <= holes.length * TARGET_MINUTES_PER_HOLE * 1.1,
+      // No grace period here — the 10% the resort's own tee sheet gets is
+      // what made this condition unfailable, and officials don't give it.
+      paceOnTarget: field.averageRoundMinutes <= holes.length * TARGET_MINUTES_PER_HOLE,
       // Crowd is infrastructure, which the second plan builds. Until it
       // exists, a rung with no building requirements is always handled.
       crowdHandled: true,
@@ -665,7 +677,7 @@ export function runDay(state, seed) {
       };
     }
     next.tournament = null;
-    report.tournament = result;
+    report.tournament = { ...result, field };
     revenue.tournament = result.paid;
     revenue.total += result.paid;
   }

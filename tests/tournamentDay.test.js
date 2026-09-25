@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { newGame, serialize, deserialize } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeHole } from '../src/sim/hole.js';
+import { RUNGS } from '../src/sim/tournaments.js';
 
 /** A resort that has finished Act II, which is where Act III begins. */
 function actThreeResort(seed = 3) {
@@ -160,4 +161,54 @@ test('the championship resolves, pays, and does not happen twice', () => {
   assert.equal(second.report.tournament ?? null, null,
     'a championship must not resolve twice');
   assert.equal(second.report.tournamentDay, false, 'and the course reopens');
+});
+
+/**
+ * A resort that neglected every lever it controls for the week: never
+ * conditioned (setup stuck near zero, missing every band), no
+ * groundskeepers so the turf stays wrecked, and a tee interval left tight
+ * enough that the field backs up behind itself. Before pace was wired to
+ * the field this still cleared roughly 58% of the ceiling on the pace
+ * bonus alone, because `report.averageRoundMinutes` was hardcoded 0 on a
+ * closed course and 0 is never over target. It should now clear close to
+ * the base fee plus the one bonus this task does not touch (`crowd`,
+ * hardcoded true until Plan 2's infrastructure — see
+ * docs/known-issues.md).
+ */
+function neglectedResort(seed) {
+  const state = actThreeResort(seed);
+  state.resort.staff = state.resort.staff.filter((m) => m.role !== 'groundskeeper');
+  state.resort.amenities.push(
+    { type: 'grandstands' }, { type: 'overflowParking' },
+    { type: 'mediaCentre' }, { type: 'hospitalityPavilion' },
+  );
+  openFullCourse(state);
+  state.resort.setup = 5;       // outside every band, low or high
+  state.turfQuality = 20;       // wrecked, and nothing is left to fix it today
+  state.resort.pricing.teeInterval = 8; // tight enough to back the field up
+  return state;
+}
+
+test('a botched championship pays close to base, not 58% of the ceiling', () => {
+  for (const rungId of ['countyOpen', 'national']) {
+    const state = neglectedResort(17);
+    state.tournament = { rung: rungId, day: state.day, resolved: false };
+    const { report } = runDay(state, 3700);
+    const result = report.tournament;
+    const rung = RUNGS[rungId];
+
+    assert.ok(!result.met.includes('band'), `${rungId}: setup 5 must miss every band`);
+    assert.ok(!result.met.includes('turf'), `${rungId}: wrecked turf must miss the turf bonus`);
+    assert.ok(!result.met.includes('pace'),
+      `${rungId}: a tight interval on a neglected week must fail pace too`);
+
+    const ratio = result.paid / rung.purseCeiling;
+    assert.ok(ratio < 0.5,
+      `${rungId}: a three-condition failure still paid ${(ratio * 100).toFixed(1)}% of the ceiling`);
+    // Only `crowd` (hardcoded true — not this task's fix) can still be paid,
+    // so the floor is the base fee plus crowd's own share, not the base
+    // fee alone.
+    assert.ok(result.paid < rung.baseFee * 1.3,
+      `${rungId}: paid ${result.paid} is not close to the ${rung.baseFee} base fee`);
+  }
 });
