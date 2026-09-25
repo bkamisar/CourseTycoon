@@ -104,7 +104,10 @@ export const MENU_SLOTS = Object.freeze({
   // with things in it. These three sell food and drink, so they get the
   // system that already exists for selling food and drink.
   fineDining: 5,
-  brewPub: 4,
+  // Eight, because the brew pub's whole point is the list. Four slots
+  // against twelve styles meant most of them never got poured, and a
+  // choice you make once and never revisit is not much of a choice.
+  brewPub: 8,
   cocktailBar: 4,
 });
 
