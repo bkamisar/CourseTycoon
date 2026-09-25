@@ -32,6 +32,7 @@ import {
   hotelUpkeep, extraNightsFrom, divertedShare, HOTEL_AMENITIES,
   caddiePaceFactor, roomValueBonus, indoorTrade,
 } from './hotelAmenities.js';
+import { nextSetup, setupDifficultyBonus } from './tournaments.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -156,6 +157,32 @@ export function runDay(state, seed) {
   next.conditions = next.conditions ?? [];
   const wrong = conditionEffects(next.conditions);
 
+  /**
+   * Turf: one groundskeeper holds roughly three holes steady, plus the
+   * traffic of a modest day.
+   *
+   * Play used to wear the course at 0.12 per group against 1.4 per hole,
+   * so at a busy optimum all the golfers in the world accounted for 2.8
+   * of 15.4 wear and the rest was just having holes. Golf did not damage
+   * a golf course, which left Act I with no cost that grows as the resort
+   * succeeds -- the thing that makes a busy day a decision rather than a
+   * reward. Traffic now costs about as much as the course does at a full
+   * tee sheet, so a crowd you cannot afford to maintain is a crowd that
+   * ruins the greens, and the greens are what the crowd came for.
+   *
+   * Also feeds Act III's setup climb below: the same crew that holds the
+   * turf steady is the crew that conditions a course for a championship,
+   * one job with two demands on it rather than two staffs to hire.
+   */
+  const keepers = next.resort.staff.filter((m) => m.role === 'groundskeeper').length;
+
+  // Act III. The course hardens while a championship is booked and drifts
+  // back when one is not.
+  next.resort.setup = nextSetup(next.resort.setup ?? 0, {
+    keepers,
+    conditioning: Boolean(next.tournament && !next.tournament.resolved),
+  });
+
   const allOpen = openHoles(next);
   // Closures take the last holes first, so the course shortens from the
   // far end rather than leaving a gap in the middle that the flow-shop
@@ -209,9 +236,14 @@ export function runDay(state, seed) {
   // guestSatisfaction). Computed once here and threaded through both, so
   // the crowd that arrives and the crowd that leaves happy can never
   // disagree about what this course's difficulty actually is.
-  const courseDifficulty = holes.length
+  const baseDifficulty = holes.length
     ? holes.reduce((s, h) => s + holeStats(h).difficulty, 0) / holes.length
     : 0;
+  // Firm greens and thick rough are what a championship wants and what a
+  // Tuesday fourball hates. This is the whole cost of the run-up: the
+  // course the regulars are paying for gets worse for weeks before
+  // anybody is paid anything.
+  const courseDifficulty = clamp(baseDifficulty + setupDifficultyBonus(next.resort.setup ?? 0), 0, 100);
   const averageScenery = holes.length
     ? holes.reduce((s, h) => s + holeStats(h).scenery, 0) / holes.length
     : 0;
@@ -486,21 +518,6 @@ export function runDay(state, seed) {
   }
 
   const profit = revenue.total - costs.total;
-
-  /**
-   * Turf: one groundskeeper holds roughly three holes steady, plus the
-   * traffic of a modest day.
-   *
-   * Play used to wear the course at 0.12 per group against 1.4 per hole,
-   * so at a busy optimum all the golfers in the world accounted for 2.8
-   * of 15.4 wear and the rest was just having holes. Golf did not damage
-   * a golf course, which left Act I with no cost that grows as the resort
-   * succeeds -- the thing that makes a busy day a decision rather than a
-   * reward. Traffic now costs about as much as the course does at a full
-   * tee sheet, so a crowd you cannot afford to maintain is a crowd that
-   * ruins the greens, and the greens are what the crowd came for.
-   */
-  const keepers = next.resort.staff.filter((m) => m.role === 'groundskeeper').length;
 
   /**
    * Wear scales with how much turf there is left to wear.

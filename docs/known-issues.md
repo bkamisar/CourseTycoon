@@ -35,6 +35,50 @@ Act I looked fine on spot measurements the day it shipped broken. The
 operator is the only thing that has ever caught a real balance problem on
 this project, and it has never been pointed at this act.
 
+### Conditioning a course raises average satisfaction instead of costing it
+
+**Found:** 2026-09-25, wiring setup into `runDay` (Task: wire the setup dial
+into `courseDifficulty`, demand and satisfaction).
+
+The intent, and what `tests/tournamentDay.test.js` asserts, is that setting
+a course up for a championship should cost something: locals' ideal
+difficulty is 30, championship condition pushes `courseDifficulty` up
+toward 60-90, and a course that far from what locals want should be a
+worse day out for the resort on average.
+
+Measured instead (`actThreeResort`, prestige 80, a 3-hole course, six
+extra groundskeepers, setup at 90 with a national championship booked,
+against setup at 0 with none): average satisfaction across six days is
+about 20-25 points *higher* conditioned than not, not lower.
+
+The cause is self-selection, not a bug in the wiring. `courseDifficulty`
+correctly feeds both who shows up (`economy.demandGroups`, via
+`segments.crowdMix`) and how they feel about it (`satisfaction.
+guestSatisfaction`) — deliberately one number, per the existing comment in
+`day.js` above where it's computed, so the crowd that arrives and the
+crowd that leaves happy can never disagree about the course. But at
+prestige 80 the tee sheet is capacity-bound (sold out) regardless of
+difficulty: raising `courseDifficulty` toward serious golfers' ideal (72)
+does not just repel locals, it also raises total appeal (locals'
+`SEGMENTS.locals` appeal collapses from ~0.50 to ~0.08 at these numbers,
+but serious's jumps from ~0.19 to ~0.93). A capacity-bound resort simply
+refills the same number of tee times with more serious golfers, who are
+both a better fit for the harder course AND, independent of difficulty,
+score higher on `guestSatisfaction`'s other terms (lower price
+sensitivity, higher turf weight against turf this resort already keeps
+decent). The population average goes up because the population changed,
+not because anyone's individual day got better in isolation — locals who
+do still turn up score noticeably worse, they are just a shrinking
+fraction of who shows up at all.
+
+`tests/tournamentDay.test.js`'s third test is marked `todo` with the
+measured numbers rather than adjusted or deleted, because the assertion
+still states the intended design correctly. A fix would touch
+`segments.js` or `economy.js` tuning (e.g. making the demand-side
+crowd-mix reaction to difficulty weaker than the satisfaction-side hit,
+or capping how far conditioning can push a capacity-bound resort's
+appeal), which is balance work outside a wiring task.
+
 ### The turf self-heals when a resort empties out
 
 **Found:** 2026-09-23, while making play wear the course. **Known and

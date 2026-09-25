@@ -71,10 +71,18 @@ export function newGame(seed) {
       // travelling to. See src/sim/rooms.js.
       rooms: { standard: 0, suite: 0 },
       shuttles: [],                                    // Act III
+      // Act III. How hard the course is set up for a championship, 0-100.
+      // Lives on the resort rather than on the tournament because it
+      // outlives one: it climbs before an event and decays after, and a
+      // resort between championships still has a setting.
+      setup: 0,
       pricing: { greenFee: 22, teeInterval: 16, foodMultiplier: 1, roomRate: 0 },
     },
     properties: [{ id: 1, name: 'Pinehollow' }],       // Act IV
     history: [],
+    // Act III. The championship currently booked, or null. See
+    // src/sim/tournaments.js.
+    tournament: null,
     satisfactionHistory: [],
     // Which narration lines have been shown lately, so the world does not
     // repeat itself while it still has something new to say.
@@ -165,6 +173,10 @@ export function deserialize(text) {
   // against a missing key.
   if (!parsed.goodwill) parsed.goodwill = emptyGoodwill();
   if (!parsed.eventsSeen) parsed.eventsSeen = [];
+  // Saves from before Act III have neither. Default them rather than let
+  // every later reader guard against a missing key.
+  if (typeof parsed.resort?.setup !== 'number') parsed.resort.setup = 0;
+  if (parsed.tournament === undefined) parsed.tournament = null;
   // A save written before HISTORY_LIMIT existed can carry hundreds of
   // days and be too large to write back. Trimmed on the way in so it
   // shrinks on the first load rather than a fortnight later.
