@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import './helpers/fakeDom.js';
 import { newGame } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
-import { startingInvestors, payBuyout } from '../src/sim/investors.js';
+import {
+  startingInvestors, payBuyout,
+} from '../src/sim/investors.js';
 import { makeRng } from '../src/sim/rng.js';
 import { GATE_THRESHOLDS } from '../src/sim/acts.js';
 import { builtOutNine } from '../tools/scenarios.js';
@@ -107,16 +109,29 @@ test('a review card quotes the verdict the report recorded', () => {
   assert.equal(card.choices.length, 1, 'a verdict is an announcement, not a choice');
 });
 
-test('the settlement card is the only one with a real decision', () => {
-  const state = act2({ confidence: 0 });
-  const { state: after, report } = runDay(state, 2100);
-  assert.ok(report.investors.demandRaised, 'sanity: confidence at zero raises a demand');
+test('an offer to sell is a real decision; a final demand is not', () => {
+  // The two settlements differ in kind, not just in wording. An offer is
+  // money changing hands and has two buttons. A demand raised because
+  // confidence hit zero cannot be paid off at all -- once trust is gone
+  // it is gone -- so the card has nothing to press and says so.
+  const demanded = act2({ confidence: 0 });
+  const out = runDay(demanded, 2100);
+  assert.ok(out.report.investors.demandRaised, 'sanity: confidence at zero raises a demand');
+  assert.ok(out.state.investors.buyoutDemand.final, 'and it should be final');
 
-  const card = investorCards(report, after).find((c) => c.id === 'investors-settlement');
+  const card = investorCards(out.report, out.state).find((c) => c.id === 'investors-settlement');
   assert.ok(card, 'the demand has to reach a card');
-  assert.equal(card.choices.length, 2, 'pay it or do not');
-  assert.equal(card.choices[0].effect, 'payBuyout');
-  assert.match(card.choices[0].label, /Pay \$/);
+  assert.equal(card.choices.length, 1, 'there is nothing to decide, only a review to pass');
+  assert.ok(!card.choices.some((c) => c.effect === 'payBuyout'),
+    'a final demand must not offer to be paid');
+
+  const offered = act2({ confidence: 95, goodReviews: 2 });
+  const o2 = runDay(offered, 2200);
+  const offerCard = investorCards(o2.report, o2.state).find((c) => c.id === 'investors-settlement');
+  if (offerCard) {
+    assert.equal(offerCard.choices.length, 2, 'an offer is pay it or do not');
+    assert.equal(offerCard.choices[0].effect, 'payBuyout');
+  }
 });
 
 test('the settlement card fires the day it is raised, not every day it stands', () => {
@@ -131,20 +146,26 @@ test('the settlement card fires the day it is raised, not every day it stands', 
     `the demand card appeared ${raised} times; a fortnight-long deadline must not nag daily`);
 });
 
-test('a demand you cannot afford shows the button shut off, not missing', () => {
+test('being rich does not save a resort they have lost confidence in', () => {
+  // The point of making a final demand unpayable. Losing the hotel used
+  // to require being out of favour AND out of cash, and a hotel makes
+  // money even when badly run, so the second never happened: nought
+  // liquidations across thirty-two measured runs.
   const state = act2({ confidence: 0 });
-  state.money = 100;
+  state.money = 5000000;
   const { state: after, report } = runDay(state, 2100);
   const card = investorCards(report, after).find((c) => c.id === 'investors-settlement');
-  assert.equal(card.choices[0].disabled, true, 'it must not be clickable');
-  assert.match(card.choices[0].cost, /not enough/,
-    'and it should say why, rather than looking broken');
+  assert.ok(!card.choices.some((c) => c.effect === 'payBuyout'),
+    'five million dollars must not buy a way out of this');
+  assert.equal(payBuyout(after).investors.bought ?? false, false,
+    'and payBuyout itself has to refuse it');
 });
 
 test('paying the buyout is announced once and then never again', () => {
-  const state = act2({ confidence: 0 });
+  // Driven from an OFFER now, since a demand can no longer be paid.
+  const state = act2({ confidence: 95, goodReviews: 2 });
   const { state: demanded } = runDay(state, 2100);
-  assert.ok(demanded.investors.buyoutDemand, 'sanity: a demand stands');
+  if (!demanded.investors.buyoutDemand) return;
 
   let current = payBuyout(demanded);
   assert.ok(current.investors.bought, 'sanity: it was affordable');

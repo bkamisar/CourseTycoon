@@ -23,6 +23,7 @@ import { weatherOn, forecast, effectsOf } from './weather.js';
 import {
   REVIEW_EVERY, MEASURES, OFFER_CONFIDENCE,
   assessTarget, confidenceChange, nextTargetFor, measureNow, settlementDue,
+  REPRIEVE_CONFIDENCE,
   forceLiquidation,
   startingInvestors,
 } from './investors.js';
@@ -644,6 +645,31 @@ export function runDay(state, seed) {
       const outcome = assessTarget(target, { report, state: next });
       const change = confidenceChange(outcome);
       next.investors.confidence = clamp(next.investors.confidence + change, 0, 100);
+
+      /**
+       * The last chance, taken.
+       *
+       * A final demand cannot be paid off, so the fortnight it runs for
+       * is the resort's opportunity to perform rather than to settle.
+       * Exactly one review falls inside it, and this is that review: pass
+       * it and they stay, on very little confidence and watching.
+       */
+      /**
+       * And it has to be BEATEN, not merely met.
+       *
+       * Targets are measured against what the resort is already doing, so
+       * a neglected hotel still meets about three reviews in four -- its
+       * bar has fallen with it. That made the last chance a formality and
+       * nought resorts in eight were ever liquidated even after their
+       * confidence hit zero. People who have stopped trusting you are not
+       * reassured by the minimum.
+       */
+      const standing = next.investors.buyoutDemand;
+      if (standing?.final && outcome === 'beat') {
+        next.investors.buyoutDemand = null;
+        next.investors.confidence = Math.max(next.investors.confidence, REPRIEVE_CONFIDENCE);
+        report.investors.reprieved = true;
+      }
       report.investors.reviewed = {
         measure: target.measure,
         threshold: target.threshold,

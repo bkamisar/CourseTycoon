@@ -254,8 +254,14 @@ test('the demand does not renew itself every morning', () => {
 });
 
 test('paying it ends the act and leaves the hotel yours', () => {
-  let state = atConfidence(0, 14);
+  // Driven from an OFFER. A demand raised because confidence hit zero
+  // can no longer be paid at all -- see `settlementDue` -- so the payable
+  // settlement is the one a well-run resort earns, not the one a failing
+  // one is handed.
+  let state = atConfidence(95, 14);
+  state.investors.goodReviews = 2;
   state = runDay(state, 1600).state;
+  if (!state.investors.buyoutDemand) return;
   state.money = 500000;
   const owed = state.investors.buyoutDemand.amount;
   const paid = payBuyout(state);

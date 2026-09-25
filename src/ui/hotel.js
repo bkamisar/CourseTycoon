@@ -219,7 +219,9 @@ function settlementCard(state, commit) {
   body.className = 'hotel-settle-body';
   body.textContent = offer
     ? 'The hotel has done well enough for long enough that they will sell you their stake. Pay it and the place is yours: no more reviews, no more targets, no more confidence to keep up.'
-    : 'Confidence ran out. Pay them off and the hotel is yours anyway. Let the deadline pass and they will sell rooms out from under you to get their money back.';
+    : demand.final
+      ? 'Confidence ran out, and they are not taking your money. There is one review left before the deadline. Pass it and they stay. Miss it and they sell rooms out from under you to get their money back.'
+      : 'Confidence ran out. Pay them off and the hotel is yours anyway. Let the deadline pass and they will sell rooms out from under you to get their money back.';
 
   const left = demand.dueDay - (state.day ?? 0);
   const clock = document.createElement('div');
@@ -229,6 +231,10 @@ function settlementCard(state, commit) {
     : `${left} ${left === 1 ? 'day' : 'days'} left — due on day ${demand.dueDay}.`;
 
   card.append(kicker, title, body, clock);
+
+  // A final demand has nothing to press. Offering a disabled Pay button
+  // would read as "you are poor" when the truth is "they have decided".
+  if (demand.final) return card;
 
   const pay = document.createElement('button');
   pay.type = 'button';

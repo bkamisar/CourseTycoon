@@ -147,10 +147,19 @@ export function investorCards(report, state) {
         ? 'They have watched this place run well for long enough to think it does not '
           + `need them. They will sell you their stake for $${demand.amount.toLocaleString()}. `
           + `The offer stands until day ${demand.dueDay}, and after that it is simply gone.`
-        : 'The folder is thinner this time. They want their money back — '
-          + `$${demand.amount.toLocaleString()}, by day ${demand.dueDay}. `
-          + 'If it is not there, they will take it out of the rooms.',
-      choices: [
+        : demand.final
+          ? 'Nobody raises their voice. They have lost confidence in how this place is '
+            + 'run and they are not interested in being bought out of it — the money was '
+            + 'never the problem. There is one review left before day '
+            + `${demand.dueDay}. Pass it and they stay. Miss it and they sell rooms `
+            + 'until they have their $' + demand.amount.toLocaleString() + ' back.'
+          : 'The folder is thinner this time. They want their money back — '
+            + `$${demand.amount.toLocaleString()}, by day ${demand.dueDay}. `
+            + 'If it is not there, they will take it out of the rooms.',
+      choices: demand.final ? [{
+        label: 'One review left',
+        cost: `Nothing to pay and nothing to decide. Everything now rests on the review due by day ${demand.dueDay}.`,
+      }] : [
         {
           label: `Pay $${demand.amount.toLocaleString()} now`,
           cost: affordable ? '' : 'not enough in the bank',

@@ -356,6 +356,21 @@ export function settlementDue(investors, day) {
       kind: 'demand',
       amount: buyoutPrice(investors),
       dueDay: day + SETTLEMENT_DAYS,
+      /**
+       * They are not taking your money.
+       *
+       * A demand used to be payable, which meant losing the hotel
+       * required being out of favour AND out of cash at the same time --
+       * and a hotel makes money even when it is badly run, so the second
+       * never happened. Measured, a neglected resort drove confidence to
+       * zero and then simply bought its way out: nought liquidations in
+       * thirty-two runs of a mechanic the act is built around.
+       *
+       * Once trust is gone it is gone, so the fortnight is a last chance
+       * to PERFORM rather than to pay. One review falls inside it. Pass
+       * it and they stay; miss it and the rooms are sold.
+       */
+      final: true,
     };
   }
   if ((investors.goodReviews ?? 0) >= 2 && investors.confidence >= OFFER_CONFIDENCE) {
@@ -378,6 +393,8 @@ export function settlementDue(investors, day) {
 export function payBuyout(state) {
   const settlement = state.investors?.buyoutDemand;
   if (!settlement || (state.money ?? 0) < settlement.amount) return state;
+  // A final demand is not an invoice. See `settlementDue`.
+  if (settlement.final) return state;
   const next = structuredClone(state);
   next.money -= settlement.amount;
   next.investors = {
@@ -425,3 +442,11 @@ export function forceLiquidation(state) {
   };
   return next;
 }
+
+/**
+ * Confidence a resort is handed back if it passes its last-chance review.
+ *
+ * Low on purpose. They stay, and they are still barely persuaded, so the
+ * next review matters as much as the one just survived.
+ */
+export const REPRIEVE_CONFIDENCE = 22;
