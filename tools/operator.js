@@ -57,6 +57,9 @@ import {
 } from '../src/sim/hotelAmenities.js';
 import { totalRooms, ROOM_TYPES, roomLimit } from '../src/sim/rooms.js';
 import { payBuyout } from '../src/sim/investors.js';
+import {
+  RUNG_IDS, RUNGS, bidFor, nextRungFor, contractFor,
+} from '../src/sim/tournaments.js';
 
 /**
  * Cash kept in hand at all times. Without a buffer the operator spends
@@ -115,6 +118,15 @@ export const LEVERS_NOT_PULLED = [
   'Act II: declining the buyout to keep playing. It settles the moment it '
   + 'can afford to, so nothing here measures a resort that chooses to '
   + 'stay under investment.',
+  'Act III: hiring grounds staff FOR a championship. It conditions with '
+  + 'whatever crew the course already needed, so nothing here says whether '
+  + 'staffing up for a week is worth it.',
+  'Act III: choosing a setup other than the middle of the band. It always '
+  + 'asks for the midpoint, so nothing here measures a host who gambles on '
+  + 'an edge of the band for a harder test or an easier one.',
+  'Act III: declining a rung it is eligible for. It always bids, so '
+  + 'nothing here measures a resort that decides a championship is not '
+  + 'worth the closed week.',
 ];
 
 const countRole = (state, role) => state.resort.staff.filter((m) => m.role === role).length;
@@ -419,6 +431,11 @@ export function playActTwo(startState, {
   }
 
   return {
+    // The resort itself, for the same reason `play` returns one: a caller
+    // measuring Act III needs a resort that has actually played Act II,
+    // and without this there was no way to get one short of replaying the
+    // whole hotel by hand in a throwaway script.
+    state,
     settledDay,
     ending,
     bankrupt,
@@ -432,5 +449,208 @@ export function playActTwo(startState, {
     prestige: Math.round(state.prestige),
     hotelBuildings: state.resort.amenities.filter((a) => HOTEL_AMENITIES[a.type]).length,
     hotelUpkeep: hotelUpkeep(state.resort.amenities),
+  };
+}
+
+// =====================================================================
+// ACT III
+// =====================================================================
+
+/**
+ * A competent host, on the same terms as the operator above.
+ *
+ * Bids for the next rung as soon as it is eligible, and asks for the
+ * middle of that rung's band.
+ *
+ * Aiming at the midpoint is the obvious competent play rather than a
+ * clever one: it is the value furthest from both edges, and a host who
+ * asked for anything else would need a reason this operator does not
+ * have. What it does NOT do is manage the crew to get there — it
+ * conditions with whatever staff the course already needed, so a run
+ * reports whether an ordinary resort arrives in its band by accident,
+ * which is the question worth asking.
+ *
+ * Setting the target matters more than it looks. setupTarget defaults to
+ * 0 and conditioning is gated on being below it, so an operator that
+ * never set one would carry a resort through a whole ladder with the
+ * course never hardening, miss every band, and report Act III as
+ * unwinnable. That is the trap that let Act I ship broken: a thing
+ * measured where it cannot work, reported as a property of the thing.
+ */
+export function spendTheTournamentMorning(state, { holesOpen }) {
+  if (state.tournament && !state.tournament.resolved) return false;
+  const next = nextRungFor(state.tournamentsHosted ?? []);
+  if (!next) return false;
+  const booked = bidFor(state, next, { holesOpen });
+  if (!booked) return false;
+  state.tournament = booked;
+  const band = RUNGS[next].band;
+  state.resort.setupTarget = Math.round((band.low + band.high) / 2);
+  return true;
+}
+
+/**
+ * Plays a resort that has already reached Act III, hosting whatever the
+ * ladder will let it host, until `days` runs out.
+ *
+ * Parameterised exactly like `playActTwo` — the operator underneath is the
+ * same one and its price, tee interval and room rate are still the levers
+ * a run is swept over. `days` is longer by default because a single rung
+ * costs twenty-one days of run-up before it pays anything, so a span that
+ * measures Act II comfortably cannot fit even one championship.
+ *
+ * Returns the Act II shape plus the thing Act III is actually for: one
+ * record per championship, naming the rung, the setup the course arrived
+ * at, which of the four conditions were met, what the contract paid, and
+ * what the field shot and how long it took them. The per-rung run-up
+ * takings are in there too, because "the base fee alone loses money
+ * against never bidding" is a claim about the twenty-one days as much as
+ * about the day.
+ */
+export function playActThree(startState, {
+  greenFee, teeInterval, roomRate, suiteShare = 0.3, days = 200, seed = 1,
+}) {
+  let state = startState;
+  let last = null;
+  let bankrupt = false;
+  let bids = 0;
+  const tournaments = [];
+  let takings = 0;
+  let profit = 0;
+  // Takings are split by what the course was doing when they were taken,
+  // because the run-up's cost is the whole question in §2 of the spec and
+  // a single total cannot show it.
+  let runUpTakings = 0;
+  let runUpProfit = 0;
+  let runUpDays = 0;
+  let ordinaryTakings = 0;
+  let ordinaryProfit = 0;
+  let ordinaryDays = 0;
+  let pendingRunUpTakings = 0;
+  let pendingRunUpProfit = 0;
+  let pendingRunUpDays = 0;
+
+  for (let day = 0; day < days; day++) {
+    spendTheMorning(state, { greenFee, teeInterval });
+    spendTheHotelMorning(state, { roomRate, suiteShare });
+    if (spendTheTournamentMorning(state, { holesOpen: openCount(state) })) bids += 1;
+
+    // Whether the course is being hardened today, read BEFORE the day
+    // runs, so a resolving championship's own day is not counted as a
+    // run-up day.
+    const conditioning = Boolean(state.tournament && !state.tournament.resolved
+      && state.day < state.tournament.day);
+
+    const result = runDay(state, seed * 7919 + day + 10000);
+    state = result.state;
+    last = result.report;
+
+    const pending = result.report.pendingEvent;
+    if (pending) {
+      const event = EVENTS.find((e) => e.id === pending.id);
+      const middle = event.choices.findIndex((c) => c.stance === 'pragmatic');
+      const index = middle >= 0 ? middle
+        : event.choices.reduce(
+          (best, c, i, all) => ((c.effects?.money ?? 0) > (all[best].effects?.money ?? 0) ? i : best), 0
+        );
+      state = applyEventChoice(state, pending.id, index);
+    }
+
+    // The contract's own money is excluded from the takings figure.
+    // Counting it as a day's takings would answer "was the week worth it"
+    // with the fee that is the thing being asked about.
+    //
+    // `report.profit` needs no such subtraction, and this is a trap worth
+    // stating: `day.js` computes `profit` BEFORE the contract is scored
+    // and then pushes the fee into the same `revenue` object afterwards,
+    // so on a championship day `report.profit` already excludes the fee
+    // while `report.revenue.total` includes it. Subtracting it from both
+    // double-counts it and reports a losing tournament as a winning one.
+    const trade = result.report.revenue.total - (result.report.revenue.tournament ?? 0);
+    const dayProfit = result.report.profit;
+    takings += trade;
+    profit += dayProfit;
+    if (conditioning) {
+      pendingRunUpTakings += trade;
+      pendingRunUpProfit += dayProfit;
+      pendingRunUpDays += 1;
+      runUpTakings += trade;
+      runUpProfit += dayProfit;
+      runUpDays += 1;
+    } else if (!result.report.tournamentDay) {
+      ordinaryTakings += trade;
+      ordinaryProfit += dayProfit;
+      ordinaryDays += 1;
+    }
+
+    const hosted = result.report.tournament;
+    if (hosted) {
+      const contract = contractFor(hosted.rung);
+      tournaments.push({
+        rung: hosted.rung,
+        day: state.day - 1,
+        // The setup the course actually arrived at. Read off the state
+        // after the day rather than guessed from the crew, because the
+        // whole point is that the operator does not aim.
+        setup: Math.round((state.resort.setup ?? 0) * 10) / 10,
+        band: RUNGS[hosted.rung].band,
+        inBand: hosted.met.includes('band'),
+        met: hosted.met,
+        missed: hosted.missed,
+        paid: hosted.paid,
+        baseFee: contract.baseFee,
+        ceiling: contract.ceiling,
+        shareOfCeiling: Number((hosted.paid / contract.ceiling).toFixed(3)),
+        prestige: hosted.prestige,
+        barDays: hosted.barDays,
+        turf: Math.round(state.turfQuality),
+        toPar: hosted.field.averageToPar,
+        underPar: hosted.field.underPar,
+        roundMinutes: hosted.field.averageRoundMinutes,
+        slowestRoundMinutes: hosted.field.slowestRoundMinutes,
+        // What the three weeks before the day cost, so the contract can
+        // be read against it rather than on its own.
+        runUpDays: pendingRunUpDays,
+        runUpTakings: Math.round(pendingRunUpTakings),
+        runUpProfit: Math.round(pendingRunUpProfit),
+      });
+      pendingRunUpTakings = 0;
+      pendingRunUpProfit = 0;
+      pendingRunUpDays = 0;
+    }
+
+    if (state.money < 0) bankrupt = true;
+  }
+
+  return {
+    state,
+    days: state.day - 1,
+    bankrupt,
+    bids,
+    tournaments,
+    hosted: state.tournamentsHosted ?? [],
+    // Which rungs are still shut, and why — a stalled ladder is the act
+    // failing quietly rather than loudly.
+    barred: Object.fromEntries(RUNG_IDS
+      .map((id) => [id, state.tournamentBars?.[id] ?? 0])
+      .filter(([, until]) => until > 0)),
+    nextRung: nextRungFor(state.tournamentsHosted ?? []),
+    contractIncome: tournaments.reduce((s, t) => s + t.paid, 0),
+    takings: Math.round(takings),
+    profit: Math.round(profit),
+    runUpDays,
+    runUpTakingsPerDay: runUpDays ? Math.round(runUpTakings / runUpDays) : 0,
+    runUpProfitPerDay: runUpDays ? Math.round(runUpProfit / runUpDays) : 0,
+    ordinaryDays,
+    ordinaryTakingsPerDay: ordinaryDays ? Math.round(ordinaryTakings / ordinaryDays) : 0,
+    ordinaryProfitPerDay: ordinaryDays ? Math.round(ordinaryProfit / ordinaryDays) : 0,
+    money: Math.round(state.money),
+    prestige: Math.round(state.prestige),
+    turf: Math.round(state.turfQuality),
+    setup: Math.round(state.resort.setup ?? 0),
+    holes: openCount(state),
+    satisfaction: Math.round(last?.averageSatisfaction ?? 0),
+    round: Math.round(last?.averageRoundMinutes ?? 0),
+    rooms: totalRooms(state.resort.rooms),
   };
 }
