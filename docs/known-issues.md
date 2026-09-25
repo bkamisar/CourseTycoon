@@ -35,6 +35,59 @@ Act I looked fine on spot measurements the day it shipped broken. The
 operator is the only thing that has ever caught a real balance problem on
 this project, and it has never been pointed at this act.
 
+### The run-up costs nothing, and the player cannot aim at the band
+
+**Found:** 2026-09-25, measuring Act III before building its surface. **The
+biggest open problem in the act.**
+
+Two faults, measured on a real eighteen-hole course over a full 21-day run-up,
+turf starting at 90:
+
+| keepers | conditioning | final setup | final turf | profit over 21 days |
+|---|---|---|---|---|
+| 3 | no  |   0 |  58 | -$88,800 |
+| 3 | yes |  50 |  58 | -$88,184 |
+| 6 | no  |   0 | 100 | -$94,592 |
+| 6 | yes | 100 | 100 | -$87,200 |
+| 9 | no  |   0 | 100 | -$109,888 |
+| 9 | yes | 100 | 100 | -$99,856 |
+
+**1. Conditioning is free, and in fact pays.** `day.js` computes
+`care = keepers * 6.8` with no reference to `conditioning`, so the same crew
+raises setup and holds the turf at the same time. Final turf is identical either
+way, and conditioning ends $7,392 AHEAD over the run-up at six keepers. The
+design says "the cost is the everyday business... paid in full before anything
+is paid back". There is no cost. This compounds the separate satisfaction issue
+below: a conditioned resort is simply a better business.
+
+**2. There is no dial.** `conditioning` is derived as
+`Boolean(next.tournament && !next.tournament.resolved)`, so setup climbs
+automatically from the moment a bid is won and the player cannot stop it or aim
+it. Six keepers reach setup 100 in 21 days, overshooting every band including
+the County Open's 45-60. The only lever is crew size, which also governs turf,
+so the two bonuses pull against each other:
+
+- 3 keepers -> setup 50 (county band met) but turf 58 (turf bonus needs 78)
+- 6 keepers -> turf 100 (met) but setup 100 (band missed, overcooked)
+
+That tension is good and worth keeping. What is wrong is that it is the ONLY
+control, and it is indirect: aiming at the band means firing groundskeepers.
+The design's "the dial therefore has an interior optimum, which is how every
+real decision in this game already works" does not hold, because the player
+never touches the dial.
+
+**A fix wants both halves**, and it is design work rather than a patch:
+
+- a target setup the player sets, with `conditioning` driven by whether the
+  course is below it, so the crew stops when it arrives; and
+- conditioning diverting crew effort away from turf care, so `care` falls while
+  they are preparing. That makes "hire more for the championship" a real
+  decision with a real bill, which is what the design wanted from reusing the
+  grounds crew in the first place.
+
+Until then Act III's economics cannot be judged, and building its screens would
+be building a surface for a decision that is not yet there.
+
 ### Conditioning a course raises average satisfaction instead of costing it
 
 **Found:** 2026-09-25, wiring setup into `runDay` (Task: wire the setup dial
