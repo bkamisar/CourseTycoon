@@ -27,7 +27,7 @@ import {
   forceLiquidation,
   startingInvestors,
 } from './investors.js';
-import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue, serviceCost } from './rooms.js';
+import { totalRooms, roomCounts, nightlyUpkeep, occupancyFor, roomRevenue, serviceCost } from './rooms.js';
 import {
   hotelUpkeep, extraNightsFrom, divertedShare, HOTEL_AMENITIES,
   caddiePaceFactor, roomValueBonus, indoorTrade,
@@ -262,7 +262,21 @@ export function runDay(state, seed) {
   // (see economy.demandGroups); `share` is that same appeal expressed as
   // proportions, and is what decides which segment each guest belongs to
   // below.
-  const demand = holes.length
+  // Act III. On the day of a championship the course is closed to normal
+  // play: no tee sheet, no green fees, no casual golfers. Everything that
+  // bills anyway still bills, and the hotel has its best night of the
+  // year.
+  //
+  // Handled by forcing the crowd to nothing rather than by branching the
+  // rest of the function, so that every existing reader of a report — the
+  // HUD, the evening screen, the investors, the gate — keeps working
+  // without knowing tournaments exist. A second code path through a
+  // seven-hundred-line day would be a far better way to produce a bug.
+  const championshipToday = Boolean(
+    next.tournament && !next.tournament.resolved && next.day >= next.tournament.day
+  );
+
+  const demand = holes.length && !championshipToday
     ? demandGroups({
         weather: sky.demand,
         courseRating: rating,
@@ -475,14 +489,31 @@ export function runDay(state, seed) {
   // The hotel. Fed the same per-segment golfer counts the menus are, so
   // the two can never disagree about how many people are on the property
   // — and so locals, who never book a room, cannot accidentally fill one.
-  const hotel = occupancyFor({
-    rooms: next.resort.rooms,
-    crowd: crowdCount,
-    roomRate: next.resort.pricing.roomRate,
-    valuePerRound: value,
-    extraNights: extraNightsFrom(next.resort.amenities),
-    valueBonus: roomValueBonus(next.resort.amenities),
-  });
+  //
+  // A championship is the one exception: the field, the press and the
+  // gallery fill every bed whether or not anybody teed off, and
+  // `crowdCount` is exactly the golfer tally this closed day has none of.
+  // Stated directly rather than derived, since there is no tee-sheet crowd
+  // to derive it from today.
+  const roomInventory = roomCounts(next.resort.rooms);
+  const hotel = championshipToday
+    ? {
+        capacity: roomInventory.standard + roomInventory.suite,
+        sold: roomInventory.standard + roomInventory.suite,
+        suitesSold: roomInventory.suite,
+        standardSold: roomInventory.standard,
+        rate: roomInventory.standard + roomInventory.suite > 0 ? 1 : 0,
+        turnedAway: 0,
+        unmetSuiteDemand: 0,
+      }
+    : occupancyFor({
+        rooms: next.resort.rooms,
+        crowd: crowdCount,
+        roomRate: next.resort.pricing.roomRate,
+        valuePerRound: value,
+        extraNights: extraNightsFrom(next.resort.amenities),
+        valueBonus: roomValueBonus(next.resort.amenities),
+      });
   revenue.rooms = roomRevenue({ occupancy: hotel, roomRate: next.resort.pricing.roomRate });
   revenue.total += revenue.rooms;
 
@@ -604,6 +635,7 @@ export function runDay(state, seed) {
     complaints,
     gate,
   };
+  report.tournamentDay = championshipToday;
 
   // What the world says about all this. Positioning here is emergent - the
   // course decides who turns up, the player never declares a market - and an

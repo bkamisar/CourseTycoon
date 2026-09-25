@@ -69,3 +69,34 @@ test('a conditioned course is a worse day out', { todo: 'see docs/known-issues.m
   assert.ok(easy - hard > 4,
     `conditioning cost only ${(easy - hard).toFixed(1)} satisfaction; the run-up is theatre`);
 });
+
+test('the course closes for the championship week', () => {
+  let state = actThreeResort(11);
+  state.resort.rooms = { standard: 20, suite: 8 };
+  state.resort.pricing.roomRate = 200;
+  state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+
+  const { state: after, report } = runDay(state, 3300);
+  assert.equal(report.tournamentDay, true, 'the report has to say what kind of day this was');
+  assert.equal(report.groupsPlayed, 0, 'nobody is playing a casual round');
+  assert.equal(report.revenue.greenFees, 0, 'and nobody is paying a green fee');
+  assert.ok(report.revenue.rooms > 0, 'but the hotel is the fullest it will ever be');
+  assert.ok(report.costs.total > 0, 'the bills do not stop');
+  assert.equal(after.day, state.day + 1, 'and the day still advances');
+});
+
+test('a closed day does not break anything downstream', () => {
+  // Every reader of a report — the HUD, the evening screen, the
+  // investors, the gate — predates tournaments and must not need to know
+  // about them.
+  let state = actThreeResort(12);
+  state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+  const { state: after, report } = runDay(state, 3400);
+
+  assert.ok(Number.isFinite(report.revenue.total));
+  assert.ok(Number.isFinite(report.costs.total));
+  assert.ok(Number.isFinite(report.profit));
+  assert.ok(Number.isFinite(report.averageSatisfaction));
+  assert.ok(report.gate, 'the gate readout still has to exist');
+  assert.doesNotThrow(() => runDay(after, 3401), 'and the next day still plays');
+});
