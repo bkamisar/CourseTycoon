@@ -52,6 +52,11 @@ import { menuPrep } from '../src/sim/menu.js';
 import { kitchenCapacity, kitchenLoad } from '../src/sim/kitchen.js';
 import { shopCapacity } from '../src/sim/shop.js';
 import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
+import {
+  HOTEL_AMENITIES, hotelUpkeep,
+} from '../src/sim/hotelAmenities.js';
+import { totalRooms, ROOM_TYPES } from '../src/sim/rooms.js';
+import { payBuyout } from '../src/sim/investors.js';
 
 /**
  * Cash kept in hand at all times. Without a buffer the operator spends
@@ -98,6 +103,18 @@ export const LEVERS_NOT_PULLED = [
   + 'a whole run, where a real player would adjust as prestige rises.',
   'Removing an amenity that turns out not to help. It only ever buys.',
   'Choosing events by anything but a fixed stance preference.',
+  'Act II: setting a menu at the dining room, the brew pub or the bar. '
+  + 'All three open on their defaults, so nothing here says whether those '
+  + 'boards are worth tuning.',
+  'Act II: moving the nightly rate as the hotel fills or empties. It is '
+  + 'fixed for a whole run, where a real player would raise it the first '
+  + 'week they sell out.',
+  'Act II: selling rooms back when they stop filling. It only ever '
+  + 'builds, so overbuilding is measured as a cost it cannot escape '
+  + 'rather than a mistake it can correct.',
+  'Act II: declining the buyout to keep playing. It settles the moment it '
+  + 'can afford to, so nothing here measures a resort that chooses to '
+  + 'stay under investment.',
 ];
 
 const countRole = (state, role) => state.resort.staff.filter((m) => m.role === role).length;
@@ -232,6 +249,9 @@ export function play(startState, { greenFee, teeInterval, days = 150, seed = 1 }
   }
 
   return {
+    // The resort itself, so a caller can carry it on into Act II rather
+    // than having to replay the whole of Act I to get one.
+    state,
     gateDay,
     bankrupt,
     days: state.day - 1,
@@ -245,5 +265,171 @@ export function play(startState, { greenFee, teeInterval, days = 150, seed = 1 }
     staff: state.resort.staff.length,
     answered,
     outstanding: last?.gate.outstanding ?? [],
+  };
+}
+
+// =====================================================================
+// ACT II
+// =====================================================================
+
+/**
+ * A competent hotelier, on the same terms as the operator above.
+ *
+ * Act II had never been measured at all. Its mechanics were each verified
+ * to fire, which is a different claim from the act being any good — and
+ * Act I looked fine on spot checks the morning it shipped with every
+ * strategy bankrupt and mean final turf of 0.1. The operator is the only
+ * thing on this project that has ever caught a real balance problem, and
+ * until now it stopped at the gate.
+ *
+ * The policy, each morning, after the Act I one has had its turn:
+ *
+ *   1. Settle with the investors the moment it is affordable. Both
+ *      endings run through that one button and a resort that can pay and
+ *      does not is not being competently run.
+ *   2. Build rooms while the ones already built are filling. Occupancy
+ *      is the signal a real player has; "build to a number I worked out
+ *      in advance" is not a decision anybody makes.
+ *   3. Buy the hotel's buildings in priority order, cheapest useful
+ *      first, one a day, with the buffer intact.
+ */
+
+
+/**
+ * What the hotel buys, in order.
+ *
+ * Trade first, because a building that takes money pays for the next one.
+ * Then the two that raise what a room is worth, then the pace and stay
+ * mechanics, then pure draw. A player would argue with this order, which
+ * is fine — it is a floor, not a recommendation.
+ */
+export const HOTEL_SHOPPING_LIST = [
+  'indoorRange', 'functionRoom', 'conferenceSuite',
+  'spa', 'fineDining',
+  'caddieProgramme', 'kidsClub',
+  'brewPub', 'cocktailBar', 'pool',
+];
+
+/** Rooms are added while the hotel is this full and no fuller. */
+const EXPAND_ABOVE = 0.85;
+
+/** And never past this, so a runaway cannot be mistaken for a strategy. */
+const MAX_ROOMS = 90;
+
+/** One hotel morning. Mutates `state`. Returns true if it spent its turn. */
+function spendTheHotelMorning(state, { roomRate, suiteShare }) {
+  state.resort.pricing.roomRate = roomRate;
+
+  // 1. Pay the investors off when it is affordable. Both endings run
+  //    through this, and a resort that can settle and does not is not
+  //    being run competently.
+  const demand = state.investors?.buyoutDemand;
+  if (demand && state.money >= demand.amount + BUFFER) {
+    const paid = payBuyout(state);
+    if (paid.investors?.bought) {
+      Object.assign(state, paid);
+      return true;
+    }
+  }
+
+  // 2. Rooms, while the ones already built are filling.
+  const rooms = state.resort.rooms ?? {};
+  const built = totalRooms(rooms);
+  const lastRate = state.history.at(-1)?.hotel?.rate ?? 1;
+  const full = built === 0 || lastRate >= EXPAND_ABOVE;
+  if (full && built < MAX_ROOMS) {
+    const wantSuite = (rooms.suite ?? 0) < Math.round(built * suiteShare);
+    const kind = wantSuite ? 'suite' : 'standard';
+    const price = ROOM_TYPES[kind].build;
+    if (state.money > price + BUFFER) {
+      state.money -= price;
+      state.resort.rooms = { ...rooms, [kind]: (rooms[kind] ?? 0) + 1 };
+      return true;
+    }
+  }
+
+  // 3. The buildings, one a day.
+  for (const type of HOTEL_SHOPPING_LIST) {
+    if (state.resort.amenities.some((a) => a.type === type)) continue;
+    const spec = HOTEL_AMENITIES[type];
+    if (state.money > spec.build + BUFFER) {
+      state.money -= spec.build;
+      state.resort.amenities.push(amenity(type));
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Plays a resort that has already reached Act II, until the investors are
+ * settled one way or the other or `days` runs out.
+ *
+ * Returns what the act is actually for: whether either ending is
+ * reachable, how long it took, and what the hotel was doing when it got
+ * there.
+ */
+export function playActTwo(startState, {
+  greenFee, teeInterval, roomRate, suiteShare = 0.3, days = 200, seed = 1,
+}) {
+  let state = startState;
+  let last = null;
+  let bankrupt = false;
+  let settledDay = null;
+  let ending = null;
+  let reviews = 0;
+  let passed = 0;
+  let lowConfidence = 100;
+  let peakRooms = 0;
+
+  for (let day = 0; day < days; day++) {
+    spendTheMorning(state, { greenFee, teeInterval });
+    spendTheHotelMorning(state, { roomRate, suiteShare });
+
+    const result = runDay(state, seed * 7919 + day + 5000);
+    state = result.state;
+    last = result.report;
+
+    const pending = result.report.pendingEvent;
+    if (pending) {
+      const event = EVENTS.find((e) => e.id === pending.id);
+      const middle = event.choices.findIndex((c) => c.stance === 'pragmatic');
+      const index = middle >= 0 ? middle
+        : event.choices.reduce(
+          (best, c, i, all) => ((c.effects?.money ?? 0) > (all[best].effects?.money ?? 0) ? i : best), 0
+        );
+      state = applyEventChoice(state, pending.id, index);
+    }
+
+    const inv = result.report.investors;
+    if (inv?.reviewed) {
+      reviews += 1;
+      if (inv.reviewed.outcome === 'beat' || inv.reviewed.outcome === 'met') passed += 1;
+    }
+    if (typeof inv?.confidence === 'number') lowConfidence = Math.min(lowConfidence, inv.confidence);
+    peakRooms = Math.max(peakRooms, totalRooms(state.resort.rooms));
+    if (state.money < 0) bankrupt = true;
+
+    if (state.investors?.bought && settledDay === null) {
+      settledDay = day + 1;
+      ending = state.investors.liquidated ? 'liquidated' : 'boughtOut';
+      break;
+    }
+  }
+
+  return {
+    settledDay,
+    ending,
+    bankrupt,
+    reviews,
+    passed,
+    lowConfidence: Math.round(lowConfidence),
+    rooms: totalRooms(state.resort.rooms),
+    peakRooms,
+    occupancy: last?.hotel?.capacity ? last.hotel.sold / last.hotel.capacity : 0,
+    money: Math.round(state.money),
+    prestige: Math.round(state.prestige),
+    hotelBuildings: state.resort.amenities.filter((a) => HOTEL_AMENITIES[a.type]).length,
+    hotelUpkeep: hotelUpkeep(state.resort.amenities),
   };
 }
