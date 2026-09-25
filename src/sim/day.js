@@ -2,7 +2,7 @@ import { makeRng } from './rng.js';
 import { holeStats, clamp } from './hole.js';
 import { makeGroup, resetGuestIds } from './golfer.js';
 import { playHole } from './round.js';
-import { scheduleRounds } from './schedule.js';
+import { scheduleRounds, TARGET_MINUTES_PER_HOLE } from './schedule.js';
 import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, menuRevenue } from './economy.js';
 import { guestSatisfaction, buildComplaints } from './satisfaction.js';
 import { courseRating, nextPrestige } from './ratings.js';
@@ -32,7 +32,7 @@ import {
   hotelUpkeep, extraNightsFrom, divertedShare, HOTEL_AMENITIES,
   caddiePaceFactor, roomValueBonus, indoorTrade,
 } from './hotelAmenities.js';
-import { nextSetup, setupDifficultyBonus, championshipRoomsSold } from './tournaments.js';
+import { nextSetup, setupDifficultyBonus, championshipRoomsSold, scoreTournament } from './tournaments.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -641,6 +641,34 @@ export function runDay(state, seed) {
     gate,
   };
   report.tournamentDay = championshipToday;
+
+  // Act III. The week resolves on the day it was booked for. Judged on
+  // the four conditions the contract named when it was signed, each of
+  // which is something the player did rather than a hidden score.
+  if (championshipToday) {
+    const result = scoreTournament(next.tournament.rung, {
+      setup: next.resort.setup ?? 0,
+      turfQuality: next.turfQuality,
+      // Pace is the existing flow-shop target, pointed at a new audience.
+      paceOnTarget: (report.averageRoundMinutes || 0) <= holes.length * TARGET_MINUTES_PER_HOLE * 1.1,
+      // Crowd is infrastructure, which the second plan builds. Until it
+      // exists, a rung with no building requirements is always handled.
+      crowdHandled: true,
+    });
+    next.money += result.paid;
+    next.prestige = clamp(next.prestige + result.prestige, 0, 100);
+    next.tournamentsHosted = [...(next.tournamentsHosted ?? []), result.rung];
+    if (result.barDays > 0) {
+      next.tournamentBars = {
+        ...(next.tournamentBars ?? {}),
+        [result.rung]: next.day + result.barDays,
+      };
+    }
+    next.tournament = null;
+    report.tournament = result;
+    revenue.tournament = result.paid;
+    revenue.total += result.paid;
+  }
 
   // What the world says about all this. Positioning here is emergent - the
   // course decides who turns up, the player never declares a market - and an

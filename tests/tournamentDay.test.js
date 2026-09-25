@@ -40,9 +40,12 @@ test('a new game carries tournament state that survives a save', () => {
   const state = newGame(1);
   assert.equal(state.resort.setup, 0, 'a course starts unconditioned');
   assert.equal(state.tournament, null, 'and with nothing booked');
+  assert.deepEqual(state.tournamentsHosted, [],
+    'hosted rungs must exist from day one or a save/load loses the ladder');
   const revived = deserialize(serialize(state));
   assert.equal(revived.resort.setup, 0);
   assert.equal(revived.tournament, null);
+  assert.deepEqual(revived.tournamentsHosted, []);
 });
 
 test('setup climbs while a championship is booked and falls back after', () => {
@@ -136,4 +139,25 @@ test('a championship night is a premium, not a blank cheque', () => {
   assert.ok(soldAt(900).sold < 28, 'a silly price does not');
   assert.equal(soldAt(4000).sold, 0, 'and an absurd one empties it');
   assert.ok(soldAt(150).rate <= 1, 'rate is an occupancy ratio, not a flag');
+});
+
+test('the championship resolves, pays, and does not happen twice', () => {
+  let state = actThreeResort(15);
+  state.resort.setup = 52;
+  state.turfQuality = 88;
+  state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+  const before = state.money;
+
+  const first = runDay(state, 3500);
+  state = first.state;
+  assert.ok(first.report.tournament, 'the report has to carry the result');
+  assert.ok(state.money > before, 'and the contract has to pay');
+  assert.equal(state.tournament, null, 'the booking is spent');
+  assert.ok((state.tournamentsHosted ?? []).includes('countyOpen'),
+    'and it is recorded as hosted, so the next rung opens');
+
+  const second = runDay(state, 3501);
+  assert.equal(second.report.tournament ?? null, null,
+    'a championship must not resolve twice');
+  assert.equal(second.report.tournamentDay, false, 'and the course reopens');
 });

@@ -83,6 +83,10 @@ export function newGame(seed) {
     // Act III. The championship currently booked, or null. See
     // src/sim/tournaments.js.
     tournament: null,
+    // Act III. Which rungs have been hosted, in the order they were, so
+    // the ladder knows what opens next (nextRungFor) and a save that
+    // never hosts anything still has the field to append to.
+    tournamentsHosted: [],
     satisfactionHistory: [],
     // Which narration lines have been shown lately, so the world does not
     // repeat itself while it still has something new to say.
@@ -177,6 +181,7 @@ export function deserialize(text) {
   // every later reader guard against a missing key.
   if (typeof parsed.resort?.setup !== 'number') parsed.resort.setup = 0;
   if (parsed.tournament === undefined) parsed.tournament = null;
+  if (!Array.isArray(parsed.tournamentsHosted)) parsed.tournamentsHosted = [];
   // A save written before HISTORY_LIMIT existed can carry hundreds of
   // days and be too large to write back. Trimmed on the way in so it
   // shrinks on the first load rather than a fortnight later.

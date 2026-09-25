@@ -201,3 +201,89 @@ export function bidFor(state, rungId, { holesOpen = 0 } = {}) {
 
   return { rung: rungId, day: state.day + RUN_UP_DAYS, resolved: false };
 }
+
+/**
+ * What each condition pays, as a share of the gap between the base fee
+ * and the advertised ceiling.
+ *
+ * Shares rather than absolute figures so the four conditions keep their
+ * relative weight at every rung, and so a change to a rung's money does
+ * not silently make the advertised ceiling a lie.
+ */
+const BONUS_SHARES = Object.freeze([
+  { id: 'band', label: 'Course set as asked', share: 0.40 },
+  { id: 'turf', label: 'Turf still standing', share: 0.27 },
+  { id: 'pace', label: 'Rounds inside the pace target', share: 0.20 },
+  { id: 'crowd', label: 'Crowd handled without complaint', share: 0.13 },
+]);
+
+/** The turf a championship expects to leave on. */
+export const TURF_EXPECTED = 78;
+
+/** What a rung offers, in full, before anybody agrees to anything. */
+export function contractFor(rungId) {
+  const rung = rungFor(rungId);
+  if (!rung) return null;
+  const pot = rung.purseCeiling - rung.baseFee;
+  // Rounded to whole dollars, with the last share taking the remainder so
+  // the advertised ceiling is exactly what the bonuses add up to. A
+  // contract whose total does not match its own line items is the same
+  // bug as a cost line that lies.
+  let spent = 0;
+  const bonuses = BONUS_SHARES.map((b, i) => {
+    const amount = i === BONUS_SHARES.length - 1
+      ? pot - spent
+      : Math.round(pot * b.share);
+    spent += amount;
+    return { id: b.id, label: b.label, amount };
+  });
+  return { rung: rungId, baseFee: rung.baseFee, bonuses, ceiling: rung.purseCeiling };
+}
+
+/** Prestige a rung moves, won or lost. */
+const PRESTIGE_SWING = Object.freeze({ countyOpen: 6, regional: 11, national: 18 });
+
+/** How long a rung is given to somebody else after a shambles. */
+export const BAR_DAYS = 120;
+
+/**
+ * How the week went.
+ *
+ * `met` names the conditions that were satisfied, which is what the
+ * report shows: four named outcomes traceable to something the player
+ * did, rather than one opaque score.
+ */
+export function scoreTournament(rungId, {
+  setup = 0, turfQuality = 0, paceOnTarget = false, crowdHandled = false,
+} = {}) {
+  const rung = rungFor(rungId);
+  if (!rung) return null;
+  const contract = contractFor(rungId);
+
+  const met = [];
+  if (withinBand(setup, rung.band)) met.push('band');
+  if (turfQuality >= TURF_EXPECTED) met.push('turf');
+  if (paceOnTarget) met.push('pace');
+  if (crowdHandled) met.push('crowd');
+
+  const paid = contract.bonuses.reduce(
+    (sum, b) => sum + (met.includes(b.id) ? b.amount : 0),
+    contract.baseFee
+  );
+
+  // Reputation follows the conditions rather than the money, so a resort
+  // that ran a good week on a small rung is not punished for the rung
+  // being small.
+  const swing = PRESTIGE_SWING[rungId] ?? 6;
+  const prestige = Math.round(((met.length / 4) * 2 - 1) * swing);
+
+  return {
+    rung: rungId,
+    met,
+    missed: contract.bonuses.map((b) => b.id).filter((id) => !met.includes(id)),
+    paid,
+    prestige,
+    // Nothing below half the conditions is a week anybody wants repeated.
+    barDays: met.length <= 1 ? BAR_DAYS : 0,
+  };
+}

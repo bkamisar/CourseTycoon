@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUNGS, RUNG_IDS, rungFor, eligibleFor, SETUP_DECAY_PER_DAY, setupClimb, nextSetup, setupDifficultyBonus, withinBand, RUN_UP_DAYS, bidFor, nextRungFor } from '../src/sim/tournaments.js';
+import { RUNGS, RUNG_IDS, rungFor, eligibleFor, SETUP_DECAY_PER_DAY, setupClimb, nextSetup, setupDifficultyBonus, withinBand, RUN_UP_DAYS, bidFor, nextRungFor, scoreTournament, contractFor } from '../src/sim/tournaments.js';
 
 test('there are three rungs, each fully specified', () => {
   assert.equal(RUNG_IDS.length, 3);
@@ -136,4 +136,54 @@ test('a barred rung refuses the bid until the bar expires', () => {
     'barred until day 160');
   assert.ok(bidFor({ ...state, day: 161 }, 'countyOpen', { holesOpen: 18 }),
     'and welcome again afterwards');
+});
+
+test('the contract lists every bonus before it is signed', () => {
+  // Every cost line in this game tells the player what they are getting
+  // into if they read it. The tournament is not an exception.
+  for (const id of RUNG_IDS) {
+    const contract = contractFor(id);
+    assert.equal(contract.baseFee, RUNGS[id].baseFee);
+    assert.equal(contract.bonuses.length, 4, 'four named conditions');
+    for (const bonus of contract.bonuses) {
+      assert.ok(bonus.id && bonus.label && bonus.label.length > 8, 'each bonus needs a name');
+      assert.ok(bonus.amount > 0, `${bonus.id} pays nothing`);
+    }
+    const ceiling = contract.baseFee + contract.bonuses.reduce((s, b) => s + b.amount, 0);
+    assert.equal(ceiling, RUNGS[id].purseCeiling,
+      `${id}: the advertised ceiling must equal what the bonuses actually add up to`);
+  }
+});
+
+test('a perfect week earns the ceiling and a shambles earns the base', () => {
+  const perfect = scoreTournament('countyOpen', {
+    setup: 52, turfQuality: 88, paceOnTarget: true, crowdHandled: true,
+  });
+  assert.equal(perfect.paid, RUNGS.countyOpen.purseCeiling);
+  assert.equal(perfect.met.length, 4);
+  assert.ok(perfect.prestige > 0, 'and it should be worth something in reputation');
+
+  const shambles = scoreTournament('countyOpen', {
+    setup: 15, turfQuality: 40, paceOnTarget: false, crowdHandled: false,
+  });
+  assert.equal(shambles.paid, RUNGS.countyOpen.baseFee);
+  assert.equal(shambles.met.length, 0);
+  assert.ok(shambles.prestige < 0, 'a shambles has to cost reputation');
+  assert.ok(shambles.barDays > 0, 'and the rung should go to somebody else for a while');
+});
+
+test('overcooking the course fails the band as surely as undercooking', () => {
+  const tricked = scoreTournament('countyOpen', {
+    setup: 95, turfQuality: 88, paceOnTarget: true, crowdHandled: true,
+  });
+  assert.ok(!tricked.met.includes('band'),
+    'a county open set like a national is not set correctly');
+  assert.ok(tricked.paid < RUNGS.countyOpen.purseCeiling);
+});
+
+test('a good week is never barred', () => {
+  const good = scoreTournament('regional', {
+    setup: 70, turfQuality: 85, paceOnTarget: true, crowdHandled: true,
+  });
+  assert.equal(good.barDays, 0);
 });
