@@ -1,13 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ITEMS, ITEM_IDS, MENU_SLOTS, itemsFor } from '../src/sim/menu.js';
+import {
+  ITEMS, ITEM_IDS, MENU_SLOTS, itemsFor, BREW_PUB_ONLY,
+} from '../src/sim/menu.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import {
   menuPull, menuBasket, menuCogs, menuPrep, menuBestEnergy, menuSatisfaction,
 } from '../src/sim/menu.js';
 
-test('there are twenty-one items, each fully specified', () => {
-  assert.equal(ITEM_IDS.length, 21);
+test('every item in the catalogue is fully specified', () => {
+  // The count is no longer pinned. It was 21, then 30 when the brew pub
+  // got a list worth having, and a test that has to be edited every time
+  // somebody writes a new drink is a test that teaches people to edit
+  // tests. What matters is that each entry is complete, which is what the
+  // rest of this checks.
+  assert.ok(ITEM_IDS.length >= 21, `catalogue has shrunk to ${ITEM_IDS.length}`);
   for (const id of ITEM_IDS) {
     const item = ITEMS[id];
     assert.ok(item, `${id} missing`);
@@ -68,7 +75,18 @@ test('each amenity accepts the right items', () => {
   assert.ok(shack.every((id) => ITEMS[id].prep <= 1), 'snack shack has no line cook');
   const cart = itemsFor('beverageCart');
   assert.ok(cart.every((id) => ITEMS[id].cartable), 'cart got something it cannot carry');
-  assert.equal(itemsFor('restaurant').length, 21, 'the restaurant can serve anything');
+  // The restaurant serves anything that is not the brew pub's own. Those
+  // nine are poured in one building and nowhere else, which is what makes
+  // the pub a place rather than a second bar.
+  const general = ITEM_IDS.filter((id) => !BREW_PUB_ONLY.has(id));
+  assert.deepEqual(itemsFor('restaurant'), general,
+    'the restaurant should serve everything except the brew pub exclusives');
+  assert.ok(itemsFor('brewPub').some((id) => BREW_PUB_ONLY.has(id)),
+    'and the brew pub should be the one place that pours them');
+  for (const type of ['restaurant', 'cocktailBar', 'fineDining', 'snackShack', 'halfwayHouse', 'beverageCart']) {
+    assert.ok(!itemsFor(type).some((id) => BREW_PUB_ONLY.has(id)),
+      `${type} is pouring a beer that is supposed to be the brew pub's alone`);
+  }
   assert.deepEqual(itemsFor('proShop'), [], 'the pro shop sells no food');
 });
 

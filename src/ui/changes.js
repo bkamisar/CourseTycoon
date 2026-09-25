@@ -31,13 +31,20 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24f';
+export const BUILD = '2026-09-24g';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24g',
+    notes: [
+      'The hotel’s fine dining room, brew pub and cocktail bar sell food and drink now, with their own boards. The dining room opens with wine, oysters, lobster, steak frites and an espresso — and like every other kitchen in the resort, that board needs cooks behind it.',
+      'The brew pub pours twelve beer styles, nine of which are poured nowhere else: a pilsner, a cask bitter, a dry stout, a hazy IPA, a sour, a wheat beer, a brown ale, a porter and a tasting flight. None of them travels on the beverage cart, because none of them would.',
+    ],
+  },
   {
     version: '2026-09-24f',
     notes: [

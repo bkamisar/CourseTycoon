@@ -41,6 +41,28 @@ const ITEM_LIST = [
   ['transfusion',       'Transfusion',        'drink', 12,  5,   0, true,  0.90, 0.80, 0.70, 4,  5],
   ['espresso',          'Espresso',           'drink',  4,  1,   1, false, 0.30, 0.60, 0.90, 2,  6],
   ['wineByGlass',       'Wine by the glass',  'drink', 14,  5,   0, false, 0.10, 0.30, 1.00, 3,  3],
+
+  // The brew pub's list. Nine of these do nothing the three above did not
+  // already do mechanically -- they are here because a brew pub with
+  // three beers is not a brew pub, and choosing between a cask bitter and
+  // a sour is the kind of small decision this game is for. They still
+  // carry real appeal profiles, because an item that pleased everyone
+  // equally would be the one right answer and there are no others here.
+  //
+  // None of them is cartable. A cart carries cans and bottles; it does
+  // not carry a stemmed goblet of sour ale. That is thematically obvious
+  // and it is also load-bearing -- made cartable, the upmarket ones
+  // pushed the beverage cart's pull with destination guests from 0.68 to
+  // 0.84 and broke the ceiling the cart is supposed to have.
+  ['pilsner',           'Crisp pilsner',      'drink',  6,  1.8, 0, false,  0.90, 0.55, 0.45, 2,  4],
+  ['caskBitter',        'Cask bitter',        'drink',  8,  2.5, 0, false,  0.85, 0.80, 0.35, 3,  4],
+  ['stout',             'Dry stout',          'drink',  9,  3,   0, false,  0.55, 0.75, 0.55, 3,  5],
+  ['hazyIpa',           'Hazy IPA',           'drink', 12,  4.5, 0, false,  0.35, 0.85, 0.80, 3,  4],
+  ['sourAle',           'Sour ale',           'drink', 13,  5,   0, false,  0.15, 0.60, 0.90, 3,  4],
+  ['hefeweizen',        'Wheat beer',         'drink', 10,  3.5, 0, false,  0.60, 0.65, 0.75, 3,  4],
+  ['brownAle',          'Brown ale',          'drink',  8,  2.8, 0, false,  0.80, 0.70, 0.40, 3,  4],
+  ['porter',            'Porter',             'drink', 10,  3.5, 0, false,  0.45, 0.75, 0.65, 3,  5],
+  ['beerFlight',        'Tasting flight',     'drink', 16,  6,   0, false, 0.40, 0.70, 0.95, 4,  3],
   ['candyBar',          'Candy bar',          'food',   3,  1,   0, true,  0.80, 0.50, 0.20, 1,  6],
   ['trailMix',          'Trail mix',          'food',   5,  2,   0, true,  0.40, 0.80, 0.40, 2,  7],
   ['turkeyWrap',        'Turkey wrap',        'food',  12,  4,   0, true,  0.50, 0.80, 0.60, 3,  9],
@@ -94,10 +116,26 @@ export const FOOD_AMENITIES = Object.freeze(Object.keys(MENU_SLOTS));
  * What `type` is allowed to serve. A snack shack has a microwave and a
  * cooler, not a line; a cart can only carry what survives the trip.
  */
+/**
+ * The brew pub's own list, poured nowhere else.
+ *
+ * Exclusivity is what makes the brew pub a place rather than a second
+ * bar. Without it these nine simply widen every drinks board in the
+ * resort, the cocktail bar ends up serving cask bitter, and building the
+ * pub buys you nothing you could not already pour. With it, the pub is
+ * the only way to get any of them, which is worth $24,000 of anybody's
+ * money.
+ */
+export const BREW_PUB_ONLY = Object.freeze(new Set([
+  'pilsner', 'caskBitter', 'stout', 'hazyIpa', 'sourAle',
+  'hefeweizen', 'brownAle', 'porter', 'beerFlight',
+]));
+
 export function itemsFor(type) {
   if (!MENU_SLOTS[type]) return [];
   return ITEM_IDS.filter((id) => {
     const item = ITEMS[id];
+    if (BREW_PUB_ONLY.has(id)) return type === 'brewPub';
     if (type === 'snackShack') return item.prep <= 1;
     if (type === 'beverageCart') return item.cartable;
     // A dining room is not a place you order a hot dog, and price alone

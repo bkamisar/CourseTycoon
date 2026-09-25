@@ -207,9 +207,85 @@ const steakFrites = [
  * has shipped here before (`SPRITES.tee` was defined, never registered,
  * every test passed, and the render loop died on page load).
  */
+// --- The brew pub's twelve --------------------------------------------
+//
+// Nine beers beside each other is the hardest test of the silhouette rule
+// at the top of this file, because a beer is a glass of amber liquid and
+// so is a beer. Colour cannot carry it alone, so every one of these is a
+// different GLASS: a narrow flute, a handled mug, a tapered pint, a
+// conical shaker, a squat goblet, a waisted vase, a bulged nonic, a small
+// snifter, and a paddle. Read the shapes with the colour turned off and
+// they still tell you which is which.
+
+/** Tall, narrow, pale gold. The thinnest thing on the board. */
+const pilsner = [
+  '............', '....oooo....', '....oWWo....', '....oMMo....',
+  '....oMMo....', '....oMMo....', '...oMMMMo...', '...oMMMMo...',
+  '...oMMMMo...', '...oooooo...', '....oooo....', '............',
+];
+
+/** The only glass here with a handle. */
+const caskBitter = [
+  '............', '..oooooo....', '..oWWWWo....', '..oAAAAoooo.',
+  '..oAAAAo..o.', '..oAAAAo..o.', '..oAAAAoooo.', '..oAAAAo....',
+  '..oAAAAo....', '..oooooo....', '............', '............',
+];
+
+/** Tapered pint, near black, two rows of head. */
+const stout = [
+  '............', '..oooooooo..', '..oWWWWWWo..', '..oWWWWWWo..',
+  '..oCCCCCCo..', '..oCCCCCCo..', '...oCCCCo...', '...oCCCCo...',
+  '...oCCCCo...', '...oooooo...', '............', '............',
+];
+
+/** Conical shaker — wide at the bottom, which nothing else is. */
+const hazyIpa = [
+  '............', '...oooooo...', '...oWWWWo...', '...oMMMMo...',
+  '..oMMMMMMo..', '..oMMMMMMo..', '..oMMMMMMo..', '..oMMMMMMo..',
+  '..oMMMMMMo..', '..oooooooo..', '............', '............',
+];
+
+/** Squat goblet, and the only pink drink that is not the wine. */
+const sourAle = [
+  '............', '............', '..oooooooo..', '..oRRRRRRo..',
+  '..oRRRRRRo..', '...oRRRRo...', '....oRRo....', '.....oo.....',
+  '.....oo.....', '....oooo....', '...oooooo...', '............',
+];
+
+/** Waisted vase with a tall head. */
+const hefeweizen = [
+  '............', '...oooooo...', '...oWWWWo...', '..oWWWWWWo..',
+  '..oMMMMMMo..', '...oMMMMo...', '...oMMMMo...', '..oMMMMMMo..',
+  '..oMMMMMMo..', '..oooooooo..', '............', '............',
+];
+
+/** A nonic, bulged near the top. */
+const brownAle = [
+  '............', '..oooooooo..', '..oWWWWWWo..', '..obbbbbbo..',
+  '.obbbbbbbbo.', '.obbbbbbbbo.', '..obbbbbbo..', '..obbbbbbo..',
+  '..obbbbbbo..', '..oooooooo..', '............', '............',
+];
+
+/** Small snifter. The shortest glass here. */
+const porter = [
+  '............', '............', '............', '...oooooo...',
+  '..oCCCCCCo..', '..oCCCCCCo..', '..oCCCCCCo..', '...oCCCCo...',
+  '.....oo.....', '....oooo....', '...oooooo...', '............',
+];
+
+/** Three glasses on a paddle. Nothing else on the board is three of
+ * anything, so it reads instantly at 24 pixels. */
+const beerFlight = [
+  '............', '............', '.ooo.ooo.ooo', '.oMo.oAo.oCo',
+  '.oMo.oAo.oCo', '.oMo.oAo.oCo', '.ooo.ooo.ooo', '............',
+  'BBBBBBBBBBBB', 'BbbbbbbbbbbB', 'BBBBBBBBBBBB', '............',
+];
+
 export const FOOD_SPRITES = {
   domesticCan, draught, craftAle, arnoldPalmer, bottledWater, transfusion,
-  espresso, wineByGlass, candyBar, trailMix, turkeyWrap, chickenCaesarWrap,
+  espresso, wineByGlass,
+  pilsner, caskBitter, stout, hazyIpa, sourAle,
+  hefeweizen, brownAle, porter, beerFlight, candyBar, trailMix, turkeyWrap, chickenCaesarWrap,
   hotDog, breakfastSandwich, chiliBowl, burgerFries, clubSandwich,
   seasonalSalad, oysters, lobsterRoll, steakFrites,
 };
