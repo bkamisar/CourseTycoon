@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { SEGMENT_KEYS, SEGMENTS } from '../src/sim/segments.js';
 import { newGame } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
+import { CONDITIONS } from '../src/sim/weather.js';
 import {
-  HOTEL_AMENITIES, HOTEL_AMENITY_IDS,
-  hotelUpkeep, extraNightsFrom, divertedShare, hasWeatherProofDraw, hotelAppeal,
+  HOTEL_AMENITIES, HOTEL_AMENITY_IDS, hotelUpkeep, extraNightsFrom, divertedShare, hasWeatherProofDraw, hotelAppeal, indoorTrade,
 } from '../src/sim/hotelAmenities.js';
 
 const all = HOTEL_AMENITY_IDS.map((type) => ({ type }));
@@ -198,16 +198,49 @@ test('an indoor range earns on a day the course is unplayable', () => {
   assert.ok(sheltered > 0, 'a range under a roof should take money anyway');
 });
 
-test('a fine day earns nothing extra indoors', () => {
+test('the indoor buildings trade on a fine day too, and more on a foul one', () => {
+  // This used to assert the range earned NOTHING when the sun was out.
+  // That was the model, and the model was backwards: a driving range
+  // takes money every day and takes more when nobody can play. Earning
+  // only in bad weather made it $62 a day against $280 of upkeep — a
+  // building whose entire selling point never paid for itself, and which
+  // could not pay back its $30,000 however long it stood.
   let state = newGame(45);
   state.resort.amenities.push({ id: 'indoorRange', type: 'indoorRange', menu: [] });
-  for (let d = 0; d < 40; d++) {
+
+  let bestFine = 0;
+  let bestFoul = 0;
+  for (let d = 0; d < 60; d++) {
     const r = runDay(state, 4500 + d);
     state = r.state;
-    if (r.report.weather.key === 'clear') {
-      assert.equal(r.report.revenue.indoors, 0,
-        'nobody hits balls under a roof when the sun is out');
-      return;
+    const earned = r.report.revenue.indoors;
+    const sky = r.report.weather.key;
+    if (sky === 'clear' || sky === 'fair') {
+      assert.ok(earned > 0, 'a range should take money on a playable day as well');
+      bestFine = Math.max(bestFine, earned);
     }
+    if (sky === 'rain' || sky === 'storm') bestFoul = Math.max(bestFoul, earned);
+  }
+  assert.ok(bestFine > 0, 'sanity: some fine days happened in sixty');
+  assert.ok(bestFoul > bestFine,
+    `a foul day ($${bestFoul}) should beat a fine one ($${bestFine}) under a roof`);
+});
+
+test('a building that trades indoors covers its own upkeep', () => {
+  // The point of the rebuild. Measured across the weather it will
+  // actually see, each of these has to be worth more than it costs to
+  // run, or its selling point is a story rather than a mechanic.
+  const WEIGHTS = { clear: 30, fair: 30, breezy: 16, blowy: 8, drizzle: 9, rain: 5, storm: 2 };
+  const total = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
+
+  for (const id of ['indoorRange', 'functionRoom', 'conferenceSuite']) {
+    const spec = HOTEL_AMENITIES[id];
+    assert.ok(spec.trade, `${id} is supposed to trade indoors`);
+    let expected = 0;
+    for (const [key, weight] of Object.entries(WEIGHTS)) {
+      expected += indoorTrade([{ type: id }], CONDITIONS[key].demand) * (weight / total);
+    }
+    assert.ok(expected > spec.upkeep,
+      `${id} takes $${expected.toFixed(0)}/day against $${spec.upkeep} of upkeep`);
   }
 });

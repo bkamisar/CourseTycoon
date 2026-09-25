@@ -54,7 +54,7 @@ const LIST = [
     blurb: 'Childcare with a rota and a craft table. Families who would have come for two nights come for three, which is worth more than another family would be.',
   },
   {
-    id: 'spa', label: 'Spa', build: 34000, upkeep: 320, serves: 'both',
+    id: 'spa', label: 'Spa', roomValue: 16, build: 34000, upkeep: 320, serves: 'both',
     appeal: { locals: 0.40, serious: 0.20, destination: 0.80 },
     extraNights: 0.4,
     blurb: 'The reason the half of the party who does not play golf agrees to come at all.',
@@ -65,7 +65,8 @@ const LIST = [
     blurb: 'Somewhere to end the evening that is not the clubhouse. Guests drink more when they are not driving home.',
   },
   {
-    id: 'fineDining', label: 'Fine dining room', build: 38000, upkeep: 420, serves: 'both',
+    id: 'fineDining',
+    roomValue: 22, label: 'Fine dining room', build: 38000, upkeep: 420, serves: 'both',
     appeal: { locals: 0.50, serious: 0.35, destination: 0.90 },
     blurb: 'A proper kitchen and a wine list. Destination guests plan an evening around it; locals drive out for an anniversary.',
   },
@@ -77,7 +78,8 @@ const LIST = [
     blurb: 'First off the tee, before the dew burns away, reserved for people sleeping here. This is the answer to why a golfer would pay for a bed at a course he could drive to: the tee time is worth more than the drive.',
   },
   {
-    id: 'indoorRange', label: 'Indoor range', build: 30000, upkeep: 280, serves: 'both',
+    id: 'indoorRange',
+    trade: { base: 430, weather: 950 }, label: 'Indoor range', build: 26000, upkeep: 240, serves: 'both',
     appeal: { locals: 0.35, serious: 0.90, destination: 0.40 },
     weatherProof: true,
     blurb: 'Bays, mats and a launch monitor, under a roof. Takes money on the days the course takes none — the only thing here that earns in a storm.',
@@ -88,7 +90,8 @@ const LIST = [
     blurb: 'Clubs cleaned overnight and waiting on the first tee. Small, cheap, and precisely what a serious golfer notices.',
   },
   {
-    id: 'caddieProgramme', label: 'Caddie programme', build: 14000, upkeep: 350, serves: 'both',
+    id: 'caddieProgramme',
+    paceFactor: 0.94, label: 'Caddie programme', build: 14000, upkeep: 350, serves: 'both',
     appeal: { locals: 0.15, serious: 0.70, destination: 0.75 },
     blurb: 'Local kids who know where the ball goes. Expensive to run and the thing people remember.',
   },
@@ -100,7 +103,8 @@ const LIST = [
 
   // --- For the people who will never book a room ----------------------
   {
-    id: 'functionRoom', label: 'Function room', build: 26000, upkeep: 210, serves: 'day',
+    id: 'functionRoom',
+    trade: { base: 450, weather: 110 }, label: 'Function room', build: 26000, upkeep: 210, serves: 'day',
     appeal: { locals: 0.85, serious: 0.10, destination: 0.20 },
     blurb: 'Weddings, societies, wakes and the golf club AGM. Revenue with no golfer attached, from the crowd who would never book a bed.',
   },
@@ -116,7 +120,8 @@ const LIST = [
     blurb: 'Three par threes and a practice green. Beginners and families play here instead of holding up the first tee — the only thing you can build that makes the main course faster by taking golfers off it.',
   },
   {
-    id: 'conferenceSuite', label: 'Conference suite', build: 29000, upkeep: 260, serves: 'day',
+    id: 'conferenceSuite',
+    trade: { base: 520, weather: 130 }, label: 'Conference suite', build: 29000, upkeep: 260, serves: 'day',
     appeal: { locals: 0.30, serious: 0.15, destination: 0.70 },
     blurb: 'Projector, bad coffee, eighteen holes in the afternoon. Fills rooms on a Tuesday, which is the hardest night of the week to sell.',
   },
@@ -127,6 +132,13 @@ export const HOTEL_AMENITIES = Object.freeze(Object.fromEntries(
     weatherProof: false,
     divertsGroups: 0,
     extraNights: 0,
+    // 1 is "changes nothing"; below 1 shortens a round.
+    paceFactor: 1,
+    // Dollars a night guests will pay on top, for having it here at all.
+    roomValue: 0,
+    // What the building takes indoors: `base` every day, plus `weather`
+    // scaled by how unplayable the course is.
+    trade: null,
     ...a,
     appeal: Object.freeze(a.appeal),
   })])
@@ -181,4 +193,51 @@ export function hotelAppeal(amenities, segment) {
   const best = Math.max(...draws);
   const mean = draws.reduce((s, d) => s + d, 0) / draws.length;
   return Math.min(1, mean + 0.5 * (best - mean));
+}
+
+/**
+ * How much the hotel's buildings shorten a round.
+ *
+ * Caddies find the ball, read the line and keep the group moving, which
+ * is the same job a marshal does from the other end. Multiplied with the
+ * marshal factor rather than added, so the two stack without either
+ * becoming free.
+ */
+export function caddiePaceFactor(amenities) {
+  return built(amenities).reduce((factor, a) => factor * (a.paceFactor ?? 1), 1);
+}
+
+/**
+ * Dollars a night a guest will pay on top, because of what is here.
+ *
+ * The nightly rate was a slider with nothing supporting it: the only way
+ * to charge more was to charge more, and guests simply stopped coming.
+ * A spa and a dining room are the reason a room is worth a hundred and
+ * sixty rather than a hundred and twenty, which makes building them and
+ * pricing the rooms one decision instead of two unrelated ones.
+ */
+export function roomValueBonus(amenities) {
+  return built(amenities).reduce((sum, a) => sum + (a.roomValue ?? 0), 0);
+}
+
+/**
+ * What the indoor buildings take today.
+ *
+ * `demandFactor` is the weather's multiplier on turnout: 1.12 on a
+ * perfect day, 0.10 in a storm. Each building earns its `base` whatever
+ * the sky is doing and its `weather` share in proportion to how
+ * unplayable the course is.
+ *
+ * The range used to earn ONLY when the weather was bad, which is
+ * backwards -- a driving range takes money every day and takes more when
+ * nobody can play. Measured, that made it $62 a day against $280 of
+ * upkeep: a building whose entire selling point never paid for itself,
+ * and which could not pay back its $30,000 however long it stood.
+ */
+export function indoorTrade(amenities, demandFactor = 1) {
+  const unplayable = Math.max(0, 1 - demandFactor);
+  return built(amenities).reduce((sum, a) => {
+    if (!a.trade) return sum;
+    return sum + a.trade.base + a.trade.weather * unplayable;
+  }, 0);
 }

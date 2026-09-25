@@ -31,13 +31,22 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-24h';
+export const BUILD = '2026-09-24i';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-24i',
+    notes: [
+      'Four hotel buildings do real work now instead of only making people likelier to turn up. The caddie programme speeds your rounds up — measured, 166 minutes down to 138, because a shorter hole compounds all the way down the tee sheet.',
+      'A spa and a fine dining room make a room worth more, so guests will pay a higher nightly rate without leaving. The rate slider used to have nothing supporting it: the only way to charge more was to charge more, and people simply stopped coming.',
+      'The function room and conference suite take money now — weddings, societies and corporate days — and cost more to put up because of it.',
+      'The indoor range was losing $218 a day and could never pay back its build. It earned ONLY when the weather was bad, which is backwards: a range takes money every day and takes more when nobody can play. It does that now, and it is cheaper.',
+    ],
+  },
   {
     version: '2026-09-24h',
     notes: [

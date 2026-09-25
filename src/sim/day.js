@@ -28,7 +28,8 @@ import {
 } from './investors.js';
 import { totalRooms, nightlyUpkeep, occupancyFor, roomRevenue } from './rooms.js';
 import {
-  hotelUpkeep, extraNightsFrom, divertedShare, hasWeatherProofDraw, HOTEL_AMENITIES,
+  hotelUpkeep, extraNightsFrom, divertedShare, HOTEL_AMENITIES,
+  caddiePaceFactor, roomValueBonus, indoorTrade,
 } from './hotelAmenities.js';
 
 const DAY_START = 420;  // 7:00am
@@ -321,7 +322,10 @@ export function runDay(state, seed) {
   // Marshals move slow groups along. Capped, deliberately: staffing must not
   // be a way to buy your way out of a badly designed course.
   const marshals = next.resort.staff.filter((m) => m.role === 'marshal').length;
-  const marshalFactor = marshalPaceFactor(marshals);
+  // Marshals push from behind; caddies pull from the front. Multiplied
+  // rather than added so the two stack without either becoming free.
+  const marshalFactor = marshalPaceFactor(marshals)
+    * caddiePaceFactor(next.resort.amenities);
   const pacedHoleMinutes = averageHoleMinutes.map((m) => m * marshalFactor);
 
   const schedule = groupCount
@@ -444,6 +448,7 @@ export function runDay(state, seed) {
     roomRate: next.resort.pricing.roomRate,
     valuePerRound: value,
     extraNights: extraNightsFrom(next.resort.amenities),
+    valueBonus: roomValueBonus(next.resort.amenities),
   });
   revenue.rooms = roomRevenue({ occupancy: hotel, roomRate: next.resort.pricing.roomRate });
   revenue.total += revenue.rooms;
@@ -467,12 +472,10 @@ export function runDay(state, seed) {
   // demand down to a tenth in a storm and leaves every other building
   // idle; a range under a roof takes money anyway, so it smooths the
   // variance rather than merely adding to the total.
-  if (hasWeatherProofDraw(next.resort.amenities) && sky.demand < 0.8) {
-    const sheltered = Math.round(
-      HOTEL_AMENITIES.indoorRange.upkeep * 2.4 * (1 - sky.demand)
-    );
-    revenue.indoors = sheltered;
-    revenue.total += sheltered;
+  const indoors = Math.round(indoorTrade(next.resort.amenities, sky.demand));
+  if (indoors > 0) {
+    revenue.indoors = indoors;
+    revenue.total += indoors;
   } else {
     revenue.indoors = 0;
   }

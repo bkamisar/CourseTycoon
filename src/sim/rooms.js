@@ -110,7 +110,7 @@ export function nightlyRate(kind, roomRate) {
  * who has driven three hours is not going to sleep in the car over twenty
  * dollars. It bites hard above roughly twice what a round is worth.
  */
-export function roomDemand({ crowd, roomRate, valuePerRound = 60, extraNights = 0 }) {
+export function roomDemand({ crowd, roomRate, valuePerRound = 60, extraNights = 0, valueBonus = 0 }) {
   const wanted = {};
   for (const key of SEGMENT_KEYS) {
     const behaviour = STAY_BEHAVIOUR[key];
@@ -120,7 +120,13 @@ export function roomDemand({ crowd, roomRate, valuePerRound = 60, extraNights = 
       continue;
     }
     // 1.0 at a rate equal to a round, falling away above it.
-    const fair = Math.max(1, valuePerRound * 1.6);
+    //
+    // `valueBonus` is what the hotel's own buildings add to that: a spa
+    // and a dining room are the reason a room is worth $160 rather than
+    // $120. Without it the nightly rate was a slider with nothing
+    // supporting it -- the only way to charge more was to charge more,
+    // and guests simply stopped coming.
+    const fair = Math.max(1, valuePerRound * 1.6 + valueBonus);
     const priceFit = clamp(1.25 - (roomRate / fair) * 0.55, 0.05, 1.15);
     // A kids' club or a spa lengthens the trip rather than attracting
     // another one — the only way to raise occupancy without raising
@@ -140,10 +146,12 @@ export function roomDemand({ crowd, roomRate, valuePerRound = 60, extraNights = 
  * than drive home, but not happily, which is what `unmetSuiteDemand`
  * exists to let the rest of the game notice.
  */
-export function occupancyFor({ rooms, crowd, roomRate, valuePerRound = 60, extraNights = 0 }) {
+export function occupancyFor({
+  rooms, crowd, roomRate, valuePerRound = 60, extraNights = 0, valueBonus = 0,
+}) {
   const counts = roomCounts(rooms);
   const capacity = counts.standard + counts.suite;
-  const wanted = roomDemand({ crowd, roomRate, valuePerRound, extraNights });
+  const wanted = roomDemand({ crowd, roomRate, valuePerRound, extraNights, valueBonus });
 
   let suiteWanted = 0;
   let totalWanted = 0;
