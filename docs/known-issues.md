@@ -35,62 +35,70 @@ Act I looked fine on spot measurements the day it shipped broken. The
 operator is the only thing that has ever caught a real balance problem on
 this project, and it has never been pointed at this act.
 
-### The run-up costs nothing, so the whole ladder is a rounding error
+### The run-up costs something now, but not enough to make bidding a real decision
 
 **Found:** 2026-09-25, measuring Act III with the operator before building its
-surface. **The one thing standing between Act III and being playable.**
+surface. **Partially fixed the same day** -- `day.js`'s `care` is now cut by
+`CARE_DIVERTED_WHILE_CONDITIONING` (`tournaments.js`, 0.4) while a
+championship is being conditioned for, so one crew doing both jobs at once no
+longer holds the turf for free. What follows is what that fix did and did not
+change, measured the same way as the original finding, so this does not read
+as fixed twice.
 
-Eight resorts carried through Acts I and II into Act III, same seed on both
-sides of every comparison, 220 days each.
+**Turf now measurably costs something.** An identical crew conditioning vs.
+not, otherwise the same seed and holes, separates by double digits of turf
+quality inside fifteen days (`tests/tournamentDay.test.js`), where before this
+fix the two were indistinguishable. That part of the design's promise --
+"paid in full before anything is paid back" -- is real now, in the one place
+it can be measured cleanly.
 
-**Bidding barely matters.** It beat never bidding in 3 runs of 8, and the
-differences (-$81,515 to +$26,550) are noise against a $4,000,000 profit. All
-eight hosted a County Open and all eight took 100% of the ceiling, so the
-contract is not a test a competent operator can fail.
+**Bidding still barely matters, and the reason is now understood rather than
+just observed.** Re-run the same eight-seed sweep after the fix: bidding still
+beat never bidding in only 3 of 8 runs, by amounts (-$88,835 to +$40,632) still
+noise against a $4,000,000 profit, and every hosted championship still took
+100% of the ceiling. Trade while conditioning fell only 0.4-2.5% below ordinary
+days across eight seeds at the *most* diversion this lever can apply (100%,
+i.e. conditioning holds no turf at all) -- nowhere near the 7-12% (~$38,800
+over the run-up) the purses need to make base-alone lose, half-the-bonuses
+break even, and all-four a real gain.
 
-**Because the run-up is free.** Trade while conditioning was $46,250 a day
-against $45,987 on ordinary days -- a fraction of a per cent, and HIGHER in
-five runs of eight. The design says the cost is the everyday business, "paid in
-full before anything is paid back". Nothing is paid.
+**Why more diversion does not close the gap:** the operator's own fixture
+(prestige ~94, 71 rooms, 18 holes, green fee 80, interval 14) is capacity- and
+catchment-bound. Measured directly: raw demand ("wanted") ran 5-6x the tee
+sheet's ceiling even with turf driven to 0 and setup to 100 *together* -- the
+tee sheet and the hotel both stayed full regardless. Green fees and room
+nights, the bulk of a day's trade, do not move at all under a capacity bound;
+only merchandise and food shift, because they alone read `averageSatisfaction`
+rather than group count, and that is a few hundred dollars on a $46,000 day.
+This is the same mechanism as "Conditioning a course raises average
+satisfaction instead of costing it" below -- a capacity-bound tee sheet
+insulates the day's numbers from course quality, whichever number is being
+asked to carry the cost. Turf, satisfaction, and trade all run into the same
+wall from different sides.
 
-**The scale, measured on a resort arriving in Act III** (prestige 93, 71 rooms,
-18 holes, 20 amenities, 19 staff):
+**0.4 was chosen against a constraint this task could still check: the turf
+bonus must stay reachable.** Above roughly 0.5, holding turf at or above 78
+through a full run-up stops being possible on eighteen holes with anything
+under a dozen groundskeepers, on even the easiest rung. At 0.4, nine hold a
+national's band and turf together for the full 21 days. Pushing the constant
+higher trades an unreachable bonus for a trade-percentage gain the demand
+model mostly refuses to pay out anyway (0.4 vs. 1.0 measured within a couple
+of points of each other).
 
-    revenue  $46,956/day     costs  $28,496/day     profit  $18,460/day
+**What would actually close the gap:** the trade-through-demand channel is
+capped by the tee sheet and the catchment, not by this constant. Making the
+run-up cost 7-12% of trade needs a channel that is not capacity-bound --
+raising the actual conditioning wage bill, adding a cost that scales with the
+crew hired for the week rather than with course rating, or loosening the
+catchment/capacity ceilings enough that quality can move group count again.
+Any of those is balance work bigger than a wiring fix, and changes the
+numbers this same file's purses were tuned against, which is why it was not
+attempted here.
 
-    a County Open's $48,000 ...... 2.6 days of profit
-    the entire ladder, $458,000 .. 24.8 days of profit
-
-**The purses are not the problem, which is the useful part.** At $18,460 a day
-the run-up spans 21 days, so a conditioning cost of roughly 9% of trade (about
-$38,800) makes all three of the design's claims true at the existing numbers:
-
-| outcome | pays | against a $38,800 run-up |
-|---|---|---|
-| base alone | $18,000 | -$20,800, loses money |
-| about half the bonuses | ~$33,000 | -$5,800, roughly breaks even |
-| all four | $48,000 | +$9,200, a real gain |
-
-**The fix wants conditioning to divert the grounds crew from turf care.** One
-crew currently does both jobs at once -- `day.js` computes `care = keepers *
-6.8` with no reference to `conditioning` -- so preparing a championship costs
-no turf and no money. Diverting a share of that care during the run-up would:
-
-- cost trade through course rating, which is the bill the design asked for;
-- put the band and turf bonuses in real tension, since holding both means
-  hiring; and
-- give "hire more grounds staff for the championship" a reason to exist, which
-  is what the design wanted from reusing the crew in the first place.
-
-Preferred over the satisfaction route below, which would need per-segment
-catchment caps and would change crowd composition in Acts I and II as well,
-invalidating their balance numbers. This change is contained to Act III's
-run-up.
-
-**Also found:** the ladder hard-stops at rung one. Every resort hosted a County
-Open and then stopped, because Regional requires grandstands and overflow
-parking and those buildings do not exist until Plan 2. Expected, but it means
-nothing above rung one has ever been measured.
+**Also still true:** the ladder hard-stops at rung one. Every resort hosted a
+County Open and then stopped, because Regional requires grandstands and
+overflow parking and those buildings do not exist until Plan 2. Nothing above
+rung one has ever been measured.
 
 ### Conditioning a course raises average satisfaction instead of costing it
 

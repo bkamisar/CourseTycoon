@@ -32,7 +32,10 @@ import {
   hotelUpkeep, extraNightsFrom, divertedShare, HOTEL_AMENITIES,
   caddiePaceFactor, roomValueBonus, indoorTrade,
 } from './hotelAmenities.js';
-import { nextSetup, setupDifficultyBonus, championshipRoomsSold, scoreTournament } from './tournaments.js';
+import {
+  nextSetup, setupDifficultyBonus, championshipRoomsSold, scoreTournament,
+  CARE_DIVERTED_WHILE_CONDITIONING,
+} from './tournaments.js';
 import { playField } from './field.js';
 
 const DAY_START = 420;  // 7:00am
@@ -183,10 +186,14 @@ export function runDay(state, seed) {
   // is the dial the design asked for: without it, conditioning ran for as
   // long as a bid stayed open and nothing told the crew when to stop, so a
   // full crew overshot every band including the county's.
+  // Hoisted rather than computed inline, because the turf calculation
+  // further down needs to know the same thing: while the crew is
+  // conditioning the course, less of their effort is holding the turf.
+  const conditioning = Boolean(next.tournament && !next.tournament.resolved)
+    && (next.resort.setup ?? 0) < (next.resort.setupTarget ?? 0);
   next.resort.setup = nextSetup(next.resort.setup ?? 0, {
     keepers,
-    conditioning: Boolean(next.tournament && !next.tournament.resolved)
-      && (next.resort.setup ?? 0) < (next.resort.setupTarget ?? 0),
+    conditioning,
     // Passed so a big crew stops on arrival rather than overshooting the
     // band and decaying back down through it.
     target: next.resort.setupTarget ?? 0,
@@ -582,10 +589,18 @@ export function runDay(state, seed) {
    * each one is worth roughly thirty points of equilibrium turf, and the
    * player can read the answer off the number rather than discovering a
    * cliff edge by falling off it.
+   *
+   * Act III spends the same crew twice. While `conditioning` is true, the
+   * hours that would hold the turf are instead hardening the course for a
+   * championship, so `care` is cut by `CARE_DIVERTED_WHILE_CONDITIONING`
+   * (see tournaments.js) for exactly the days the crew spends doing that
+   * second job. Without this the run-up cost nothing — one crew raised
+   * setup AND held the turf at once, so trade while conditioning never
+   * measured below trade on an ordinary day.
    */
   const wearRate = holes.length * 1.4 + groupCount * 0.45;
   const wear = wearRate * (next.turfQuality / 100);
-  const care = keepers * 6.8;
+  const care = keepers * 6.8 * (conditioning ? 1 - CARE_DIVERTED_WHILE_CONDITIONING : 1);
   // Rain waters the course for free; a run of clear days bakes it. A wet
   // week costs money and leaves the turf better than it found it, which
   // is a trade rather than a punishment.

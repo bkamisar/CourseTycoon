@@ -98,6 +98,45 @@ export const SETUP_PER_KEEPER = 0.8;
 /** And it falls back on its own, because firm greens do not stay firm. */
 export const SETUP_DECAY_PER_DAY = 3.5;
 
+/**
+ * How much of the grounds crew's turf care is diverted to conditioning
+ * while a championship is being prepared for.
+ *
+ * This is the run-up's cost. The spec promises firm greens and thick
+ * rough are "paid in full before anything is paid back," but one crew
+ * both raises setup and holds the turf, so without a diversion the run-up
+ * was free: trade while conditioning measured no lower than trade on an
+ * ordinary day.
+ *
+ * Chosen by measurement, and NOT at the 7-12% target that was asked for.
+ * `tools/operator.js`'s Act III sweep (prestige ~94, 71 rooms, 18 holes,
+ * green fee 80, interval 14) is capacity- and catchment-bound: raw demand
+ * ("wanted") ran 5-6x the tee sheet's ceiling even at turf 0 and setup
+ * 100 together, so a lower course rating removes people who were never
+ * going to fit on the sheet anyway. Green fees and room nights, the bulk
+ * of a day's trade, do not move at all; only merchandise and food shift,
+ * because they alone read `averageSatisfaction` rather than group count.
+ * A full 100% diversion — the most this lever can do — measured trade
+ * during the run-up only 0.4-2.5% below an ordinary day across eight
+ * seeds, not 7-12%. This is the same capacity-bound demand that keeps
+ * `tests/tournamentDay.test.js`'s "a conditioned course is a worse day
+ * out" a todo (see docs/known-issues.md) — a course-quality lever cannot
+ * out-argue a sold-out tee sheet, and no value of this constant changes
+ * that.
+ *
+ * 0.4 is chosen against a different, checkable constraint instead: the
+ * turf bonus (`TURF_EXPECTED`, 78) must stay reachable by a real crew.
+ * Above roughly 0.5 it stops being reachable on eighteen holes by
+ * anything under a dozen groundskeepers even on the easiest rung; at 0.4,
+ * nine hold a national's band and turf together through the full 21-day
+ * run-up (see `tests/tournamentDay.test.js`). It costs turf measurably
+ * (double digits of turf quality against an identical non-conditioning
+ * crew, also tested) without being punitive past the point this task was
+ * asked to fix. Not the same lever as `SETUP_PER_KEEPER` or
+ * `SETUP_DECAY_PER_DAY`, which stay exactly what they were.
+ */
+export const CARE_DIVERTED_WHILE_CONDITIONING = 0.4;
+
 /** What one day of work adds, given the crew. */
 export function setupClimb(keepers = 0) {
   return Math.max(0, keepers) * SETUP_PER_KEEPER;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { newGame, serialize, deserialize } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeHole } from '../src/sim/hole.js';
-import { RUNGS } from '../src/sim/tournaments.js';
+import { RUNGS, RUN_UP_DAYS, TURF_EXPECTED } from '../src/sim/tournaments.js';
 
 /** A resort that has finished Act II, which is where Act III begins. */
 function actThreeResort(seed = 3) {
@@ -144,6 +144,64 @@ test('after the championship resolves, lowering the target still lets setup fall
   for (let d = 0; d < 5; d++) after = runDay(after, 4500 + d).state;
   assert.ok(after.resort.setup < resolved.resort.setup,
     'a lowered target after the event must still let setup fall');
+});
+
+/**
+ * The run-up's cost, in the one place it is unambiguous: the turf itself.
+ * `courseDifficulty` and satisfaction are muddied by self-selection (see
+ * the todo test below), but care diverted away from the turf is a direct
+ * subtraction with nothing else feeding it, so it is the cleanest place to
+ * prove the mechanic actually fires.
+ */
+test('a crew conditioning the course holds less turf than an identical crew that is not', () => {
+  function turfAfter(conditioning) {
+    let state = openFullCourse(actThreeResort(30));
+    if (conditioning) {
+      // A target no fifteen-day crew of seven could reach, so conditioning
+      // stays true (and care stays diverted) for the whole comparison
+      // rather than settling into the target-holding oscillation partway
+      // through.
+      state.tournament = { rung: 'national', day: state.day + 21, resolved: false };
+      state.resort.setupTarget = 100;
+    }
+    for (let d = 0; d < 15; d++) state = runDay(state, 5000 + d).state;
+    return state.turfQuality;
+  }
+  const idle = turfAfter(false);
+  const conditioning = turfAfter(true);
+  assert.ok(conditioning < idle,
+    `conditioning must cost turf: idle held ${idle.toFixed(1)}, conditioning only ${conditioning.toFixed(1)}`);
+  // Not just "lower" — lower by more than the noise a run of ordinary days
+  // could produce on its own, or this is testing rounding rather than the
+  // mechanic. One-sided ("it went down") is exactly how a trivial or
+  // rounding-error-sized effect would sneak past review.
+  assert.ok(idle - conditioning > 10,
+    `the cost has to be more than noise: only ${(idle - conditioning).toFixed(1)} points apart`);
+});
+
+/**
+ * And the other direction, which the fix could just as easily have broken:
+ * a diversion large enough to cost something can also be large enough that
+ * no crew can outrun it, which would swap a free bonus for an impossible
+ * one. Ten groundskeepers on eighteen holes is a real hire, not a maxed-out
+ * fantasy roster — see the balance report for the sweep that chose it.
+ */
+test('a realistic crew still holds turf at or above the championship expectation through a full run-up', () => {
+  let state = openFullCourse(actThreeResort(31));
+  state.resort.staff.push({ role: 'groundskeeper' }, { role: 'groundskeeper' }, { role: 'groundskeeper' });
+  const keepers = state.resort.staff.filter((m) => m.role === 'groundskeeper').length;
+  const band = RUNGS.national.band;
+  state.tournament = { rung: 'national', day: state.day + RUN_UP_DAYS, resolved: false };
+  state.resort.setupTarget = Math.round((band.low + band.high) / 2);
+
+  let minTurf = 100;
+  for (let d = 0; d < RUN_UP_DAYS; d++) {
+    state = runDay(state, 6000 + d).state;
+    minTurf = Math.min(minTurf, state.turfQuality);
+  }
+  assert.ok(minTurf >= TURF_EXPECTED,
+    `${keepers} groundskeepers should hold turf at or above ${TURF_EXPECTED} through the run-up; `
+    + `it fell to ${minTurf.toFixed(1)}`);
 });
 
 // TODO (see docs/known-issues.md, "Conditioning a course raises average
