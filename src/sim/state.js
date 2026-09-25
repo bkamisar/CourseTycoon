@@ -76,6 +76,12 @@ export function newGame(seed) {
       // outlives one: it climbs before an event and decays after, and a
       // resort between championships still has a setting.
       setup: 0,
+      // The dial. What the player wants `setup` to be — the crew works
+      // toward it and holds there, rather than climbing forever the moment
+      // a bid is won. Also survives between championships, same as `setup`
+      // itself: a target left up after an event is what conditioning has
+      // to fall back from until the player brings it down.
+      setupTarget: 0,
       pricing: { greenFee: 22, teeInterval: 16, foodMultiplier: 1, roomRate: 0 },
     },
     properties: [{ id: 1, name: 'Pinehollow' }],       // Act IV
@@ -180,6 +186,7 @@ export function deserialize(text) {
   // Saves from before Act III have neither. Default them rather than let
   // every later reader guard against a missing key.
   if (typeof parsed.resort?.setup !== 'number') parsed.resort.setup = 0;
+  if (typeof parsed.resort?.setupTarget !== 'number') parsed.resort.setupTarget = 0;
   if (parsed.tournament === undefined) parsed.tournament = null;
   if (!Array.isArray(parsed.tournamentsHosted)) parsed.tournamentsHosted = [];
   // A save written before HISTORY_LIMIT existed can carry hundreds of

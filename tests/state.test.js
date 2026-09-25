@@ -107,6 +107,24 @@ test('a non-food amenity has no menu', () => {
   assert.deepEqual(defaultMenuFor('restrooms'), []);
 });
 
+test('a save made before championship targets existed defaults to zero', () => {
+  // Mirrors how tournamentsHosted and resort.setup were back-filled when
+  // Act III landed: an old save simply lacks the field, and loading it
+  // must not crash or leave setupTarget undefined for day.js to read.
+  const old = JSON.stringify({
+    version: 1,
+    day: 4, money: 1000, prestige: 10, turfQuality: 50,
+    resort: {
+      courses: [{ holes: [] }],
+      amenities: [], staff: [], pricing: { greenFee: 40, teeInterval: 10 },
+      setup: 30,
+    },
+    history: [], satisfactionHistory: [],
+  });
+  const loaded = deserialize(old);
+  assert.equal(loaded.resort.setupTarget, 0);
+});
+
 test('a save made before menus existed gets one', () => {
   // Never make an old save unloadable. The author plays on a phone and on
   // a desktop, and a save code moves between them.

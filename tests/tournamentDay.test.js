@@ -40,18 +40,32 @@ function openFullCourse(state) {
 test('a new game carries tournament state that survives a save', () => {
   const state = newGame(1);
   assert.equal(state.resort.setup, 0, 'a course starts unconditioned');
+  assert.equal(state.resort.setupTarget, 0, 'and with nothing dialled in');
   assert.equal(state.tournament, null, 'and with nothing booked');
   assert.deepEqual(state.tournamentsHosted, [],
     'hosted rungs must exist from day one or a save/load loses the ladder');
   const revived = deserialize(serialize(state));
   assert.equal(revived.resort.setup, 0);
+  assert.equal(revived.resort.setupTarget, 0);
   assert.equal(revived.tournament, null);
   assert.deepEqual(revived.tournamentsHosted, []);
+});
+
+test('a target set mid-game survives a save/load round trip', () => {
+  const state = newGame(4);
+  state.resort.setupTarget = 62;
+  const revived = deserialize(serialize(state));
+  assert.equal(revived.resort.setupTarget, 62,
+    'the dial itself is exactly the kind of thing a save must not lose');
 });
 
 test('setup climbs while a championship is booked and falls back after', () => {
   let state = actThreeResort();
   state.tournament = { rung: 'countyOpen', day: state.day + 21, resolved: false };
+  // The crew only climbs toward a target the player has set. Without one
+  // there is nothing to aim at, so give it a target above where ten days
+  // of a full crew could possibly overshoot.
+  state.resort.setupTarget = 100;
 
   for (let d = 0; d < 10; d++) state = runDay(state, 3000 + d).state;
   const climbed = state.resort.setup;
@@ -60,6 +74,76 @@ test('setup climbs while a championship is booked and falls back after', () => {
   state.tournament = null;
   for (let d = 0; d < 10; d++) state = runDay(state, 3100 + d).state;
   assert.ok(state.resort.setup < climbed, 'with nothing booked it must fall back');
+});
+
+test('a target holds a full crew inside the county band instead of running to 100', () => {
+  // This is the defect itself: a crew big enough to overshoot every band
+  // in the game used to drive setup to 100 because conditioning had no
+  // target to stop at. actThreeResort's seven groundskeepers (one from
+  // newGame plus six added) are exactly that crew.
+  let state = actThreeResort(21);
+  state.tournament = { rung: 'countyOpen', day: state.day + 21, resolved: false };
+  state.resort.setupTarget = 52;
+
+  for (let d = 0; d < 21; d++) state = runDay(state, 4000 + d).state;
+
+  const band = RUNGS.countyOpen.band;
+  assert.ok(state.resort.setup >= band.low && state.resort.setup <= band.high,
+    `setup landed at ${state.resort.setup.toFixed(1)}, outside the county band [${band.low},${band.high}]`);
+  // The explicit upper bound: this is the whole bug. A dial-less crew ran
+  // this to 100 every time, overshooting even the top rung's band.
+  assert.ok(state.resort.setup < 100,
+    `setup reached ${state.resort.setup.toFixed(1)} — the crew must stop at the target, not run to 100`);
+});
+
+test('a target of zero keeps the course from conditioning at all', () => {
+  let state = actThreeResort(22);
+  state.tournament = { rung: 'countyOpen', day: state.day + 21, resolved: false };
+  state.resort.setupTarget = 0;
+
+  for (let d = 0; d < 21; d++) state = runDay(state, 4100 + d).state;
+
+  // Both sides: not merely "stayed low", but held exactly at zero, with a
+  // full crew and a live booking that would have climbed it under the old
+  // all-or-nothing rule.
+  assert.equal(state.resort.setup, 0,
+    'with the target left at zero, a booked championship must not move the dial at all');
+});
+
+test('lowering the target lets a conditioned course fall back even while still booked', () => {
+  let state = actThreeResort(23);
+  state.tournament = { rung: 'countyOpen', day: state.day + 30, resolved: false };
+  state.resort.setupTarget = 90;
+
+  for (let d = 0; d < 10; d++) state = runDay(state, 4200 + d).state;
+  const climbed = state.resort.setup;
+  assert.ok(climbed > 30, `setup only reached ${climbed.toFixed(1)} in ten days aiming at 90`);
+
+  // The player changes their mind with the championship still booked.
+  // Reversibility has to answer to the target itself, not just to whether
+  // a tournament exists — the crew must let a conditioned course fall
+  // back the moment the target drops below where it already sits.
+  state.resort.setupTarget = 10;
+  for (let d = 0; d < 5; d++) state = runDay(state, 4300 + d).state;
+  assert.ok(state.resort.setup < climbed,
+    'setup must fall once the target is lowered below it, championship or not');
+});
+
+test('after the championship resolves, lowering the target still lets setup fall', () => {
+  let state = actThreeResort(24);
+  state.resort.setup = 90;
+  state.resort.setupTarget = 90;
+  state.turfQuality = 88;
+  state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+
+  const resolved = runDay(state, 4400).state;
+  assert.equal(resolved.tournament, null, 'the booking is spent');
+
+  resolved.resort.setupTarget = 10;
+  let after = resolved;
+  for (let d = 0; d < 5; d++) after = runDay(after, 4500 + d).state;
+  assert.ok(after.resort.setup < resolved.resort.setup,
+    'a lowered target after the event must still let setup fall');
 });
 
 // TODO (see docs/known-issues.md, "Conditioning a course raises average

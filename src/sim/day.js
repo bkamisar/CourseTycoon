@@ -177,11 +177,16 @@ export function runDay(state, seed) {
    */
   const keepers = next.resort.staff.filter((m) => m.role === 'groundskeeper').length;
 
-  // Act III. The course hardens while a championship is booked and drifts
-  // back when one is not.
+  // Act III. The course hardens toward the player's target while a
+  // championship is booked, holds there once it arrives, and drifts back
+  // when nothing is booked or the target has been brought down. The target
+  // is the dial the design asked for: without it, conditioning ran for as
+  // long as a bid stayed open and nothing told the crew when to stop, so a
+  // full crew overshot every band including the county's.
   next.resort.setup = nextSetup(next.resort.setup ?? 0, {
     keepers,
-    conditioning: Boolean(next.tournament && !next.tournament.resolved),
+    conditioning: Boolean(next.tournament && !next.tournament.resolved)
+      && (next.resort.setup ?? 0) < (next.resort.setupTarget ?? 0),
   });
 
   const allOpen = openHoles(next);
