@@ -409,6 +409,12 @@ export function playActTwo(startState, {
   let settledDay = null;
   let ending = null;
   let reviews = 0;
+  // Every verdict, not only the tally. "Are the four investor measures
+  // four problems or one?" is the question this act most needs answered,
+  // and a count cannot answer it -- if one measure is missed constantly
+  // and three are never missed at all, the fortnightly review is one
+  // problem wearing four hats.
+  const verdicts = [];
   let passed = 0;
   let lowConfidence = 100;
   let peakRooms = 0;
@@ -435,6 +441,14 @@ export function playActTwo(startState, {
     const inv = result.report.investors;
     if (inv?.reviewed) {
       reviews += 1;
+      verdicts.push({
+        day: state.day - 1,
+        measure: inv.reviewed.measure,
+        outcome: inv.reviewed.outcome,
+        threshold: inv.reviewed.threshold,
+        actual: inv.reviewed.actual,
+        confidence: inv.confidence,
+      });
       if (inv.reviewed.outcome === 'beat' || inv.reviewed.outcome === 'met') passed += 1;
     }
     if (typeof inv?.confidence === 'number') lowConfidence = Math.min(lowConfidence, inv.confidence);
@@ -458,6 +472,7 @@ export function playActTwo(startState, {
     ending,
     bankrupt,
     reviews,
+    verdicts,
     passed,
     lowConfidence: Math.round(lowConfidence),
     rooms: totalRooms(state.resort.rooms),

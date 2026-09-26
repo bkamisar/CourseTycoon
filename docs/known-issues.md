@@ -14,10 +14,17 @@ entry: it sends the next session chasing something that is already done.
 
 ### Act II has never been measured
 
-**The most important thing outstanding.** `tools/operator.js` has no
-notion of rooms, room rates, hotel amenities or investors — it plays Act
-I and stops. So nothing is known about whether Act II is any good, only
-that its mechanics fire correctly.
+**The most important thing outstanding.** This entry used to say the
+operator "plays Act I and stops", which stopped being true when
+`playActTwo` and `spendTheHotelMorning` were written — it sets a room
+rate, builds rooms while the ones it has are filling, works through a
+hotel shopping list and settles with the investors when it can afford to.
+
+What has never happened is anyone *measuring* it. Act II gets exercised
+constantly, because every Act III sweep carries resorts through it to
+reach the third act, but being exercised is not the same as being judged:
+nothing has ever asked whether more than one way of running the hotel
+works, only whether a resort comes out of the far end alive.
 
 The questions nobody can currently answer:
 
