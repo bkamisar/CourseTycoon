@@ -12,40 +12,42 @@ entry: it sends the next session chasing something that is already done.
 
 ## Open
 
-### Two of the four investor measures are still formalities
+### Half the Act II runs still end unresolved
 
-**Narrowed:** 2026-09-26, after giving revenue per room a ceiling. The
-original complaint -- that the review was one problem wearing four hats -- is
-mostly fixed, and what is left is smaller and worth stating precisely.
+**Narrowed:** 2026-09-26. The original complaint -- that the fortnightly review
+was one problem wearing four hats -- is fixed. What is left is a different
+thing that the fixing exposed.
 
-Revenue per room was the only measure with no ceiling, so it compounded 7% a
-fortnight until it could not be met, and accounted for nearly every failure.
-It now stops at a full house. Measured across 371 reviews:
+The measures are real now. Revenue per room had no ceiling and compounded until
+it could not be met; occupancy could not be failed by anybody, because a hotel
+is always full by design. Revenue per room now stops at a full house, occupancy
+has been replaced by turf quality, and the prestige and satisfaction ceilings
+were raised off the floor they had sunk below. Measured:
 
 | measure | before | after |
 |---|---|---|
-| revenue per room | 87% missed | 38% |
-| prestige | 11% | 11% |
-| occupancy | 5% | 3% |
-| guest satisfaction | 0% | 0% |
+| revenue per room | 87% missed | 39% |
+| prestige | 11% | 48% |
+| guest satisfaction | 0% | 44% |
+| occupancy -> turf | 3% | 1% for a competent operator, fatal for a careless one |
 
-**What is left:** occupancy and satisfaction are still passed by existing --
-3% and 0% respectively. Revenue per room is now a real test and prestige is a
-mild one, so the fortnightly meeting is two genuine questions rather than one,
-but it is not four.
+Both failure modes work. Overpricing liquidates 6 of 8 at $700 and 8 of 8 at
+$900; refusing to hire greenkeepers liquidates 8 of 8 while turf sits at 42-61.
 
-Occupancy cannot be a test while every room fills at any sane price (see the
-room-ratchet entry below). Satisfaction cannot be a test while it barely moves.
-Both want the hotel to have a reason to run less than full, which the
-per-population catchment did not provide -- it caps how many GOLFERS exist, and
-room demand keys off the crowd that turns up rather than off a separate
-population of people wanting beds.
+**What is left:** at a viable price, about half of all runs neither settle nor
+fail inside 260 days. They are not lost -- confidence simply never climbs the
+thirty points from 55 to the 85 the offer needs, and the act just keeps going.
 
-Not urgent. The act now has a proper shape without it: a viable band from $150
-to $575, poverty below it, and total collapse above $700 where eight resorts in
-eight are liquidated, one of them left with $2,979. There is a real risk-reward
-inside the band too -- $300 buys the investors out 7 times in 8 for about $1.1M,
-$575 earns three times as much and leaves half the runs unsettled.
+The arithmetic is in `CONFIDENCE_CHANGE`'s comment. At a third of reviews
+missed the climb takes about ten reviews, which fits; the runs that stall are
+the ones that miss rather more than that and spend the act treading water. A
+resort doing moderately badly has no ending of its own -- it is not bad enough
+to be pulled out of and not good enough to be bought out from.
+
+Worth considering whether the offer should have a second route: time served
+with reasonable confidence, say, rather than a single threshold. A fortnightly
+relationship that can run for ever without resolving is the one shape the act
+should not have.
 
 ### Rooms build to the planning cap, and that is the design
 
