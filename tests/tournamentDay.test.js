@@ -312,10 +312,10 @@ test('the championship resolves, pays, and does not happen twice', () => {
  * enough that the field backs up behind itself. Before pace was wired to
  * the field this still cleared roughly 58% of the ceiling on the pace
  * bonus alone, because `report.averageRoundMinutes` was hardcoded 0 on a
- * closed course and 0 is never over target. It should now clear close to
- * the base fee plus the one bonus this task does not touch (`crowd`,
- * hardcoded true until Plan 2's infrastructure — see
- * docs/known-issues.md).
+ * closed course and 0 is never over target. It should now clear exactly
+ * the base fee and nothing more: missing the band pays base only, even
+ * though `crowd` (hardcoded true until Plan 2's infrastructure — see
+ * docs/known-issues.md) is still individually "met".
  */
 function neglectedResort(seed) {
   const state = actThreeResort(seed);
@@ -347,10 +347,11 @@ test('a botched championship pays close to base, not 58% of the ceiling', () => 
     const ratio = result.paid / rung.purseCeiling;
     assert.ok(ratio < 0.5,
       `${rungId}: a three-condition failure still paid ${(ratio * 100).toFixed(1)}% of the ceiling`);
-    // Only `crowd` (hardcoded true — not this task's fix) can still be paid,
-    // so the floor is the base fee plus crowd's own share, not the base
-    // fee alone.
-    assert.ok(result.paid < rung.baseFee * 1.3,
-      `${rungId}: paid ${result.paid} is not close to the ${rung.baseFee} base fee`);
+    // `crowd` is still individually "met" (hardcoded true — not this
+    // task's fix), but the band is missed, and the band gates everything
+    // past the base fee. So the floor is the base fee exactly, not the
+    // base fee plus crowd's own share.
+    assert.equal(result.paid, rung.baseFee,
+      `${rungId}: paid ${result.paid}, expected exactly the ${rung.baseFee} base fee`);
   }
 });

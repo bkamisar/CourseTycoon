@@ -130,11 +130,23 @@ export const LEVERS_NOT_PULLED = [
 ];
 
 const countRole = (state, role) => state.resort.staff.filter((m) => m.role === role).length;
-const openCount = (state) => state.resort.courses[0].holes
+// Exported for measurement scripts that need to reuse the same "how many
+// holes are actually open" definition `playActThree` uses internally —
+// `state.resort.holes` looks plausible and is silently wrong (see the
+// module comment on `play`).
+export const openCount = (state) => state.resort.courses[0].holes
   .filter((h) => h.open && h.corridor && h.corridor.length > 1).length;
 
-/** One morning's decisions, applied in priority order. Mutates `state`. */
-function spendTheMorning(state, { greenFee, teeInterval }) {
+/**
+ * One morning's decisions, applied in priority order. Mutates `state`.
+ *
+ * Exported alongside `spendTheHotelMorning` and `openCount` so a
+ * measurement script can drive the same ordinary-operation policy while
+ * substituting its own tournament-morning behaviour (e.g. bidding but
+ * never conditioning) instead of `spendTheTournamentMorning`'s
+ * band-midpoint targeting.
+ */
+export function spendTheMorning(state, { greenFee, teeInterval }) {
   state.resort.pricing.greenFee = greenFee;
   state.resort.pricing.teeInterval = teeInterval;
 
@@ -329,7 +341,7 @@ const EXPAND_ABOVE = 0.85;
 const MAX_ROOMS = 90;
 
 /** One hotel morning. Mutates `state`. Returns true if it spent its turn. */
-function spendTheHotelMorning(state, { roomRate, suiteShare }) {
+export function spendTheHotelMorning(state, { roomRate, suiteShare }) {
   state.resort.pricing.roomRate = roomRate;
 
   // 1. Pay the investors off when it is affordable. Both endings run

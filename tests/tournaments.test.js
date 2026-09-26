@@ -181,6 +181,35 @@ test('overcooking the course fails the band as surely as undercooking', () => {
   assert.ok(tricked.paid < RUNGS.countyOpen.purseCeiling);
 });
 
+test('missing the band pays base only, even when turf, pace and crowd all hit — '
+  + 'and hitting the band pays them, in the same three conditions', () => {
+  // Changed with the free-ride fix: band used to be one bonus among four,
+  // so a course left unconditioned (or overcooked past the band) still
+  // banked turf, pace and crowd for free — three of the four contract
+  // conditions are satisfied by ordinary operation, so only band ever
+  // required the work. Now band gates the other three: missing it pays
+  // the base fee only, whatever else went right that week. Asserted both
+  // directions on the identical turf/pace/crowd inputs, so this cannot
+  // pass by only ever checking the failing side.
+  const common = { turfQuality: 88, paceOnTarget: true, crowdHandled: true };
+  const band = RUNGS.countyOpen.band;
+
+  const outOfBand = scoreTournament('countyOpen', { ...common, setup: band.high + 20 });
+  assert.ok(!outOfBand.met.includes('band'), 'sanity: this setup must miss the band');
+  assert.deepEqual(outOfBand.met.sort(), ['crowd', 'pace', 'turf'],
+    'turf, pace and crowd are still individually met and reported as such');
+  assert.equal(outOfBand.paid, RUNGS.countyOpen.baseFee,
+    'none of the three pay out without the band — base fee only');
+
+  const inBand = scoreTournament('countyOpen', {
+    ...common, setup: (band.low + band.high) / 2,
+  });
+  assert.ok(inBand.met.includes('band'));
+  assert.equal(inBand.met.length, 4);
+  assert.equal(inBand.paid, RUNGS.countyOpen.purseCeiling,
+    'the identical turf/pace/crowd DO pay out once the band is also met');
+});
+
 test('a good week is never barred', () => {
   const good = scoreTournament('regional', {
     setup: 70, turfQuality: 85, paceOnTarget: true, crowdHandled: true,

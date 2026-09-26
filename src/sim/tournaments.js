@@ -30,7 +30,8 @@ const LIST = [
     requires: [],
     band: { low: 45, high: 60 },
     baseFee: 18000,
-    purseCeiling: 48000,
+    purseCeiling: 100000,
+    prepPerDay: 1600,
   },
   {
     id: 'regional',
@@ -39,8 +40,9 @@ const LIST = [
     prestige: 70,
     requires: ['grandstands', 'overflowParking'],
     band: { low: 62, high: 78 },
-    baseFee: 45000,
-    purseCeiling: 120000,
+    baseFee: 30000,
+    purseCeiling: 240000,
+    prepPerDay: 3200,
   },
   {
     id: 'national',
@@ -49,8 +51,9 @@ const LIST = [
     prestige: 82,
     requires: ['mediaCentre', 'hospitalityPavilion'],
     band: { low: 80, high: 92 },
-    baseFee: 110000,
-    purseCeiling: 290000,
+    baseFee: 55000,
+    purseCeiling: 500000,
+    prepPerDay: 5400,
   },
 ];
 
@@ -227,24 +230,27 @@ export function championshipRoomsSold(capacity, roomRate, valuePerRound = 60) {
 /**
  * The daily bill for conditioning toward a rung.
  *
- * Total run-up cost is set to the midpoint between the base fee and the
- * purse ceiling — (baseFee + purseCeiling) / 2 — spread evenly across
- * `RUN_UP_DAYS`. Deriving it from the contract rather than picking a
- * number is what makes the three promises true at every rung at once:
+ * Used to be derived from the contract itself — (baseFee + purseCeiling) /
+ * 2 / RUN_UP_DAYS — so the bill scaled in lockstep with the purse. That
+ * derivation died with the free-ride fix: `scoreTournament` now pays base
+ * only when the band is missed, which is what actually closes the exploit,
+ * so the bill no longer has to do that job by being large. Deriving it from
+ * the ceiling also stopped being affordable once the ceiling grew to make
+ * the bonuses worth chasing — at the new national it would have billed
+ * $23,810/day against a resort earning $18,460/day in profit, which is
+ * ruinous rather than demanding.
  *
- *   base fee alone:      B - (B+C)/2 = (B-C)/2   -- a loss
- *   all four bonuses:    C - (B+C)/2 = (C-B)/2   -- the same gain, mirrored
- *   half the bonuses:    B + (C-B)/2 = (B+C)/2   -- exactly break even
- *
- * It scales the ladder without retuning the tension: because the bill is
- * a fraction of the contract rather than a flat figure, editing a rung's
- * purse moves its bill in lockstep and the loses/breaks-even/gains shape
- * above holds without anybody re-tuning it by hand.
+ * Instead each rung declares its own affordable daily figure (`prepPerDay`)
+ * directly, chosen against a resort's ~$18,460/day of ordinary profit
+ * rather than against its own purse: a bill a competent resort can carry
+ * for three weeks without the run-up alone threatening bankruptcy, but
+ * still large enough that skipping it (the free ride) has to beat paying it
+ * only by losing the one bonus — band — that gates all the others.
  */
 export function conditioningCostPerDay(rungId) {
   const rung = rungFor(rungId);
   if (!rung) return 0;
-  return (rung.baseFee + rung.purseCeiling) / 2 / RUN_UP_DAYS;
+  return rung.prepPerDay;
 }
 
 /** The next rung this resort is allowed to attempt, or null at the top. */
@@ -325,9 +331,24 @@ export const BAR_DAYS = 120;
 /**
  * How the week went.
  *
- * `met` names the conditions that were satisfied, which is what the
- * report shows: four named outcomes traceable to something the player
- * did, rather than one opaque score.
+ * `met` names the conditions that were individually satisfied — turf,
+ * pace and crowd are reported honestly even when they end up unpaid, so
+ * the tournament report can tell a player "your turf held, but the course
+ * was never set for a championship" rather than silently zeroing a
+ * condition they actually met.
+ *
+ * `band` is the gate, not one bonus among four. Three of the four
+ * conditions are satisfied by ordinary operation — a normally-staffed
+ * course clears turf, the default tee interval clears pace, and crowd is
+ * hardcoded true — so paying them regardless of the band is what made
+ * bidding and never conditioning the best line in the game: base plus
+ * three free bonuses, for a bill that was never paid. A course that was
+ * never set the way the rung asked for was not delivered as a
+ * championship, whatever else went right that week, so missing the band
+ * pays the base fee only. The spec's own line is that a course set wrong
+ * is "worse than never having bid" — true here because the run-up bill
+ * (`conditioningCostPerDay`) is charged whenever `conditioning` was true,
+ * whether or not the band was ever reached.
  */
 export function scoreTournament(rungId, {
   setup = 0, turfQuality = 0, paceOnTarget = false, crowdHandled = false,
@@ -342,10 +363,17 @@ export function scoreTournament(rungId, {
   if (paceOnTarget) met.push('pace');
   if (crowdHandled) met.push('crowd');
 
-  const paid = contract.bonuses.reduce(
-    (sum, b) => sum + (met.includes(b.id) ? b.amount : 0),
-    contract.baseFee
-  );
+  // Everything past the base fee is withheld unless the course was set
+  // the way the rung asked for. Turf, pace and crowd stay in `met` when
+  // they were individually earned — the report can still say so — but
+  // none of them pay out without the band.
+  const bandMet = met.includes('band');
+  const paid = bandMet
+    ? contract.bonuses.reduce(
+      (sum, b) => sum + (met.includes(b.id) ? b.amount : 0),
+      contract.baseFee
+    )
+    : contract.baseFee;
 
   // Reputation follows the conditions rather than the money, so a resort
   // that ran a good week on a small rung is not punished for the rung

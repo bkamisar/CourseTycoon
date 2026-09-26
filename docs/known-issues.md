@@ -35,118 +35,23 @@ Act I looked fine on spot measurements the day it shipped broken. The
 operator is the only thing that has ever caught a real balance problem on
 this project, and it has never been pointed at this act.
 
-### The run-up costs something now, but not enough to make bidding a real decision
+### Only the County Open is ever reachable
 
-**Found:** 2026-09-25, measuring Act III with the operator before building its
-surface. **Partially fixed the same day** -- `day.js`'s `care` is now cut by
-`CARE_DIVERTED_WHILE_CONDITIONING` (`tournaments.js`, 0.4) while a
-championship is being conditioned for, so one crew doing both jobs at once no
-longer holds the turf for free. What follows is what that fix did and did not
-change, measured the same way as the original finding, so this does not read
-as fixed twice.
+**Found:** 2026-09-25, across every attempt to measure Regional or National.
+**Still true after the free-ride fix (2026-09-25)** -- unrelated to it, and
+worth keeping separate now that the money side is settled.
 
-**Turf now measurably costs something.** An identical crew conditioning vs.
-not, otherwise the same seed and holes, separates by double digits of turf
-quality inside fifteen days (`tests/tournamentDay.test.js`), where before this
-fix the two were indistinguishable. That part of the design's promise --
-"paid in full before anything is paid back" -- is real now, in the one place
-it can be measured cleanly.
+Regional needs `grandstands` and `overflowParking`; National needs
+`mediaCentre` and `hospitalityPavilion`. None of those four buildings exist
+in the game yet -- `eligibleFor` checks for them, but nothing in
+`tools/effects.js` or the amenity list can build them, and no operator
+policy can either. So the cheapest rung is the only rung a real playthrough
+can ever reach, and Regional's and National's contracts (and their
+purses -- see `src/sim/tournaments.js`) have only ever been exercised by
+handing a test or measurement script a resort with the building requirement
+satisfied by hand, the way `tests/tournaments.test.js` already does.
 
-**Bidding still barely matters, and the reason is now understood rather than
-just observed.** Re-run the same eight-seed sweep after the fix: bidding still
-beat never bidding in only 3 of 8 runs, by amounts (-$88,835 to +$40,632) still
-noise against a $4,000,000 profit, and every hosted championship still took
-100% of the ceiling. Trade while conditioning fell only 0.4-2.5% below ordinary
-days across eight seeds at the *most* diversion this lever can apply (100%,
-i.e. conditioning holds no turf at all) -- nowhere near the 7-12% (~$38,800
-over the run-up) the purses need to make base-alone lose, half-the-bonuses
-break even, and all-four a real gain.
-
-**Why more diversion does not close the gap:** the operator's own fixture
-(prestige ~94, 71 rooms, 18 holes, green fee 80, interval 14) is capacity- and
-catchment-bound. Measured directly: raw demand ("wanted") ran 5-6x the tee
-sheet's ceiling even with turf driven to 0 and setup to 100 *together* -- the
-tee sheet and the hotel both stayed full regardless. Green fees and room
-nights, the bulk of a day's trade, do not move at all under a capacity bound;
-only merchandise and food shift, because they alone read `averageSatisfaction`
-rather than group count, and that is a few hundred dollars on a $46,000 day.
-This is the same mechanism as "Conditioning a course raises average
-satisfaction instead of costing it" below -- a capacity-bound tee sheet
-insulates the day's numbers from course quality, whichever number is being
-asked to carry the cost. Turf, satisfaction, and trade all run into the same
-wall from different sides.
-
-**0.4 was chosen against a constraint this task could still check: the turf
-bonus must stay reachable.** Above roughly 0.5, holding turf at or above 78
-through a full run-up stops being possible on eighteen holes with anything
-under a dozen groundskeepers, on even the easiest rung. At 0.4, nine hold a
-national's band and turf together for the full 21 days. Pushing the constant
-higher trades an unreachable bonus for a trade-percentage gain the demand
-model mostly refuses to pay out anyway (0.4 vs. 1.0 measured within a couple
-of points of each other).
-
-**What would actually close the gap:** the trade-through-demand channel is
-capped by the tee sheet and the catchment, not by this constant. Making the
-run-up cost 7-12% of trade needs a channel that is not capacity-bound --
-raising the actual conditioning wage bill, adding a cost that scales with the
-crew hired for the week rather than with course rating, or loosening the
-catchment/capacity ceilings enough that quality can move group count again.
-Any of those is balance work bigger than a wiring fix, and changes the
-numbers this same file's purses were tuned against, which is why it was not
-attempted here.
-
-**Also still true:** the ladder hard-stops at rung one. Every resort hosted a
-County Open and then stopped, because Regional requires grandstands and
-overflow parking and those buildings do not exist until Plan 2. Nothing above
-rung one has ever been measured.
-
-### Bidding and then not preparing is the best line in Act III
-
-**Found:** 2026-09-25, after the third attempt at making the run-up cost
-something. **A live exploit, and the reason Act III is not yet a decision.**
-
-Measured over the 22-day window from bid to hosting day, money-delta ground
-truth, five seeds: bidding and leaving `setupTarget` at 0 -- never conditioning
-at all -- nets **+$10,200 to +$11,600 against never bidding, in every seed,
-with tight variance.** Properly conditioning beat the free ride in only three
-of five.
-
-**Why.** Three of the four contract conditions are satisfied by ordinary
-operation:
-
-- **turf** -- `TURF_EXPECTED` is 78 and a normally-staffed course sits near 100,
-  so it passes without preparing. Care is only diverted while conditioning, so
-  the free ride never pays even that.
-- **pace** -- met by normal flow at the default tee interval.
-- **crowd** -- hardcoded `true` pending Plan 2's buildings.
-
-Only **band** requires conditioning. So a player pays a $33,000 run-up bill for
-a single $12,000 bonus, while the free ride banks base plus three bonuses --
-$36,000 of a $48,000 ceiling -- for nothing, and the one closed day is more
-than covered by the championship night's own hotel premium.
-
-**The deeper problem, which four fixes have now failed to reach.** The contract
-is internally coherent: the run-up bill is (base + ceiling) / 2, so base alone
-loses, half breaks even and all four gains, exactly, at every rung. But that
-only makes bidding coherent, not significant. A resort arriving in Act III
-earns **$18,460 a day**. A County Open's ceiling is 2.6 days of profit and the
-entire three-rung ladder is 24.8 days. Across a 220-day run the whole act moves
-total profit by less than the noise from investor timing and decision events.
-
-And only the County Open is ever reachable: Regional needs grandstands and
-overflow parking, National a media centre and hospitality pavilion, and none of
-those buildings exist yet. So the cheapest rung is the only rung, measured
-against an economy a hundred times its size.
-
-**What this means for the design.** Act III's stakes cannot be financial at
-this scale without either purses several times larger, or the act arriving
-while the resort is much smaller. The alternative is to accept the money as
-incidental and let the real stakes be prestige and ladder position -- which is
-what was chosen when the act was brainstormed, and what the spec already
-describes in its stakes section.
-
-Do not attempt a fifth cost channel before that question is settled. Three have
-now died on the same wall.
+Fix alongside Plan 2's infrastructure buildings.
 
 ### Conditioning a course raises average satisfaction instead of costing it
 
@@ -246,8 +151,15 @@ spec gates on grandstands, overflow parking, a media centre and a hospitality
 pavilion. Until those exist, a national can bank its crowd bonus with no
 gallery provision whatsoever.
 
-The cost, measured: it lifts the contract's floor by 13% of the base-to-ceiling
-gap at every rung -- $3,900 on a County Open, $23,400 on a National.
+The cost, measured: crowd is 13% of the base-to-ceiling gap at every rung --
+$10,660 on a County Open, $57,850 on a National (figures updated 2026-09-25
+for the new purses; see "Bidding and then not preparing was the best line in
+Act III" having been closed the same day in `src/sim/tournaments.js`). It no
+longer lifts the contract's *floor*, because `scoreTournament` now withholds
+every bonus, crowd included, unless the band was also met -- so the free pass
+only pays out on top of a course that was actually set correctly, not on a
+do-nothing week. It still means a Regional or National host banks crowd's
+share with no gallery provision whatsoever, on any week the band was hit.
 
 Fix alongside Plan 2's infrastructure buildings: judge it against whether the
 rung's required buildings exist and are adequate for the gallery that rung
