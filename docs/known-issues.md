@@ -47,21 +47,46 @@ eight are liquidated, one of them left with $2,979. There is a real risk-reward
 inside the band too -- $300 buys the investors out 7 times in 8 for about $1.1M,
 $575 earns three times as much and leaves half the runs unsettled.
 
-### Rooms build themselves up to the planning cap
+### Rooms build to the planning cap, and that is the design
 
-**Found:** 2026-09-26, same sweep. Milder than it first looked, and recorded
-so the next reader does not re-measure it.
+**Closed:** 2026-09-26, after trying to fix it and finding it was not broken.
 
-At every rate from $60 to $575 a resort ends with 67-71 rooms against a
-planning limit of 72, at 99-100% occupancy, with identical upkeep. "How many
-rooms" is not a decision; it is a ceiling you walk into while the hotel is
-always full.
+Every rate from $60 to $575 ends with 67-71 rooms against a cap of 72, at
+~100% occupancy. That reads like a missing decision -- you build to the ceiling
+every time -- and it is what led to this being filed.
 
-It is a symptom rather than a cause. The operator only builds while occupancy
-is above 85%, so building to the cap simply means never dropping below it --
-and at $700 a night, where rooms genuinely go unsold, it stops dead at 13
-rooms. So the ratchet is what being under-priced looks like, not a separate
-fault, and it will ease if the saturated-demand problem above is addressed.
+It is deliberate, and `rooms.js` says so where the limit is defined:
+
+> A limit on demand would have been the obvious fix and the wrong one:
+> building rooms is supposed to be good. This is a limit on BUILDING, in the
+> form the world already has one -- planning permission. It starts small, and
+> it grows with the resort's reputation... So it is a goal rather than a wall:
+> the answer to "I want more rooms" is "be worth more rooms".
+
+The decision is not "how many rooms" but "how do I earn permission for more",
+which is a different question and a real one.
+
+**The attempt, recorded so nobody repeats it.** Room demand assumed every
+golfer wanted a bed of their own -- no sharing at all -- which put demand at
+roughly three times anything a player may build: a 120-room hotel still ran at
+100% with 93 turned away against a cap of 72. Dividing by two guests to a room
+is more honest about what a hotel is, and it halves demand to about 107.
+
+It also breaks the act. At prestige 75 planning permits 61 rooms, and with
+sharing modelled:
+
+      8 rooms   100% full   +$25/night
+     40 rooms    65% full   -$425
+     61 rooms    48% full   -$1,023   <- the permitted maximum
+    120 rooms    24% full   -$4,523
+
+A limit that permits 61 rooms while the economics support 8 is a trap, not a
+goal. Reverted.
+
+**What this leaves.** Occupancy is a weak investor measure (3% missed) as a
+direct consequence of this design, and that is the honest place to fix it if it
+wants fixing -- change what the investors ask about, rather than break a hotel
+that is working as intended. See the entry above.
 
 ### The turf self-heals when a resort empties out
 
