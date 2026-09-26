@@ -31,13 +31,23 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-25a';
+export const BUILD = '2026-09-25b';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-25b',
+    notes: [
+      'Act III. Settle up with the investors — bought out or sold up, either counts — on a course with all eighteen holes open, and a governing body writes to ask whether you would like to host a championship. A Championship button appears beside the Hotel.',
+      'Three rungs, climbed in order: the County Open, the Regional, then the National. Each one is a contract that lists everything it will pay before you sign it, and each one wants buildings you have no other use for — grandstands that are empty fifty-one weeks a year, a car park nobody will ever admire.',
+      'Winning a bid schedules the championship three weeks out and your grounds crew start conditioning the course. You tell them how hard to make it. Every rung wants the course inside a band, and overcooking it is exactly as bad as leaving it soft — miss the band and the week pays the base fee alone, however good your turf and your pace were.',
+      'Conditioning costs money every day and pulls your crew off looking after the turf, so a championship is paid for in full before it pays anything back. On the day itself the course closes to normal play, the hotel fills at whatever you are charging, and a field turns up who are rather better than your Tuesday fourball.',
+      'Still being fitted out: the write-up of how the week went. The money and the reputation land correctly, but the report on what the field actually shot is coming in the next update.',
+    ],
+  },
   {
     version: '2026-09-25a',
     notes: [
