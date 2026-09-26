@@ -26,6 +26,7 @@ import { mountReport } from './ui/report.js';
 import { mountNarrationCard, clearNarrationHeight } from './ui/narration.js';
 import { mountEventCard } from './ui/event.js';
 import { investorCards } from './ui/investorCard.js';
+import { championshipCards } from './ui/championshipCard.js';
 import { payBuyout } from './sim/investors.js';
 import { mountChanges, liveVersion } from './ui/changes.js';
 import { openHotelSheet } from './ui/hotel.js';
@@ -726,24 +727,37 @@ function onReportContinue() {
   // and the decision event is about tomorrow. A day can earn more than
   // one -- a review and a demand land together when confidence runs out
   // at a review -- so they queue rather than compete.
-  const investor = investorCards(dayResult.report, dayResult.state);
-  if (investor.length > 0) {
-    showInvestorCards(investor);
+  //
+  // The championship's cards come after the investors' and before the
+  // decision: the investors are the act being left behind, the
+  // championship is the day that just happened, and the decision is
+  // tomorrow. The evening an Act II settlement opens Act III, both sets
+  // land, in that order.
+  const queue = [
+    ...investorCards(dayResult.report, dayResult.state),
+    ...championshipCards(dayResult.report, dayResult.state),
+  ];
+  if (queue.length > 0) {
+    showEveningCards(queue);
     return;
   }
   showPendingEventOrCommit();
 }
 
 /**
- * Plays the investors' cards one at a time, then hands over to whatever
- * the evening had planned.
+ * Plays the evening's cards one at a time, then hands over to whatever
+ * else the evening had planned.
+ *
+ * Named for the evening rather than the investors because Act III's
+ * championship cards queue through here too. The only card with a real
+ * choice is still the investors' settlement.
  *
  * The only card with a real choice is the settlement, and its "pay now"
  * button goes through the same `payBuyout` the hotel sheet uses -- which
  * refuses rather than overdrawing, so a state that comes back unchanged
  * means it was not paid and nothing is committed as though it were.
  */
-function showInvestorCards(queue) {
+function showEveningCards(queue) {
   const [card, ...rest] = queue;
   narrationRoot.replaceChildren();
   clearNarrationHeight();
@@ -756,7 +770,7 @@ function showInvestorCards(queue) {
         if (paid.investors?.bought) dayResult.state = paid;
       }
       eventRoot.replaceChildren();
-      if (rest.length > 0) showInvestorCards(rest);
+      if (rest.length > 0) showEveningCards(rest);
       else showPendingEventOrCommit();
     },
   });
