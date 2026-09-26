@@ -42,7 +42,25 @@ import { clamp } from './hole.js';
  * earn the same money to the dollar. A ceiling is meant to stop a good
  * resort compounding without limit, not to stop a new one growing at all.
  */
-export const LOCAL_GROUPS = 18;
+export const LOCAL_GROUPS = 14;
+
+/**
+ * The three pools below replace what used to be one `LOCAL_GROUPS + reach`
+ * ceiling, and are arranged to sum to exactly the same number so that no
+ * balance figure tuned against the old total has to move.
+ *
+ *   old:  18          + 16 * curve                      + beds
+ *   new:   8 + 3 + 7  + (9 * curve) + (7 * curve)        + beds
+ *
+ * Which crowd gets which share of the reach is the design decision. A
+ * serious golfer will drive further for good golf than a visitor will, but
+ * there are simply more visitors, so the visitor pool carries the larger
+ * base and the smaller reach.
+ */
+export const SERIOUS_BASE = 0;
+export const SERIOUS_REACH = 8;
+export const DESTINATION_BASE = 0;
+export const DESTINATION_REACH = 12;
 
 /**
  * How many more groups a perfect reputation can reach, on top of the
@@ -77,8 +95,39 @@ export const MAX_ROOM_REACH = 12;
  * is a ceiling on *interest*, not a target: a resort nobody likes will
  * not reach it, and a tee sheet too small to hold it will not seat it.
  */
-export function catchmentGroups(prestige = 0, rooms = null) {
-  const reach = REACH_GROUPS * (clamp(prestige, 0, 100) / 100) ** REACH_CURVE;
+/**
+ * The catchment, split into the three populations it is made of.
+ *
+ * **Each crowd is a different set of people, and one cannot be turned
+ * into another.** Without this, every segment's interest was computed
+ * from the whole ceiling, so a course that pleased serious golfers drew
+ * more of them out of one undifferentiated total and displaced the others
+ * one for one. Driving the locals away was free, and sometimes better
+ * than free -- which is why conditioning a course for a championship, an
+ * act that is supposed to cost a resort its everyday trade, instead made
+ * it money.
+ *
+ * They are split by what actually distinguishes them:
+ *
+ * - **locals** are the town. Fixed, because it is a place rather than an
+ *   achievement: getting famous does not build houses.
+ * - **serious golfers** will drive for good golf, so reputation reaches
+ *   further into the counties around.
+ * - **destination guests** are visitors, so reputation reaches them too
+ *   AND a bed brings people who would not otherwise make the trip.
+ *
+ * An earlier attempt put serious and destination in one "travellers"
+ * pool, which failed twice over: it starved Act I, where a course with no
+ * hotel still draws 40% of its crowd from destination guests, and it left
+ * conditioning free to swap serious for destination inside the shared
+ * pool. Both bases below exist so that neither happens.
+ *
+ * The three sum to what `catchmentGroups` returned before the split, so
+ * the total ceiling -- and therefore every balance number tuned against
+ * it -- is unchanged.
+ */
+export function catchmentBySegment(prestige = 0, rooms = null) {
+  const curve = (clamp(prestige, 0, 100) / 100) ** REACH_CURVE;
 
   let beds = 0;
   if (rooms) {
@@ -86,7 +135,30 @@ export function catchmentGroups(prestige = 0, rooms = null) {
     beds = Math.min(total * GROUPS_PER_ROOM, MAX_ROOM_REACH);
   }
 
-  return LOCAL_GROUPS + reach + beds;
+  return {
+    locals: LOCAL_GROUPS,
+    serious: SERIOUS_BASE + SERIOUS_REACH * curve,
+    destination: DESTINATION_BASE + DESTINATION_REACH * curve + beds,
+  };
+}
+
+/** Which population each crowd is drawn from. One each, by construction. */
+export const SEGMENT_POOL = Object.freeze({
+  locals: 'locals',
+  serious: 'serious',
+  destination: 'destination',
+});
+
+/**
+ * The most groups that could turn up today.
+ *
+ * `rooms` is the resort's room counts, or undefined in Act I. Note this
+ * is a ceiling on *interest*, not a target: a resort nobody likes will
+ * not reach it, and a tee sheet too small to hold it will not seat it.
+ */
+export function catchmentGroups(prestige = 0, rooms = null) {
+  const pools = catchmentBySegment(prestige, rooms);
+  return pools.locals + pools.serious + pools.destination;
 }
 
 /**

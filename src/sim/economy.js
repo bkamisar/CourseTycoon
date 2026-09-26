@@ -1,6 +1,6 @@
 import { maxGroupsForDay } from './schedule.js';
 import { clamp } from './hole.js';
-import { catchmentGroups } from './catchment.js';
+import { catchmentGroups, catchmentBySegment, SEGMENT_POOL } from './catchment.js';
 
 /**
  * How close a resort with everything going for it gets to filling its
@@ -232,6 +232,20 @@ export function demandGroups({
    * narrow one seats more of the crowd and makes every one of them wait,
    * a wide one turns some away and sends the rest home happy.
    */
+  /*
+   * Interest is drawn from the population each crowd belongs to, and
+   * capped there.
+   *
+   * Every segment used to want `ceiling * appeal * pull`, so all three
+   * competed for one undifferentiated total and `allocateByWeight` split
+   * it by appeal. Please one crowd more and it took the others' seats one
+   * for one, which made driving a crowd away free -- and is why
+   * conditioning a course for a championship, which is supposed to cost a
+   * resort its everyday trade, made it money instead.
+   *
+   * The town is the size it is. No amount of appeal conjures a golfer who
+   * does not exist.
+   */
   const rawBySegment = {};
   let rawTotal = 0;
   for (const key of SEGMENT_KEYS) {
@@ -257,10 +271,39 @@ export function demandGroups({
   // failed to equal the sum of the whole-numbered per-segment split.
   const limit = Math.max(0, Math.floor(Math.min(capacity, ceiling)));
   const total = clamp(wanted, 0, limit);
-  const bySegment = allocateByWeight(total, rawBySegment);
+  /*
+   * And then nobody may send more people than they have.
+   *
+   * The interest above is unchanged -- each crowd's appetite is still
+   * measured against the whole catchment, which is what keeps every
+   * balance figure tuned against that total valid. What is new is that
+   * the ANSWER is clamped to the population it came from, and the excess
+   * is simply lost rather than handed to somebody else.
+   *
+   * That is the whole fix. `allocateByWeight` split a fixed total by
+   * appeal, so pleasing one crowd more took the others' seats one for
+   * one: driving the locals away was free, and conditioning a course for
+   * a championship -- which is supposed to cost a resort its everyday
+   * trade -- made it money instead. Now a course that empties the town
+   * loses those groups for good, because the serious golfers who would
+   * have replaced them do not exist in those numbers.
+   *
+   * In Act I no pool is anywhere near its limit, so this changes nothing
+   * there: the clamp only bites once a resort has skewed itself hard
+   * toward one crowd, which is exactly when it should.
+   */
+  const pools = catchmentBySegment(prestige, rooms);
+  const allocated = allocateByWeight(total, rawBySegment);
+  const bySegment = {};
+  let served = 0;
+  for (const key of SEGMENT_KEYS) {
+    const cap = Math.floor(pools[SEGMENT_POOL[key]] ?? 0);
+    bySegment[key] = Math.min(allocated[key] ?? 0, cap);
+    served += bySegment[key];
+  }
 
   return {
-    total,
+    total: served,
     bySegment,
     share,
     // What stopped more people playing today. The evening report needs

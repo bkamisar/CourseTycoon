@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, WAGES, menuRevenue, MENU_RATE, AMENITIES } from '../src/sim/economy.js';
 import { demolitionRefund } from '../src/sim/economy.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
+import { catchmentBySegment, catchmentGroups } from '../src/sim/catchment.js';
 import { menuPrep } from '../src/sim/menu.js';
 import { BASE_CAPACITY, PER_COOK } from '../src/sim/kitchen.js';
 
@@ -240,4 +241,65 @@ test('demolishing an amenity returns most of what it cost, not all', () => {
 test('demolishing something that was free returns nothing', () => {
   assert.equal(demolitionRefund('clubhouse'), 0);
   assert.equal(demolitionRefund('nonsense'), 0);
+});
+
+// --- Each crowd is drawn from its own population ----------------------
+
+test('NO CROWD MAY EXCEED THE POPULATION IT IS DRAWN FROM', () => {
+  // The fault this fixes: every segment's interest was measured against
+  // the whole catchment and `allocateByWeight` then split a fixed total
+  // by appeal, so pleasing one crowd took the others' seats one for one.
+  // Emptying the town was therefore free -- and conditioning a course for
+  // a championship, which is supposed to cost a resort its everyday
+  // trade, made it money instead.
+  //
+  // Swept across the difficulty range, because the whole question is what
+  // happens when a course stops suiting the people who live near it.
+  const rooms = { standard: 44, suite: 18 };
+  const pools = catchmentBySegment(88, rooms);
+  for (const courseDifficulty of [20, 35, 50, 65, 80, 95]) {
+    const d = demandGroups({
+      courseRating: 85, prestige: 88, amenities, greenFee: 80, teeInterval: 14,
+      recentSatisfaction: 60, holesOpen: 18, courseDifficulty, scenery: 60,
+      turfQuality: 95, hasRooms: true, rooms,
+    });
+    for (const key of SEGMENT_KEYS) {
+      assert.ok(d.bySegment[key] <= Math.ceil(pools[key]),
+        `at difficulty ${courseDifficulty}, ${d.bySegment[key]} groups of ${key} came from a `
+        + `population of ${pools[key].toFixed(1)} -- golfers are being conjured from nowhere`);
+    }
+  }
+});
+
+test('a course built for one crowd loses the others for good', () => {
+  // The other direction. A cap nothing ever reaches would pass the test
+  // above while changing nothing about the game, so this asserts that the
+  // total actually falls -- the locals lost are NOT replaced.
+  const rooms = { standard: 44, suite: 18 };
+  const common = {
+    courseRating: 85, prestige: 88, amenities, greenFee: 80, teeInterval: 14,
+    recentSatisfaction: 60, holesOpen: 18, scenery: 60, turfQuality: 95,
+    hasRooms: true, rooms,
+  };
+  const gentle = demandGroups({ ...common, courseDifficulty: 30 });
+  const brutal = demandGroups({ ...common, courseDifficulty: 90 });
+
+  assert.ok(brutal.bySegment.locals < gentle.bySegment.locals * 0.5,
+    `locals barely noticed: ${brutal.bySegment.locals} against ${gentle.bySegment.locals}`);
+  assert.ok(brutal.bySegment.serious > gentle.bySegment.serious,
+    'and the golfers who want a test should turn up for one');
+  assert.ok(brutal.total < gentle.total,
+    `a course nobody local wants drew ${brutal.total} groups against ${gentle.total} -- `
+    + 'the crowd it drove away is being replaced, which is the bug this guards');
+});
+
+test('the three populations still sum to the catchment they replaced', () => {
+  // The split has to be invisible to anything tuned against the old
+  // total, or every balance figure in the game quietly moves.
+  for (const [prestige, rooms] of [[10, null], [45, null], [70, null], [95, { standard: 50, suite: 22 }]]) {
+    const pools = catchmentBySegment(prestige, rooms);
+    const sum = pools.locals + pools.serious + pools.destination;
+    assert.ok(Math.abs(sum - catchmentGroups(prestige, rooms)) < 1e-9,
+      `at prestige ${prestige} the pools sum to ${sum} but the catchment is ${catchmentGroups(prestige, rooms)}`);
+  }
 });
