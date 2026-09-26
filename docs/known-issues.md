@@ -74,52 +74,6 @@ Worth doing alongside the barring rule, which has the same shape -- `barDays`
 currently triggers on `met.length <= 1`, so the same badly-set course that
 gains prestige also escapes being barred.
 
-### The buildings' upkeep makes the whole ladder lose money
-
-**Found:** 2026-09-26, the first sweep that ever got past the County Open.
-
-Eight resorts carried through Acts I and II into Act III over 400 days, against
-an identical control that never bids. All eight hosted **all three rungs**, all
-24 championships landed **in band**, and all eight **passed Act III** -- the
-act works. But:
-
-    bidding beat never bidding in 3 runs of 8
-    range: -$200,420 to +$250,651
-    contract income across the whole ladder: $782,150
-
-**A perfect run of the entire ladder loses money more often than not.** Not a
-botched week, not a missed band -- every single championship in band, and it
-is still the wrong business decision five times in eight.
-
-The arithmetic is not subtle:
-
-| | |
-|---|---|
-| four buildings, to build | \$303,000 |
-| their upkeep at \$1,050/day, over a ~400-day run | ~\$420,000 |
-| prep bills, three rungs | \$214,200 |
-| **total** | **~\$937,000** |
-| **contract income** | **\$782,150** |
-
-The build cost is fine -- that is the capital commitment the design asks for,
-and \$303,000 against \$782,150 of prize money is a real decision. It is the
-**running** cost that breaks it: \$1,050 a day, for ever, for buildings used on
-three days of the game. A grandstand standing empty for fifty-one weeks costs
-inspection and insurance, not a fifth of what a hotel costs to run.
-
-The design says these are "mostly dead capital, deliberately... the player pays
-to be capable, not to be busy". Capital tied up is exactly right. A permanent
-running bill that outgrows the prize money is not the same thing, and it turns
-the act's reward into a penalty for a host who does everything correctly.
-
-**Also found:** a national never covers its gallery. All eight resorts built
-all four buildings and still met only band, turf and pace -- 88% of the
-ceiling, never 100%. The national's 12,000 gallery needs the short course, brew
-pub and function room helping, which an Act III operator does not build. That
-is arguably the intended "the whole property pitches in" design working, but it
-means the advertised ceiling is unreachable for a resort that did not build
-those in Act II, and nothing tells the player that is why.
-
 ### Conditioning a course raises average satisfaction instead of costing it
 
 **Found:** 2026-09-25, wiring setup into `runDay` (Task: wire the setup dial
