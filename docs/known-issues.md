@@ -133,40 +133,6 @@ by a player wondering what they had missed, which is an expensive way to find
 out that a line meant nothing, and it is unlikely to be the only line whose
 premise goes unchecked.
 
-### "Crowd handled" is a bonus nobody can fail
-
-**Found:** 2026-09-25, wiring the hosting contract (Act III Task 7).
-
-`scoreTournament` judges four named conditions and the contract card will
-advertise all four with a price against each. `crowdHandled` is hardcoded
-`true` in `src/sim/day.js`, so one of the four is paid unconditionally.
-
-This much is deliberate and commented: the gallery is handled by
-infrastructure -- grandstands, overflow parking -- which Plan 2 builds, and a
-rung with no building requirements has nothing to fail at. The County Open
-genuinely requires no buildings, so a free pass there is arguably correct.
-
-What is not correct is that it stays free at Regional and National, which the
-spec gates on grandstands, overflow parking, a media centre and a hospitality
-pavilion. Until those exist, a national can bank its crowd bonus with no
-gallery provision whatsoever.
-
-The cost, measured: crowd is 13% of the base-to-ceiling gap at every rung --
-$10,660 on a County Open, $57,850 on a National (figures updated 2026-09-25
-for the new purses; see "Bidding and then not preparing was the best line in
-Act III" having been closed the same day in `src/sim/tournaments.js`). It no
-longer lifts the contract's *floor*, because `scoreTournament` now withholds
-every bonus, crowd included, unless the band was also met -- so the free pass
-only pays out on top of a course that was actually set correctly, not on a
-do-nothing week. It still means a Regional or National host banks crowd's
-share with no gallery provision whatsoever, on any week the band was hit.
-
-Fix alongside Plan 2's infrastructure buildings: judge it against whether the
-rung's required buildings exist and are adequate for the gallery that rung
-draws. Do not simply flip it to `false` in the meantime -- that makes a bonus
-the card advertises permanently unearnable, which is the same lie pointing the
-other way.
-
 ### The turf self-heals when a resort empties out
 
 **Found:** 2026-09-23, while making play wear the course. **Known and

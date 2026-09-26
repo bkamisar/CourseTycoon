@@ -394,3 +394,27 @@ test('a three-hole resort is not invited, however well it is run', () => {
   const { state: after } = runDay(state, 5220);
   assert.equal(after.act, 2, 'three holes cannot host a championship');
 });
+
+test('the crowd bonus is earned by having somewhere to put them', () => {
+  // Both directions. This condition spent its whole life hardcoded true,
+  // so a test checking only the passing case would have agreed with the bug.
+  function hostWith(types) {
+    const state = openFullCourse(actThreeResort(31));
+    state.prestige = 90;
+    state.resort.setup = 86;
+    state.resort.setupTarget = 86;
+    state.turfQuality = 95;
+    for (const type of types) state.resort.amenities.push({ id: type, type, menu: [] });
+    state.tournament = { rung: 'national', day: state.day, resolved: false };
+    return runDay(state, 5300).report.tournament;
+  }
+
+  const four = ['grandstands', 'overflowParking', 'mediaCentre', 'hospitalityPavilion'];
+  const bare = hostWith(four);
+  assert.ok(!bare.met.includes('crowd'),
+    'four buildings alone cannot hold a national gallery');
+
+  const helped = hostWith([...four, 'shortCourse', 'brewPub', 'functionRoom']);
+  assert.ok(helped.met.includes('crowd'), 'with the property helping, it can');
+  assert.ok(helped.paid > bare.paid, 'and the contract should pay more for it');
+});

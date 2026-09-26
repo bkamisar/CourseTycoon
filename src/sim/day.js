@@ -702,9 +702,11 @@ export function runDay(state, seed) {
       // No grace period here — the 10% the resort's own tee sheet gets is
       // what made this condition unfailable, and officials don't give it.
       paceOnTarget: field.averageRoundMinutes <= holes.length * TARGET_MINUTES_PER_HOLE,
-      // Crowd is infrastructure, which the second plan builds. Until it
-      // exists, a rung with no building requirements is always handled.
-      crowdHandled: true,
+      // Whether the gallery this rung draws has somewhere to be. A rung's
+      // REQUIRED buildings are deliberately not enough on their own -- see
+      // `championshipBuildings.js` -- so this is a decision rather than a
+      // consequence of having been allowed to bid.
+      crowdHandled: crowdHandledFor(next.resort.amenities, next.tournament.rung),
     });
     next.money += result.paid;
     next.prestige = clamp(next.prestige + result.prestige, 0, 100);
