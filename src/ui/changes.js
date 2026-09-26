@@ -31,13 +31,24 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-25b';
+export const BUILD = '2026-09-26a';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-09-26a',
+    notes: [
+      'Act III is finished. The championship now tells you how it went: what the course was set to against what they wanted, what the field shot, and each of the four conditions met or missed with its own money beside it. It reads on the evening report and again as a write-up you can keep.',
+      'A countdown sits on the HUD while a championship is booked — how many days, what the course is set to, and the band they want it in. It turns amber when the crew are heading somewhere that will not score.',
+      'Four buildings to put up: grandstands, overflow parking, a media centre and a hospitality pavilion. A Regional will not take your bid without the first two, a National without the last two, and none of them does anything for you the rest of the year — except the pavilion, which holds weddings, and earns rather well on a day the weather has shut the course.',
+      'The gallery has to go somewhere. A County Open is watched by people who parked on the grass, but a National brings twelve thousand and the four buildings do not hold them on their own — the short course and the brew pub end up taking the overflow, which is the sort of thing you only find out by hosting one.',
+      'Host a National Open properly and Act III is done. Properly means the band: turn up with the course set wrong and you are paid the base fee and nothing else, however good your turf and your pace were.',
+      'Dee and the greenkeeper no longer stand in front of your takings. The evening report makes room for them rather than letting them land on the profit.',
+    ],
+  },
   {
     version: '2026-09-25b',
     notes: [
