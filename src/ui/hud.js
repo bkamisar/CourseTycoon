@@ -19,9 +19,37 @@
  * enjoying themselves.
  */
 import { PALETTE } from '../render/palette.js';
+import { RUNGS, withinBand } from '../sim/tournaments.js';
 import { openHoles } from '../sim/state.js';
 import { courseRating } from '../sim/ratings.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
+
+/**
+ * What the HUD needs to know about a booked championship, or null.
+ *
+ * `inBand` rides along because a countdown that does not say whether the
+ * course is set right is a clock rather than information -- the run-up is
+ * three weeks long and the one thing a player needs to glance at is
+ * whether the crew are heading for a number that will score.
+ *
+ * Null for an unknown rung rather than throwing. This is drawn every
+ * frame, and a save from a future version should not be the thing that
+ * takes the game down.
+ */
+function tournamentReadout(state) {
+  const booked = state.tournament;
+  if (!booked || booked.resolved) return null;
+  const rung = RUNGS[booked.rung];
+  if (!rung) return null;
+  const setup = Math.round(state.resort.setup ?? 0);
+  return {
+    label: rung.label,
+    daysLeft: Math.max(0, booked.day - state.day),
+    setup,
+    inBand: withinBand(setup, rung.band),
+    band: rung.band,
+  };
+}
 
 export function computeHudData(state) {
   const holes = openHoles(state);
@@ -37,6 +65,9 @@ export function computeHudData(state) {
     turfQuality: Math.round(state.turfQuality),
     satisfaction: lastReport ? Math.round(lastReport.averageSatisfaction) : null,
     crowd: crowdBars(lastReport),
+    // Act III. Null when nothing is booked, so the HUD simply does not
+    // draw it and Acts I and II carry none of Act III's furniture.
+    tournament: tournamentReadout(state),
   };
 }
 
@@ -81,6 +112,8 @@ function injectStyles() {
       flex-direction: column;
       pointer-events: none;
     }
+    .hud-tournament { color: ${PALETTE.FAIRWAY}; }
+    .hud-tournament--off { color: ${PALETTE.SAND}; }
     .hud-crowd {
       display: flex;
       gap: 6px;
@@ -169,8 +202,11 @@ export function mountHud(root) {
   day.className = 'hud-day';
   const ratings = document.createElement('span');
   ratings.className = 'hud-ratings';
+  const tournament = document.createElement('span');
+  tournament.className = 'hud-tournament';
+  tournament.hidden = true;
 
-  bar.append(money, day, ratings);
+  bar.append(money, day, ratings, tournament);
 
   // The three crowds, as bars, always on screen. The whole game turns on the
   // fact that no course pleases everybody, and until now that only showed up
@@ -210,6 +246,19 @@ export function mountHud(root) {
     // "Happy" rather than "Sat": the author read the abbreviation and had to
     // ask what it meant, which is the whole test a HUD label has to pass.
     ratings.textContent = `Happy ${satText} · CR ${data.courseRating} · Prestige ${data.prestige} · Turf ${data.turfQuality}`;
+
+    // The championship, with the band beside it -- the number alone does
+    // not tell the player whether it is the right number.
+    if (data.tournament) {
+      const t = data.tournament;
+      const when = t.daysLeft === 0 ? 'today' : `${t.daysLeft}d`;
+      tournament.textContent =
+        `${t.label} ${when} · setup ${t.setup} (want ${t.band.low}-${t.band.high})`;
+      tournament.hidden = false;
+      tournament.classList.toggle('hud-tournament--off', !t.inBand);
+    } else {
+      tournament.hidden = true;
+    }
 
     // Before the first day there is no crowd, and inventing an even split
     // would be a lie, so the row hides rather than showing three empty bars.
