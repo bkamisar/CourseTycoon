@@ -100,6 +100,54 @@ Worth doing alongside the barring rule, which has the same shape -- `barDays`
 currently triggers on `met.length <= 1`, so the same badly-set course that
 gains prestige also escapes being barred.
 
+### The per-population catchment was tried, and broke Act I
+
+**Attempted and reverted:** 2026-09-26. Recorded so the next attempt starts
+from the numbers rather than from the idea.
+
+The diagnosis below is right: every segment's interest is computed from the
+WHOLE catchment (`ceiling * appeal * pull` in `economy.demandGroups`), so the
+three crowds compete for one undifferentiated total and `allocateByWeight`
+splits it by appeal. Please serious golfers more and they take locals' seats
+one for one, which is why driving locals away is free.
+
+The obvious fix -- give locals and travellers separate populations, so the town
+is a fixed eighteen groups and reputation only widens the travelling crowd --
+was built and measured. It works, and it is not enough:
+
+- conditioning went from EARNING money to costing it on a controlled fixture
+  (profit 10,492/day at setup 0 against 9,894 at setup 86)
+- but at a mature resort the effect on takings is +0.3% to +1.8%, i.e. still
+  marginally positive. It halves the paradox rather than reversing it.
+- satisfaction still rises with setup, and probably should: the average is
+  taken over whoever turned up, and the people who turn up to a hard course
+  are the ones who like hard courses. The original test's premise is wrong.
+
+**What killed it was Act I.** With no rooms, travellers are only reach --
+2.8 groups at prestige 10, 4.8 at prestige 20 -- where before, serious and
+destination could each draw on the full ~23-group ceiling. Destination guests
+are the high-spending segment, and squeezing them into a third of the space
+collapsed early revenue:
+
+    before:  cheap and busy 8/8, balanced 8/8, quiet and pricey 8/8
+    after:   cheap and busy 0/8, balanced 0/8, quiet and pricey 0/8
+
+Raising REACH_GROUPS does not rescue it on its own and is not monotonic:
+
+    REACH_GROUPS 24: cheap 3/8, balanced 0/8, quiet 6/8
+    REACH_GROUPS 32: cheap 6/8, balanced 1/8, quiet 8/8
+    REACH_GROUPS 40: cheap 0/8, balanced 1/8, quiet 8/8
+
+**So it needs a real re-tune, not a constant.** LOCAL_GROUPS, REACH_GROUPS,
+REACH_CURVE and INTEREST_SCALE were all calibrated for a model where every
+segment drew on the whole ceiling, and splitting the pools invalidates all
+four together. That is several measure-and-tune cycles across all three acts,
+and it should not be attempted without an Act I baseline captured first --
+`node tools/balance.js` gives one in about four minutes.
+
+Worth doing. Not worth doing halfway, because a broken Act I is far worse than
+this wart.
+
 ### Conditioning a course raises average satisfaction instead of costing it
 
 **Found:** 2026-09-25, wiring setup into `runDay` (Task: wire the setup dial
