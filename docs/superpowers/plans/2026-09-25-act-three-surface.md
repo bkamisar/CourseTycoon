@@ -1,12 +1,33 @@
 # Act III Surface Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make Act III reachable and playable — a resort that settles with its investors is invited to bid for championships, builds the infrastructure a gallery needs, sets the course up on a dial it can see, and reads how the week went.
 
 **Architecture:** The simulation is already complete and measured (see `2026-09-25-act-three-simulation.md`). Nothing here changes how a championship scores or pays. It adds the entry point (`state.act = 3`, which nothing currently sets), four buildings as data in a new `src/sim/championshipBuildings.js`, one sheet in `src/ui/championship.js`, cards in `src/ui/championshipCard.js`, and a section on the evening report. Every UI file keeps this project's split: a pure `compute*` function tests can call, and a `mount*` function that is untestable DOM plumbing.
 
 **Tech Stack:** ES modules, no build step, `node --test`, hand-rolled DOM. `src/sim/` is pure — no DOM, no clock, no `Math.random` — and `tests/purity.test.js` enforces it by grepping source **text, including comments and prose**. It once failed on an event about broken *windows* because of `/\bwindow\b/`.
+
+---
+
+## Status, 2026-09-26
+
+Tasks 1-9 complete and committed. Act III is reachable and playable: a settled
+resort is invited, can bid, build, set the dial, host, and read a write-up, and
+the act is passed by delivering a national.
+
+Task 10's operator work is done; its measurement sweep is the outstanding item,
+and it is the one that matters -- the Regional and National rungs have never
+been measured, because every previous sweep ran against an operator that never
+built infrastructure and so stopped at the County Open every time.
+
+Found while building, and NOT fixed -- see `docs/known-issues.md`:
+
+- Prestige is not gated by the band, so a venue that turns up to a National
+  with the course set to 12 still gains reputation.
+- The reported profit excluded the purse on the day it was won. Fixed in
+  53d5b73; noted here because it was invisible to the tests and only appeared
+  when the report was looked at in a browser.
 
 ---
 
@@ -58,7 +79,7 @@ Never run `git push`, `git fetch` or `git pull`.
 - Modify: `src/sim/day.js`
 - Test: `tests/tournamentDay.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/tournamentDay.test.js`:
 
@@ -101,12 +122,12 @@ test('a three-hole resort is not invited, however well it is run', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/tournamentDay.test.js`
 Expected: FAIL — `after.act` is 2 and `actThreeArrived` is undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `src/sim/state.js`, in the object `newGame` returns, beside `tournament: null` and `tournamentsHosted: []`:
 
@@ -149,13 +170,13 @@ In `src/sim/day.js`, find the `if (gate.passed) { next.act = 2; ... }` block nea
 
 Extend the existing `./tournaments.js` import at the top of `src/sim/day.js` to include `CHAMPIONSHIP_HOLES`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/tournamentDay.test.js`
 Then: `node --test "tests/*.test.js"`
 Expected: 0 fail, exactly 1 todo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/sim/state.js src/sim/day.js tests/tournamentDay.test.js
@@ -173,7 +194,7 @@ The spec's §5: four buildings gated by rung, *"mostly dead capital, deliberatel
 - Modify: `src/sim/day.js`
 - Test: `tests/championshipBuildings.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/championshipBuildings.test.js`:
 
@@ -259,12 +280,12 @@ test('championship buildings cost money every day', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/championshipBuildings.test.js`
 Expected: FAIL — `Cannot find module '../src/sim/championshipBuildings.js'`
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/sim/championshipBuildings.js`:
 
@@ -417,7 +438,7 @@ import { championshipUpkeep, crowdHandledFor } from './championshipBuildings.js'
 
 `crowdHandledFor` is unused until Task 3; that is fine, there is no linter in this project.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/championshipBuildings.test.js`
 Then: `node --test "tests/*.test.js"`
@@ -425,7 +446,7 @@ Expected: 0 fail, exactly 1 todo.
 
 If "a national needs the whole property" fails, check the arithmetic: base 1500 + grandstands 3000 + parking 2500 + media 800 + pavilion 2200 = 10000, under the national's 12000; adding shortCourse 1200 + brewPub 500 + functionRoom 400 gives 12100. Adjust `GALLERY` or the capacities so **both** directions hold — do not change the test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/sim/championshipBuildings.js src/sim/day.js tests/championshipBuildings.test.js
@@ -443,7 +464,7 @@ git commit -m "Add the four championship buildings, and bill them"
 - Modify: `docs/known-issues.md`
 - Test: `tests/tournamentDay.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/tournamentDay.test.js`:
 
@@ -473,12 +494,12 @@ test('the crowd bonus is earned by having somewhere to put them', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/tournamentDay.test.js`
 Expected: FAIL — `bare.met` includes `'crowd'`, because it is hardcoded.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `src/sim/day.js`, replace:
 
@@ -498,7 +519,7 @@ with:
       crowdHandled: crowdHandledFor(next.resort.amenities, next.tournament.rung),
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/tournamentDay.test.js`
 Then: `node --test "tests/*.test.js"`
@@ -506,11 +527,11 @@ Expected: 0 fail, exactly 1 todo.
 
 Other tests assert payouts that assumed crowd was free. Where one fails, **give the fixture the buildings it needs rather than lowering the assertion** — the payout numbers are the design, and a test that passes because the bar moved is worse than no test. Name the fixtures you adjusted in your commit message.
 
-- [ ] **Step 5: Delete the fixed known-issues entry**
+- [x] **Step 5: Delete the fixed known-issues entry**
 
 Remove the whole `### "Crowd handled" is a bonus nobody can fail` section from `docs/known-issues.md`. That file's own rule, stated at the top: *"Fixed entries are deleted rather than annotated. A file of mostly-solved problems is one nobody reads."*
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/sim/day.js tests/tournamentDay.test.js docs/known-issues.md
@@ -529,7 +550,7 @@ The pure part is `computeChampionshipData`, which is what tests exercise. This p
 - Create: `src/ui/championship.js`
 - Test: `tests/championship.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/championship.test.js`:
 
@@ -629,12 +650,12 @@ test('when the ladder is finished there is nothing left to apply for', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/championship.test.js`
 Expected: FAIL — `Cannot find module '../src/ui/championship.js'`
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/ui/championship.js`. Write `computeChampionshipData` first and make the tests pass, then add `mountChampionshipSheet` beneath it:
 
@@ -778,13 +799,13 @@ Buying a building pushes `{ id, type, menu: [] }` onto `state.resort.amenities` 
 
 Use `injectStyles()` with a `championship-` class prefix, as `src/ui/hotel.js` does with `hotel-`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/championship.test.js`
 Expected: PASS, 6 tests.
 Then: `node --test "tests/*.test.js"` — 0 fail, exactly 1 todo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/championship.js tests/championship.test.js
@@ -800,7 +821,7 @@ The sheet exists but nothing opens it. This is the task that makes Act III reach
 **Files:**
 - Modify: `src/main.js`
 
-- [ ] **Step 1: Add the toolbar button**
+- [x] **Step 1: Add the toolbar button**
 
 In `src/main.js`, import the sheet beside the hotel's:
 
@@ -831,18 +852,18 @@ championshipButton.update = () => {
 };
 ```
 
-- [ ] **Step 2: Register it**
+- [x] **Step 2: Register it**
 
 Add `championshipButton` to the `overviewToolbar.append(...)` call (it lists `nineToggle`, `hotelButton`, `Amenities`, `Staff`; around line 426), placing it after `hotelButton`, and add `championshipButton.update();` beside `hotelButton.update();` (around line 525).
 
-- [ ] **Step 3: Verify by hand**
+- [x] **Step 3: Verify by hand**
 
 There is no DOM test for `main.js` wiring; this project tests pure functions and wires DOM by inspection. Load the game, confirm no console errors, and confirm the button is absent in Acts I and II.
 
 Run: `node --test "tests/*.test.js"`
 Expected: 0 fail, exactly 1 todo — nothing here should change any test.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/main.js
@@ -860,7 +881,7 @@ Three moments deserve a card rather than a grey line on the report: the invitati
 - Modify: `src/main.js`
 - Test: `tests/championshipCard.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/championshipCard.test.js`:
 
@@ -926,12 +947,12 @@ test('a barred rung says so, because a setback the player cannot see is a dead e
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/championshipCard.test.js`
 Expected: FAIL — `Cannot find module '../src/ui/championshipCard.js'`
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/ui/championshipCard.js`. Export `championshipCards(report, state)` returning an array, exactly as `investorCards` does. Follow that file's conventions: a `{ id, kicker, speaker, prompt, choices }` shape, `choices: [{ label, cost: '' }]` for an announcement, and every claim read off `report` rather than recomputed.
 
@@ -941,7 +962,7 @@ Write the copy in the voice the rest of the game uses — the invitation is a le
 
 **Prose warning:** this file is in `src/ui/`, so `tests/purity.test.js` does not grep it. But keep the copy free of anything that reads as a mechanic being explained; this project's rule is that a line explaining a mechanic is a worse line than one that lets the player work it out.
 
-- [ ] **Step 4: Queue the cards in `src/main.js`**
+- [x] **Step 4: Queue the cards in `src/main.js`**
 
 Find `showInvestorCards` and the block that calls `investorCards(dayResult.report, dayResult.state)` around line 698. Championship cards queue **after** the investors' and **before** the pending decision event, because the investors' card is about the act being left and the decision event is about tomorrow.
 
@@ -959,13 +980,13 @@ Import it beside `investorCards`, then extend the queue — the simplest correct
 
 Rename `showInvestorCards` to `showEveningCards` in the same commit, since it no longer plays only the investors' cards, and update its doc comment — a function whose name has drifted from its job is how the next reader gets misled.
 
-- [ ] **Step 5: Run the suite**
+- [x] **Step 5: Run the suite**
 
 Run: `node --test tests/championshipCard.test.js`
 Then: `node --test "tests/*.test.js"`
 Expected: 0 fail, exactly 1 todo.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/ui/championshipCard.js tests/championshipCard.test.js src/main.js
@@ -982,7 +1003,7 @@ The card is the moment; the report is the record. `report.tournament.field` alre
 - Modify: `src/ui/report.js`
 - Test: `tests/report.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/report.test.js`:
 
@@ -1014,12 +1035,12 @@ test('an ordinary day has no tournament section', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/report.test.js`
 Expected: FAIL — `data.tournament` is undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `src/ui/report.js`, add to the object `computeReportData` returns:
 
@@ -1063,13 +1084,13 @@ Then render it in `mountReport`, following how the existing sections are built w
 
 The scoring picture should read like the spec's §6a rather than a table of fields — the field averaged so many over par, this many broke par, and which hole took the most off them.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/report.test.js`
 Then: `node --test "tests/*.test.js"`
 Expected: 0 fail, exactly 1 todo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/report.js tests/report.test.js
@@ -1086,7 +1107,7 @@ Deferred from Plan 1's Task 9, where it would have displayed nothing because no 
 - Modify: `src/ui/hud.js`
 - Test: `tests/hud.test.js` (create)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/hud.test.js`:
 
@@ -1137,12 +1158,12 @@ test('a resolved championship leaves the HUD', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/hud.test.js`
 Expected: FAIL — `data.tournament` is undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `src/ui/hud.js`, import:
 
@@ -1208,13 +1229,13 @@ And in `injectStyles`:
     .hud-tournament--off { color: ${PALETTE.SAND}; }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/hud.test.js`
 Expected: PASS, 4 tests.
 Then: `node --test "tests/*.test.js"` — 0 fail, exactly 1 todo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/ui/hud.js tests/hud.test.js
@@ -1231,7 +1252,7 @@ The spec's §8: *"Act III's gate: host a National Open successfully."* At which 
 - Modify: `src/sim/day.js`
 - Test: `tests/tournamentDay.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/tournamentDay.test.js`:
 
@@ -1284,12 +1305,12 @@ test('a county open never passes Act III, however perfect', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/tournamentDay.test.js`
 Expected: FAIL — `after.actThreePassed` is undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `src/sim/state.js`, beside `actThreeArrived`:
 
@@ -1323,13 +1344,13 @@ In `src/sim/day.js`, where the tournament result is assigned to `report.tourname
 
 Adjust the variable names to match the surrounding code — the result of `scoreTournament` may be bound to something other than `result` at that point in the file. Read it rather than assuming.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/tournamentDay.test.js`
 Then: `node --test "tests/*.test.js"`
 Expected: 0 fail, exactly 1 todo.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/sim/state.js src/sim/day.js tests/tournamentDay.test.js
@@ -1346,7 +1367,7 @@ Every previous Act III measurement ran against an operator that never built infr
 - Modify: `tools/operator.js`
 - Test: none — `tools/` is measurement, not shipped code
 
-- [ ] **Step 1: Teach the operator to build for a rung**
+- [x] **Step 1: Teach the operator to build for a rung**
 
 In `tools/operator.js`, extend `spendTheTournamentMorning` so that before bidding it buys any building the next rung requires and it can afford, and any building needed to cover that rung's gallery. Keep the existing behaviour of asking for the band's midpoint.
 
@@ -1358,13 +1379,13 @@ import {
 } from '../src/sim/championshipBuildings.js';
 ```
 
-- [ ] **Step 2: Correct `LEVERS_NOT_PULLED`**
+- [x] **Step 2: Correct `LEVERS_NOT_PULLED`**
 
 It currently says the operator never builds championship infrastructure. That will no longer be true. Replace that entry with what is genuinely still unmeasured — declining a rung it could afford, and choosing *not* to cover the gallery when the bonus is worth less than the buildings.
 
 A stale entry in that list is worse than no entry: it tells the next reader a lever is unmeasured when it is, or measured when it is not.
 
-- [ ] **Step 3: Measure and report**
+- [x] **Step 3: Measure and report**
 
 Write a sweep in the scratch directory (not the repo), at least 8 seeds, carrying resorts through Acts I and II into Act III with `play`, `playActTwo` and `playActThree`. Use green fee **80** and tee interval **14** — a fee of 26 never passes Act I. Clone with `deserialize(serialize(state))`. Compare against a never-bids control by setting `state.tournamentsHosted = [...RUNG_IDS]`.
 
@@ -1380,7 +1401,7 @@ Report:
 
 **Report before changing anything.** Do not tune in the same pass as measuring — that is how Act I ended up with a confident, wrong report.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tools/operator.js
