@@ -121,17 +121,16 @@ export function championshipCards(report, state) {
         + 'it was worth, which on a week like this is nothing.'
       : '';
 
-    // Only crow about it on a week that was actually delivered. The
-    // simulation currently hands out prestige on met conditions alone, so
-    // a venue that turned up outside the band can still come away with
-    // more reputation than it started with (see docs/known-issues.md) --
-    // and printing "word gets round in your favour" directly under "you
-    // have not staged a championship" would have the card arguing with
-    // itself in the same breath.
+    // The band governs reputation and the rung as well as the money now,
+    // so this can simply read what happened rather than working around a
+    // simulation that disagreed with it. It used to be possible to miss
+    // the band and GAIN nine points of reputation, which had the card
+    // printing "you have not staged a championship" and "word gets round
+    // in your favour" two sentences apart.
     const standing = t.barDays > 0
-      ? ` They will give the ${rung?.label ?? 'rung'} to somebody else for ${t.barDays} days. `
-        + 'Not said unkindly, and not negotiable.'
-      : bandMet && t.prestige > 0
+      ? ` They will give the ${rung?.label ?? 'rung'} to somebody else for ${t.barDays} days, `
+        + 'and the write-up will be read by people who were not there.'
+      : t.prestige > 0
         ? ' Word gets round, and it gets round in your favour.'
         : '';
 

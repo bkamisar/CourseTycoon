@@ -378,8 +378,28 @@ export function scoreTournament(rungId, {
   // Reputation follows the conditions rather than the money, so a resort
   // that ran a good week on a small rung is not punished for the rung
   // being small.
+  /*
+   * The band governs reputation and the rung as well as the money.
+   *
+   * Prestige used to average the four conditions, so a venue that turned
+   * up to a National with the course set to 12 -- having failed the one
+   * thing the week was about -- still scored three of four and came away
+   * NINE points of reputation better off. The result card noticed before
+   * anybody else did: it was printing "a venue that turns up outside the
+   * band has not staged a championship" and then, two sentences later,
+   * "word gets round, and it gets round in your favour".
+   *
+   * So a missed band costs the full swing, whatever else went right,
+   * because the design's line is that a course set wrong is "worse than
+   * never having bid". Turf, pace and crowd decide how much CREDIT a
+   * delivered championship earns; they cannot rescue one that was not
+   * delivered.
+   */
   const swing = PRESTIGE_SWING[rungId] ?? 6;
-  const prestige = Math.round(((met.length / 4) * 2 - 1) * swing);
+  const earned = ['turf', 'pace', 'crowd'].filter((id) => met.includes(id)).length;
+  const prestige = bandMet
+    ? Math.round((earned / 3) * swing)
+    : -swing;
 
   return {
     rung: rungId,
@@ -388,6 +408,11 @@ export function scoreTournament(rungId, {
     paid,
     prestige,
     // Nothing below half the conditions is a week anybody wants repeated.
-    barDays: met.length <= 1 ? BAR_DAYS : 0,
+    // And they give the rung to somebody else. Same rule as the money and
+    // the reputation: the band is whether a championship happened at all,
+    // so missing it is what "a poor tournament" means. A week that made
+    // the band but fumbled the rest is a venue having a bad day, which is
+    // not the same thing and is not barred for it.
+    barDays: bandMet ? 0 : BAR_DAYS,
   };
 }

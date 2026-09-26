@@ -61,45 +61,6 @@ and at $700 a night, where rooms genuinely go unsold, it stops dead at 13
 rooms. So the ratchet is what being under-priced looks like, not a separate
 fault, and it will ease if the saturated-demand problem above is addressed.
 
-### Missing the band still raises your reputation
-
-**Found:** 2026-09-25, writing the championship result card, which ended up
-arguing with itself.
-
-`scoreTournament` sets prestige from how many conditions were met and nothing
-else:
-
-    prestige = round(((met.length / 4) * 2 - 1) * PRESTIGE_SWING[rung])
-
-The band gates the *money* -- a venue outside its band takes the base fee and
-none of the bonuses -- but it does not gate reputation. So a resort that turns
-up to a **National Open with the course set to 12**, against a band of 80-92,
-and happens to have good turf, good pace and a covered gallery, scores three of
-four and comes away **+9 prestige**. Its reputation improves.
-
-The spec is explicit that this should go the other way: "turn up at a national
-with the course set for a county open and the field embarrasses you", and a
-course outside its band produces "a write-up worse than never having bid".
-
-Caught because the result card printed "a venue that turns up outside the band
-has not staged a championship" and then, two sentences later, "word gets round,
-and it gets round in your favour". The card has been changed to stay quiet
-about standing on a week where the band was missed, so the contradiction is no
-longer visible -- but that is covering for the simulation rather than fixing
-it, and it is recorded here so the next session does not mistake the quiet card
-for a solved problem.
-
-**The fix is a design decision, not a patch.** Either prestige is gated by the
-band the way the money is, or a missed band carries its own reputation penalty
-that outweighs whatever the other three conditions earned. The second is
-probably better: it keeps turf, pace and crowd meaning something on a week that
-went wrong in one specific way, while still making "we set the course wrong"
-the worst thing that can happen to a venue's standing.
-
-Worth doing alongside the barring rule, which has the same shape -- `barDays`
-currently triggers on `met.length <= 1`, so the same badly-set course that
-gains prestige also escapes being barred.
-
 ### The per-population catchment was tried, and broke Act I
 
 **Attempted and reverted:** 2026-09-26. Recorded so the next attempt starts

@@ -263,3 +263,46 @@ test('and a thin crew still cannot get there inside the run-up', () => {
     `two groundskeepers reached ${setup.toFixed(1)} in ${RUN_UP_DAYS} days, so asking is all it takes`);
   assert.ok(setup > 0, 'sanity: they did do some work');
 });
+
+test('the band governs the money, the reputation AND the rung', () => {
+  // All three stakes answer to one question: was this a championship
+  // venue on the day. Prestige used to average the four conditions, so a
+  // National with the course set to 12 scored three of four and came away
+  // NINE points better off -- having failed the only thing the week was
+  // about.
+  const common = { turfQuality: 95, paceOnTarget: true, crowdHandled: true };
+
+  const delivered = scoreTournament('national', { setup: 86, ...common });
+  const notDelivered = scoreTournament('national', { setup: 12, ...common });
+
+  // Identical turf, pace and crowd on both. The only difference is the band.
+  assert.deepEqual(notDelivered.met.sort(), ['crowd', 'pace', 'turf'],
+    'the other three were genuinely earned, and the report still says so');
+
+  assert.ok(delivered.paid > notDelivered.paid, 'money');
+  assert.ok(delivered.prestige > 0, 'a delivered championship earns reputation');
+  assert.ok(notDelivered.prestige < 0,
+    `turning up outside the band scored ${notDelivered.prestige} prestige; it must cost, not pay`);
+  assert.equal(notDelivered.barDays > 0, true, 'and the rung goes to somebody else');
+  assert.equal(delivered.barDays, 0, 'while a good week is never barred');
+});
+
+test('inside the band, the other three decide how much credit you get', () => {
+  // The band is a gate, not the whole score. A venue that delivered but
+  // fumbled its turf should earn less than one that did everything, and
+  // still more than one that never set the course at all.
+  const inBand = (extra) => scoreTournament('national', {
+    setup: 86, turfQuality: 95, paceOnTarget: true, crowdHandled: true, ...extra,
+  });
+  const perfect = inBand({});
+  const scruffy = inBand({ turfQuality: 40, paceOnTarget: false });
+  const missedBand = scoreTournament('national', {
+    setup: 12, turfQuality: 95, paceOnTarget: true, crowdHandled: true,
+  });
+
+  assert.ok(perfect.prestige > scruffy.prestige, 'doing it well should be worth more');
+  assert.ok(scruffy.prestige >= 0, 'but a delivered championship is never a reputational loss');
+  assert.ok(scruffy.prestige > missedBand.prestige,
+    'and a scruffy delivered week must still beat one that was never delivered');
+  assert.equal(scruffy.barDays, 0, 'a bad day inside the band is not a barring offence');
+});
