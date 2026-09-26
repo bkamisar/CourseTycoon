@@ -38,7 +38,9 @@ import {
   RUNGS,
 } from './tournaments.js';
 import { playField } from './field.js';
-import { championshipUpkeep, crowdHandledFor } from './championshipBuildings.js';
+import {
+  championshipUpkeep, crowdHandledFor, championshipTrade,
+} from './championshipBuildings.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -578,7 +580,13 @@ export function runDay(state, seed) {
   // demand down to a tenth in a storm and leaves every other building
   // idle; a range under a roof takes money anyway, so it smooths the
   // variance rather than merely adding to the total.
-  const indoors = Math.round(indoorTrade(next.resort.amenities, sky.demand));
+  // The hotel's indoor venues, plus the hospitality pavilion, which is the
+  // one championship building that is not dead capital -- it holds
+  // weddings between events, which is why a real resort would put one up.
+  const indoors = Math.round(
+    indoorTrade(next.resort.amenities, sky.demand)
+    + championshipTrade(next.resort.amenities, sky.demand)
+  );
   if (indoors > 0) {
     revenue.indoors = indoors;
     revenue.total += indoors;

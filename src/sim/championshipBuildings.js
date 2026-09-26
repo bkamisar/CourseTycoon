@@ -21,27 +21,38 @@
  * returns 0 for types it does not know — so `championshipUpkeep` exists
  * and `day.js` adds it separately.
  *
+ * **Upkeep is a mothball rate, not a running one.** These stand empty for
+ * fifty-one weeks: a grandstand costs inspection and insurance, not what a
+ * hotel costs to run. Measured before this was true -- at $1,050/day
+ * across the four, a resort that hosted all three rungs and hit every
+ * single band still LOST money against never bidding in five runs of
+ * eight, because ~$420,000 of upkeep over a run swamped $782,150 of prize
+ * money for buildings used on three days. The build cost is the capital
+ * commitment the design asks for; a permanent running bill that outgrows
+ * the purse is a different thing, and it turned the act's reward into a
+ * penalty for doing everything right.
+ *
  * Pure data. Nothing in `src/sim/` computes with a DOM or a clock.
  */
 
 const LIST = [
   {
-    id: 'grandstands', label: 'Grandstands', build: 65000, upkeep: 220,
+    id: 'grandstands', label: 'Grandstands', build: 65000, upkeep: 60,
     rung: 'regional', gallery: 3000,
     blurb: 'Scaffold, planking and a safety certificate. Empty fifty-one weeks a year, and the only reason four thousand people can watch the eighteenth at all.',
   },
   {
-    id: 'overflowParking', label: 'Overflow parking', build: 38000, upkeep: 90,
+    id: 'overflowParking', label: 'Overflow parking', build: 38000, upkeep: 25,
     rung: 'regional', gallery: 2500,
     blurb: 'Two fields, a hardcore track and a gate. Nobody has ever admired a car park, and a championship without one is a traffic story in the local paper instead of a golf story.',
   },
   {
-    id: 'mediaCentre', label: 'Media centre', build: 90000, upkeep: 340,
+    id: 'mediaCentre', label: 'Media centre', build: 90000, upkeep: 90,
     rung: 'national', gallery: 800,
     blurb: 'Desks, cabling, and somewhere to put forty laptops and a coffee urn. The week is only national if somebody files copy about it.',
   },
   {
-    id: 'hospitalityPavilion', label: 'Hospitality pavilion', build: 110000, upkeep: 400,
+    id: 'hospitalityPavilion', label: 'Hospitality pavilion', build: 110000, upkeep: 140,
     rung: 'national', gallery: 2200,
     // The one that is not dead capital. `trade` matches the shape
     // `hotelAmenities.js` uses for the function room, so the existing
@@ -117,6 +128,34 @@ export function crowdHandledFor(amenities = [], rungId) {
   const needed = galleryFor(rungId);
   if (!needed) return false;
   return galleryCapacity(amenities) >= needed;
+}
+
+/**
+ * What these take between championships, which is almost nothing.
+ *
+ * Only the hospitality pavilion earns at all -- a marquee on a permanent
+ * base with a kitchen behind it is somewhere to hold a wedding, and a
+ * resort would put one up for that alone. Its `trade` has been declared
+ * since the buildings were written and was dead data until now:
+ * `hotelAmenities.indoorTrade` resolves types through HOTEL_AMENITIES, so
+ * the one building the design says "earns its keep in February" earned
+ * nothing at all.
+ *
+ * Same shape as `indoorTrade`, and deliberately a poor return on its own
+ * terms: $380 a day against a $110,000 build is a four-hundred-day
+ * payback, where the function room's $450 against $26,000 is a hundred.
+ * Nobody should build a pavilion for the weddings. It is a championship
+ * building that happens to pay a little rent.
+ */
+export function championshipTrade(amenities = [], demandFactor = 1) {
+  const unplayable = Math.max(0, 1 - demandFactor);
+  let total = 0;
+  for (const b of amenities) {
+    const spec = CHAMPIONSHIP_BUILDINGS[b.type];
+    if (!spec?.trade) continue;
+    total += spec.trade.base + spec.trade.weather * unplayable;
+  }
+  return total;
 }
 
 /** Daily upkeep of the championship buildings, summed. */

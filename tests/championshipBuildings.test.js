@@ -77,3 +77,37 @@ test('championship buildings cost money every day', () => {
   assert.ok(dailyCost(['grandstands']) > dailyCost([]),
     'grandstands must show up on the bill');
 });
+
+test('upkeep is a mothball rate, not a hotel rate', () => {
+  // Measured: at $1,050/day across the four, a resort that hosted all
+  // three rungs and hit every band still lost money against never bidding
+  // in five runs of eight, because upkeep over a run swamped the prize
+  // money for buildings used on three days.
+  const all = CHAMPIONSHIP_BUILDING_IDS.map((type) => ({ type }));
+  assert.ok(championshipUpkeep(all) < 400,
+    `the four together run at $${championshipUpkeep(all)}/day, which is a running cost `
+    + 'rather than a mothball one');
+  // But not free -- a stand standing empty still gets inspected.
+  for (const id of CHAMPIONSHIP_BUILDING_IDS) {
+    assert.ok(CHAMPIONSHIP_BUILDINGS[id].upkeep > 0, `${id} must cost something to hold`);
+  }
+});
+
+test('only the pavilion earns between championships, and badly', async () => {
+  const { championshipTrade } = await import('../src/sim/championshipBuildings.js');
+  assert.equal(championshipTrade([{ type: 'grandstands' }]), 0,
+    'a grandstand earns nothing in February, which is the point of dead capital');
+  const pavilion = championshipTrade([{ type: 'hospitalityPavilion' }]);
+  assert.ok(pavilion > 0, 'the pavilion holds weddings');
+
+  // Deliberately a poor return on its own terms. If it ever pays back
+  // faster than the function room it stops being a championship building
+  // that happens to pay rent and becomes a function room with a silly
+  // price, and the decision to build it disappears.
+  const spec = CHAMPIONSHIP_BUILDINGS.hospitalityPavilion;
+  const netPerDay = pavilion - spec.upkeep;
+  const paybackDays = spec.build / netPerDay;
+  assert.ok(paybackDays > 300,
+    `the pavilion pays for itself in ${Math.round(paybackDays)} days, which is too good `
+    + 'for a building whose real job is one week a year');
+});
