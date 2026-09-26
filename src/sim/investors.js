@@ -86,14 +86,29 @@ export const MEASURES = Object.freeze([
  * against a starting 55, and the investors pulled out of exactly nought
  * resorts. The failure mode the act is built around could not happen.
  *
- * Meeting a target is now worth much less than missing one costs, which
- * is how trust works. At three in four the balance is roughly flat; at
- * one in two it drains; at one in three the hotel is gone inside four
- * months. That is friction for a careful operator and a real ending for
- * a careless one.
+ * Meeting a target is still worth much less than missing one costs, which
+ * is how trust works. What changed since is the pass rate it has to cope
+ * with: the four measures were tuned to be real tests rather than
+ * formalities, and now miss around a third of the time between them. At
+ * the old +13/+7 that made the good ending unreachable -- the arithmetic,
+ * with the offer needing a thirty-point climb from a start of 55:
+ *
+ *   miss 15% -> +5.7 a review ->  6 reviews (84 days)
+ *   miss 25% -> +2.8          -> 11 reviews (154 days)
+ *   miss 32% -> +0.8          -> 38 reviews (532 days)
+ *   miss 40% -> -1.5          -> never
+ *
+ * An act that runs about eighteen reviews cannot absorb a third of them
+ * going badly, so two thirds of runs simply never finished -- not lost,
+ * just never resolved, which is the worst of both endings.
+ *
+ * At +18/+9 a resort missing a third climbs by about three a review and
+ * reaches the offer inside ten, while one missing more than half still
+ * drains. Friction for a careful operator, a real ending for a careless
+ * one, and an act that finishes either way.
  */
 const CONFIDENCE_CHANGE = Object.freeze({
-  beat: 13, met: 7, missed: -15, missedBadly: -30,
+  beat: 18, met: 9, missed: -15, missedBadly: -30,
 });
 
 export function confidenceChange(outcome) {

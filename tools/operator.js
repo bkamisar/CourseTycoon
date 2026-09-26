@@ -100,6 +100,10 @@ const SHOPPING_LIST = [
  * this harness. Go and measure it deliberately instead.
  */
 export const LEVERS_NOT_PULLED = [
+  'Act II: letting the greens go while running everything else properly. '
+  + 'Reachable now via the keepGreens option on playActTwo, but nothing '
+  + 'here sweeps it, so the cost of neglect is measured only when asked. '
+  + 'A resort can let its course go and still run everything else well.',
   'Tuning a menu to the crowd the course actually draws. Default boards '
   + 'only, so nothing here says anything about whether menu choice matters.',
   'Rebuilding holes for variety or difficulty. The course is built once '
@@ -152,7 +156,7 @@ export const openCount = (state) => state.resort.courses[0].holes
  * never conditioning) instead of `spendTheTournamentMorning`'s
  * band-midpoint targeting.
  */
-export function spendTheMorning(state, { greenFee, teeInterval }) {
+export function spendTheMorning(state, { greenFee, teeInterval, keepGreens = true }) {
   state.resort.pricing.greenFee = greenFee;
   state.resort.pricing.teeInterval = teeInterval;
 
@@ -173,7 +177,18 @@ export function spendTheMorning(state, { greenFee, teeInterval }) {
   const groups = state.history.at(-1)?.groupsPlayed ?? 0;
   const wearRate = holes * 1.4 + groups * 0.45;
   const needed = Math.max(1, Math.ceil(wearRate / 6.8));
-  if (countRole(state, 'groundskeeper') < needed && state.money > BUFFER) {
+  /*
+   * `keepGreens: false` is how a careless resort is measured.
+   *
+   * Turf is one of the four things the investors ask about, and it is the
+   * only one that answers purely to a decision made every day -- the size
+   * of the grounds crew. Whether neglecting it actually costs a resort the
+   * act could not be measured at all while this function always hired,
+   * because every attempt to force a thin crew was simply re-staffed the
+   * next morning. Two measurements were lost to that before anybody
+   * noticed the operator was undoing the thing being tested.
+   */
+  if (keepGreens && countRole(state, 'groundskeeper') < needed && state.money > BUFFER) {
     state.resort.staff.push({ role: 'groundskeeper' });
     return;
   }
@@ -401,6 +416,7 @@ export function spendTheHotelMorning(state, { roomRate, suiteShare }) {
  * there.
  */
 export function playActTwo(startState, {
+  keepGreens = true,
   greenFee, teeInterval, roomRate, suiteShare = 0.3, days = 200, seed = 1,
 }) {
   let state = startState;
@@ -420,7 +436,7 @@ export function playActTwo(startState, {
   let peakRooms = 0;
 
   for (let day = 0; day < days; day++) {
-    spendTheMorning(state, { greenFee, teeInterval });
+    spendTheMorning(state, { greenFee, teeInterval, keepGreens });
     spendTheHotelMorning(state, { roomRate, suiteShare });
 
     const result = runDay(state, seed * 7919 + day + 5000);
