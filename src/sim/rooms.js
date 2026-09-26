@@ -162,7 +162,18 @@ export function roomDemand({ crowd, roomRate, valuePerRound = 60, extraNights = 
     // supporting it -- the only way to charge more was to charge more,
     // and guests simply stopped coming.
     const fair = Math.max(1, valuePerRound * 1.6 + valueBonus);
-    const priceFit = clamp(1.25 - (roomRate / fair) * 0.55, 0.05, 1.15);
+    // The floor is 0, and it matters more than it looks. At 0.05 there was
+    // no price a guest would refuse: five per cent of them booked whatever
+    // was asked, so `rooms sold x rate` grew without bound and the best
+    // strategy in Act II was to charge an absurd number at a nearly empty
+    // hotel. Measured on a mature 70-room resort, occupancy sat at exactly
+    // 14 rooms from $700 a night upwards -- and at $1,000,000 a night
+    // those same 14 rooms took $28,400,000 in an evening.
+    //
+    // At 0 the demand curve is unchanged everywhere it used to bite and
+    // simply reaches zero, at a bit over twice what a stay is worth. Above
+    // that nobody comes, which is what "too expensive" has to mean.
+    const priceFit = clamp(1.25 - (roomRate / fair) * 0.55, 0, 1.15);
     // A kids' club or a spa lengthens the trip rather than attracting
     // another one — the only way to raise occupancy without raising
     // demand. Locals are excluded by their zero chance above, so no

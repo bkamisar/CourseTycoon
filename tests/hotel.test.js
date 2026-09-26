@@ -5,7 +5,7 @@ import { newGame, amenity } from '../src/sim/state.js';
 import {
   HOTEL_AMENITIES, HOTEL_AMENITY_IDS, hotelUpkeep,
 } from '../src/sim/hotelAmenities.js';
-import { nightlyUpkeep } from '../src/sim/rooms.js';
+import { nightlyUpkeep, roomDemand } from '../src/sim/rooms.js';
 
 const { openHotelSheet } = await import('../src/ui/hotel.js');
 
@@ -135,4 +135,45 @@ test('hotel amenities and Act I amenities share one list without colliding', () 
   state.resort.amenities.push(amenity('proShop'), amenity('pool'));
   assert.equal(hotelUpkeep(state.resort.amenities), HOTEL_AMENITIES.pool.upkeep,
     'hotelUpkeep must charge for the pool and ignore the pro shop');
+});
+
+test('NO PRICE IS IMMUNE: room demand reaches zero', () => {
+  // The floor on priceFit used to be 0.05, so five per cent of guests
+  // booked whatever was asked and `rooms sold x rate` grew without bound.
+  // Measured on a mature 70-room resort before the fix: occupancy sat at
+  // exactly 14 rooms from $700 a night upwards, and at $1,000,000 a night
+  // those same 14 rooms took $28,400,000 in one evening.
+  const crowd = { locals: 64, serious: 16, destination: 96 };
+  const silly = roomDemand({ crowd, roomRate: 1000000, valuePerRound: 60, valueBonus: 120 });
+  for (const key of Object.keys(silly)) {
+    assert.equal(silly[key], 0, `${key} still wanted a room at a million a night`);
+  }
+
+  // And the other direction, because a curve that is always zero would
+  // pass the assertion above and break the entire act.
+  const fair = roomDemand({ crowd, roomRate: 150, valuePerRound: 60, valueBonus: 120 });
+  assert.ok(fair.destination > 0, 'a fair price must still fill beds');
+  assert.equal(fair.locals, 0, 'and locals still never book one');
+});
+
+test('there is a best nightly rate, and the buildings move it', () => {
+  // What valueBonus was always for -- "a spa and a dining room are the
+  // reason a room is worth $160 rather than $120". It could not have been
+  // true while the best price was unbounded.
+  function bestRate(valueBonus) {
+    const crowd = { locals: 64, serious: 16, destination: 96 };
+    let top = { rate: 0, take: -1 };
+    for (let rate = 50; rate <= 1200; rate += 25) {
+      const wanted = roomDemand({ crowd, roomRate: rate, valuePerRound: 60, valueBonus });
+      const nights = Object.values(wanted).reduce((s, v) => s + v, 0);
+      const take = Math.min(nights, 70) * rate;
+      if (take > top.take) top = { rate, take };
+    }
+    return top.rate;
+  }
+  const bare = bestRate(0);
+  const kitted = bestRate(160);
+  assert.ok(bare > 50 && bare < 1200, `a bare hotel's best rate is ${bare}, which is an edge not an optimum`);
+  assert.ok(kitted > bare,
+    `a hotel with a spa and a dining room should carry a higher rate, got ${kitted} against ${bare}`);
 });

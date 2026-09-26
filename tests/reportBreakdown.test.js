@@ -52,7 +52,14 @@ function act2Day() {
   state.act = 2;
   state.money = 400000;
   state.resort.rooms = { standard: 12, suite: 5 };
-  state.resort.pricing.roomRate = 120;
+  // $60, not $120. This is a three-hole resort with a pro shop and a
+  // snack shack -- no spa, no dining room -- and room demand now reaches
+  // zero rather than bottoming out at five per cent of guests booking
+  // whatever is asked. At $120 a night nobody stays here, which is the
+  // right answer about the world and was not available before that floor
+  // was removed. The test is about the recap naming its lines; the
+  // fixture just has to be a resort that could plausibly let a room.
+  state.resort.pricing.roomRate = 60;
   state.resort.amenities.push(
     amenity('proShop'), amenity('snackShack'), amenity('indoorRange'),
   );
