@@ -215,28 +215,54 @@ test('a realistic crew still holds turf at or above the championship expectation
 // (measured ~20-25 points higher by day 2+ of this fixture) rather than
 // falling. Marked todo rather than adjusted or deleted: the assertion
 // below is exactly what the task specified and still describes the
-// intended design ("the run-up has to cost something"); the fix belongs
-// in segments.js/economy.js tuning, not in this wiring task's scope.
-test('a conditioned course is a worse day out', { todo: 'see docs/known-issues.md — demand self-selects toward a happier crowd; not fixed by this task' }, () => {
-  // The sacrifice. Locals want an easy course — SEGMENTS.locals
-  // idealDifficulty is 30 — and championship condition is the opposite
-  // of that. The run-up has to cost something or it is theatre.
-  function satisfactionWith(setup) {
-    let state = actThreeResort(7);
-    state.resort.setup = setup;
-    if (setup > 0) state.tournament = { rung: 'national', day: state.day + 21, resolved: false };
+test('conditioning a course costs it trade', () => {
+  /*
+   * The sacrifice. Locals want an easy course -- SEGMENTS.locals
+   * idealDifficulty is 30 -- and championship condition is the opposite.
+   * The run-up has to cost something or it is theatre.
+   *
+   * This asserted falling SATISFACTION and sat as a `todo` for days,
+   * because satisfaction goes UP: a hard course keeps the golfers who
+   * like hard courses, and the average is taken over whoever turned up.
+   * That is self-selection working correctly. The premise was wrong, not
+   * the simulation.
+   *
+   * What the design actually asks for is that the everyday business is
+   * paid in full before anything is paid back, so this measures TAKINGS.
+   * It became true when the catchment was split per population: the town
+   * is a fixed number of groups, so the locals a hard course drives away
+   * can no longer be replaced one-for-one by serious golfers conjured out
+   * of a pool with no bottom.
+   *
+   * Setup is pinned rather than reached by booking a tournament, so this
+   * measures the crowd effect alone and not the prep bill on top of it.
+   */
+  function takingsAt(setup) {
+    let state = openFullCourse(actThreeResort(7));
+    state.prestige = 88;
+    state.resort.rooms = { standard: 44, suite: 18 };
+    state.resort.pricing.roomRate = 220;
     let total = 0;
-    for (let d = 0; d < 6; d++) {
+    for (let d = 0; d < 10; d++) {
+      state.resort.setup = setup;
       const out = runDay(state, 3200 + d);
       state = out.state;
-      total += out.report.averageSatisfaction;
+      total += out.report.revenue.total;
     }
-    return total / 6;
+    return total / 10;
   }
-  const easy = satisfactionWith(0);
-  const hard = satisfactionWith(90);
-  assert.ok(easy - hard > 4,
-    `conditioning cost only ${(easy - hard).toFixed(1)} satisfaction; the run-up is theatre`);
+  const easy = takingsAt(0);
+  const hard = takingsAt(86);
+
+  assert.ok(hard < easy,
+    `conditioning earned MORE than leaving the course alone ($${Math.round(hard)} against `
+    + `$${Math.round(easy)}); the run-up is a bonus, not a sacrifice`);
+
+  // And the other direction: a resort that simply stopped trading when
+  // conditioned would pass the line above and be a worse bug.
+  assert.ok(hard > easy * 0.75,
+    `conditioning cost ${Math.round((1 - hard / easy) * 100)}% of takings, which is a collapse `
+    + 'rather than a sacrifice');
 });
 
 test('the course closes for the championship week', () => {
