@@ -12,38 +12,40 @@ entry: it sends the next session chasing something that is already done.
 
 ## Open
 
-### The fortnightly review is one problem wearing four hats
+### Two of the four investor measures are still formalities
 
-**Found:** 2026-09-26, the first time Act II was ever measured.
+**Narrowed:** 2026-09-26, after giving revenue per room a ceiling. The
+original complaint -- that the review was one problem wearing four hats -- is
+mostly fixed, and what is left is smaller and worth stating precisely.
 
-The investors ask for one of four things each fortnight. Across 622 reviews,
-six pricing strategies, eight resorts:
+Revenue per room was the only measure with no ceiling, so it compounded 7% a
+fortnight until it could not be met, and accounted for nearly every failure.
+It now stops at a full house. Measured across 371 reviews:
 
-| measure | asked | missed | |
-|---|---|---|---|
-| revenue per room | 149 | 86 | **58%** |
-| prestige | 158 | 15 | 9% |
-| occupancy | 156 | 10 | 6% |
-| guest satisfaction | 159 | 7 | 4% |
+| measure | before | after |
+|---|---|---|
+| revenue per room | 87% missed | 38% |
+| prestige | 11% | 11% |
+| occupancy | 5% | 3% |
+| guest satisfaction | 0% | 0% |
 
-**Revenue per room is nearly every failure. The other three are passed by
-existing.** Occupancy is ~100% at any price a player would actually charge,
-prestige climbs on its own, and satisfaction sits comfortably high -- so three
-quarters of the reviews are a formality, and the act's whole pressure comes
-down to one number that ratchets 7% compounding until it cannot be met.
+**What is left:** occupancy and satisfaction are still passed by existing --
+3% and 0% respectively. Revenue per room is now a real test and prestige is a
+mild one, so the fortnightly meeting is two genuine questions rather than one,
+but it is not four.
 
-That is not four problems. It is one problem, announced four ways, and it makes
-the fortnightly meeting feel like a real relationship while only ever testing
-a single decision the player made once.
+Occupancy cannot be a test while every room fills at any sane price (see the
+room-ratchet entry below). Satisfaction cannot be a test while it barely moves.
+Both want the hotel to have a reason to run less than full, which the
+per-population catchment did not provide -- it caps how many GOLFERS exist, and
+room demand keys off the crowd that turns up rather than off a separate
+population of people wanting beds.
 
-**A fix wants the other three to be losable.** Occupancy cannot be a test while
-every room fills at any sane price (see the room-ratchet note below).
-Satisfaction cannot be a test while it barely moves. Both are symptoms of the
-same thing the conditioning issue is a symptom of: demand at this stage of the
-game hugely exceeds what the resort can serve, so anything measuring *how full*
-or *how happy* is measuring a saturated system.
-
-Worth taking together with that entry rather than separately.
+Not urgent. The act now has a proper shape without it: a viable band from $150
+to $575, poverty below it, and total collapse above $700 where eight resorts in
+eight are liquidated, one of them left with $2,979. There is a real risk-reward
+inside the band too -- $300 buys the investors out 7 times in 8 for about $1.1M,
+$575 earns three times as much and leaves half the runs unsettled.
 
 ### Rooms build themselves up to the planning cap
 
