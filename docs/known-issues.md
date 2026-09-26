@@ -12,35 +12,54 @@ entry: it sends the next session chasing something that is already done.
 
 ## Open
 
-### Act II has never been measured
+### The fortnightly review is one problem wearing four hats
 
-**The most important thing outstanding.** This entry used to say the
-operator "plays Act I and stops", which stopped being true when
-`playActTwo` and `spendTheHotelMorning` were written — it sets a room
-rate, builds rooms while the ones it has are filling, works through a
-hotel shopping list and settles with the investors when it can afford to.
+**Found:** 2026-09-26, the first time Act II was ever measured.
 
-What has never happened is anyone *measuring* it. Act II gets exercised
-constantly, because every Act III sweep carries resorts through it to
-reach the third act, but being exercised is not the same as being judged:
-nothing has ever asked whether more than one way of running the hotel
-works, only whether a resort comes out of the far end alive.
+The investors ask for one of four things each fortnight. Across 622 reviews,
+six pricing strategies, eight resorts:
 
-The questions nobody can currently answer:
+| measure | asked | missed | |
+|---|---|---|---|
+| revenue per room | 149 | 86 | **58%** |
+| prestige | 158 | 15 | 9% |
+| occupancy | 156 | 10 | 6% |
+| guest satisfaction | 159 | 7 | 4% |
 
-- Is building rooms a ratchet? Upkeep bills whether a bed is filled or
-  not, which is supposed to be the brake, but is the optimum simply
-  "build to the catchment and coast"?
-- Are the four investor measures four problems or one? If a single way of
-  running the hotel satisfies occupancy, revenue per room, prestige and
-  satisfaction together, the fortnightly review is a formality.
-- Can a competent operator actually lose? Confidence has to be able to
-  reach zero without the player trying to fail.
-- Do the fourteen hotel amenities support more than one build?
+**Revenue per room is nearly every failure. The other three are passed by
+existing.** Occupancy is ~100% at any price a player would actually charge,
+prestige climbs on its own, and satisfaction sits comfortably high -- so three
+quarters of the reviews are a formality, and the act's whole pressure comes
+down to one number that ratchets 7% compounding until it cannot be met.
 
-Act I looked fine on spot measurements the day it shipped broken. The
-operator is the only thing that has ever caught a real balance problem on
-this project, and it has never been pointed at this act.
+That is not four problems. It is one problem, announced four ways, and it makes
+the fortnightly meeting feel like a real relationship while only ever testing
+a single decision the player made once.
+
+**A fix wants the other three to be losable.** Occupancy cannot be a test while
+every room fills at any sane price (see the room-ratchet note below).
+Satisfaction cannot be a test while it barely moves. Both are symptoms of the
+same thing the conditioning issue is a symptom of: demand at this stage of the
+game hugely exceeds what the resort can serve, so anything measuring *how full*
+or *how happy* is measuring a saturated system.
+
+Worth taking together with that entry rather than separately.
+
+### Rooms build themselves up to the planning cap
+
+**Found:** 2026-09-26, same sweep. Milder than it first looked, and recorded
+so the next reader does not re-measure it.
+
+At every rate from $60 to $575 a resort ends with 67-71 rooms against a
+planning limit of 72, at 99-100% occupancy, with identical upkeep. "How many
+rooms" is not a decision; it is a ceiling you walk into while the hotel is
+always full.
+
+It is a symptom rather than a cause. The operator only builds while occupancy
+is above 85%, so building to the cap simply means never dropping below it --
+and at $700 a night, where rooms genuinely go unsold, it stops dead at 13
+rooms. So the ratchet is what being under-priced looks like, not a separate
+fault, and it will ease if the saturated-demand problem above is addressed.
 
 ### Missing the band still raises your reputation
 
