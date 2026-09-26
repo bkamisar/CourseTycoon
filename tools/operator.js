@@ -60,6 +60,9 @@ import { payBuyout } from '../src/sim/investors.js';
 import {
   RUNG_IDS, RUNGS, bidFor, nextRungFor, contractFor,
 } from '../src/sim/tournaments.js';
+import {
+  CHAMPIONSHIP_BUILDINGS, CHAMPIONSHIP_BUILDING_IDS, crowdHandledFor,
+} from '../src/sim/championshipBuildings.js';
 
 /**
  * Cash kept in hand at all times. Without a buffer the operator spends
@@ -121,6 +124,9 @@ export const LEVERS_NOT_PULLED = [
   'Act III: hiring grounds staff FOR a championship. It conditions with '
   + 'whatever crew the course already needed, so nothing here says whether '
   + 'staffing up for a week is worth it.',
+  'Act III: declining to cover the gallery. It buys until the crowd fits '
+  + 'whenever it can afford to, so nothing here measures a host who decides '
+  + 'a stand costs more than the bonus it unlocks.',
   'Act III: choosing a setup other than the middle of the band. It always '
   + 'asks for the midpoint, so nothing here measures a host who gambles on '
   + 'an edge of the band for a harder test or an easier one.',
@@ -493,12 +499,56 @@ export function spendTheTournamentMorning(state, { holesOpen }) {
   if (state.tournament && !state.tournament.resolved) return false;
   const next = nextRungFor(state.tournamentsHosted ?? []);
   if (!next) return false;
+
+  // Put up whatever the rung insists on, if it can be afforded. Until
+  // this existed the operator stopped at the County Open for ever --
+  // Regional wants grandstands and overflow parking and nothing in the
+  // policy ever built them -- so every Act III measurement to date has
+  // been of the cheapest rung and nothing else.
+  buildFor(state, next);
+
   const booked = bidFor(state, next, { holesOpen });
   if (!booked) return false;
   state.tournament = booked;
   const band = RUNGS[next].band;
   state.resort.setupTarget = Math.round((band.low + band.high) / 2);
   return true;
+}
+
+/**
+ * Builds a rung's requirements, then keeps buying until the gallery fits.
+ *
+ * Two different jobs, which is the point. The REQUIRED buildings are what
+ * the governing body insists on before it will take the bid seriously;
+ * covering the gallery is a separate decision, because a rung's own
+ * requirements are deliberately not enough to hold the crowd it draws.
+ *
+ * Buys cheapest-first once the requirements are met, which is the obvious
+ * play rather than a clever one -- it is not trying to find the most
+ * efficient seat per dollar, only to stop the crowd bonus going unclaimed
+ * for want of a car park.
+ */
+function buildFor(state, rungId) {
+  const owned = () => new Set(state.resort.amenities.map((a) => a.type));
+
+  for (const id of RUNGS[rungId].requires) {
+    if (owned().has(id)) continue;
+    const spec = CHAMPIONSHIP_BUILDINGS[id];
+    if (!spec || state.money < spec.build + BUFFER) continue;
+    state.money -= spec.build;
+    state.resort.amenities.push({ id: `${id}-op`, type: id, menu: [] });
+  }
+
+  const spare = CHAMPIONSHIP_BUILDING_IDS
+    .filter((id) => !owned().has(id))
+    .sort((a, b) => CHAMPIONSHIP_BUILDINGS[a].build - CHAMPIONSHIP_BUILDINGS[b].build);
+  for (const id of spare) {
+    if (crowdHandledFor(state.resort.amenities, rungId)) break;
+    const spec = CHAMPIONSHIP_BUILDINGS[id];
+    if (state.money < spec.build + BUFFER) break;
+    state.money -= spec.build;
+    state.resort.amenities.push({ id: `${id}-op`, type: id, menu: [] });
+  }
 }
 
 /**
