@@ -29,6 +29,7 @@ import { investorCards } from './ui/investorCard.js';
 import { payBuyout } from './sim/investors.js';
 import { mountChanges, liveVersion } from './ui/changes.js';
 import { openHotelSheet } from './ui/hotel.js';
+import { mountChampionshipSheet } from './ui/championship.js';
 import { mountStartScreen, startNewGame, applySaveCode } from './ui/start.js';
 import { createSaveAdapter } from './save/adapter.js';
 import { createLocalBackend } from './save/local.js';
@@ -401,6 +402,25 @@ hotelButton.update = () => {
   hotelButton.hidden = (state?.act ?? 1) < 2;
 };
 
+/**
+ * The championship, which only exists from Act III. Hidden until then
+ * rather than disabled, for the same reason the hotel button is: a button
+ * that does nothing is a question the player has to keep answering.
+ */
+const championshipButton = toolbarButton('Championship', () => {
+  mountChampionshipSheet(sheets, {
+    state,
+    onChange: (next) => {
+      commitState(next);
+      hud.update(state);
+      amenityBar.update(state);
+    },
+  });
+});
+championshipButton.update = () => {
+  championshipButton.hidden = (state?.act ?? 1) < 3;
+};
+
 const nineToggle = toolbarButton('Back 9', () => {
   shownNine = shownNine === 0 ? 1 : 0;
   nineToggle.textContent = shownNine === 0 ? 'Back 9' : 'Front 9';
@@ -426,6 +446,7 @@ nineToggle.update = () => {
 overviewToolbar.append(
   nineToggle,
   hotelButton,
+  championshipButton,
   toolbarButton('Amenities', () => onAmenityTap()),
   toolbarButton('Staff', () =>
     openStaffSheet(sheets, {
@@ -523,6 +544,7 @@ function syncScreenChrome() {
   playbackMute.update();
   nineToggle.update();
   hotelButton.update();
+  championshipButton.update();
 }
 router.subscribe(syncScreenChrome);
 syncScreenChrome();
