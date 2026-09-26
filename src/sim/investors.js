@@ -132,9 +132,26 @@ export const MEASURE_LABEL = Object.freeze({
  * be met.
  */
 const CEILING = Object.freeze({
+  // Occupancy is the odd one out and is left where it is deliberately. A
+  // hotel is always full -- that is the design, see `roomLimit` -- so no
+  // ceiling below 1.0 can make this a test. It is a gimme, and the entry
+  // in docs/known-issues.md says so rather than pretending otherwise.
   occupancy: 0.95,
-  prestige: 90,
-  satisfaction: 86,
+  // Measured: a working resort delivers 82-97 prestige and 87-96
+  // satisfaction. These used to stop at 90 and 86, BELOW what a resort
+  // actually achieves, so the ask could never catch up with the delivery
+  // and neither measure could be failed -- satisfaction was missed zero
+  // times in 37 reviews. They were presumably right when resorts
+  // performed worse; the acts got better and the bars stayed put.
+  //
+  // Set just inside the top of what is achievable, so a resort at the
+  // bottom of its range fails and one at the top passes.
+  // Prestige is a cliff and wants care: delivered values cluster tightly
+  // just above 90, so a ceiling of 90 was missed 11% of the time and 95
+  // was missed 76% -- the same "impossible measure" fault, recreated in a
+  // different place while fixing it in the first.
+  prestige: 92,
+  satisfaction: 93,
 });
 
 /**
