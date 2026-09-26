@@ -379,6 +379,29 @@ function injectStyles() {
       padding: 22px 18px 40px;
       z-index: 25;
     }
+    /*
+     * Room for the narration card, which floats over this screen from its
+     * own root (see src/ui/narration.js). Reported from play: Dee and the
+     * marshal were landing squarely on top of the day's profit, so the
+     * first thing a player wanted to read was the one thing they could not
+     * see.
+     *
+     * Only on narrow screens, and that is the whole subtlety. The card is
+     * centred with a max-width, so on a desktop it sits beside the
+     * top-left heading and overlaps nothing -- padding the report down
+     * there would open an empty band for no reason. Below this width the
+     * card spans the full column and the overlap is total.
+     *
+     * The custom property is set by the card as it mounts and cleared as
+     * it goes, so this collapses to nothing when there is no card.
+     * (No backticks in here: this comment lives inside a template literal,
+     * and one would close it and leave CSS being parsed as JavaScript.)
+     */
+    @media (max-width: 560px) {
+      .report-screen {
+        padding-top: calc(22px + var(--narration-height, 0px));
+      }
+    }
     .report-day {
       color: ${PALETTE.UI_LIGHT};
       font-size: 13px;

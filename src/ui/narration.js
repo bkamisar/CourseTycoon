@@ -141,5 +141,45 @@ export function mountNarrationCard(root, { narration, onDismiss } = {}) {
   card.append(speaker, text, dismiss);
   wrap.appendChild(card);
   root.appendChild(wrap);
+
+  /*
+   * Tell the page how tall this is.
+   *
+   * The card floats over the evening report from its own root, which is
+   * the point -- dismissing it is a separate act from reading the report.
+   * But floating over a phone's narrow column meant floating over the
+   * day's profit, which is the first thing anybody looks for. The report
+   * reserves exactly this much room for it (see `--narration-height` in
+   * src/ui/report.js) rather than guessing at a height that changes with
+   * how much Dee has to say.
+   *
+   * Measured after it is in the document, because a card that has not been
+   * laid out has no height. Cleared by `clearNarrationHeight` when the
+   * card goes, so the report closes the gap again.
+   */
+  publishHeight(card);
   return { element: wrap };
+}
+
+/** The gap the report should leave, in the units CSS wants. */
+function publishHeight(card) {
+  const height = Math.ceil(card.getBoundingClientRect().height);
+  // 0 in a test harness with no layout engine, where reserving space for a
+  // card nobody can see would be the wrong answer anyway.
+  if (height > 0) {
+    document.documentElement.style.setProperty('--narration-height', `${height + 12}px`);
+  }
+}
+
+/**
+ * Stop reserving room for a card that is no longer there.
+ *
+ * Called by whoever empties the narration root. Kept separate rather than
+ * wired into the dismiss button, because the root is also cleared without
+ * anybody pressing anything -- a decision card takes the screen, or the
+ * next day begins -- and every one of those paths has to close the gap or
+ * the report keeps a hole in it.
+ */
+export function clearNarrationHeight() {
+  document.documentElement.style.removeProperty('--narration-height');
 }

@@ -23,7 +23,7 @@ import { mountHoleEditor, openTemplatePicker } from './ui/editor.js';
 import { openBuildSheet, openStaffSheet, openPricingSheet } from './ui/panels.js';
 import { openGlossarySheet } from './ui/glossary.js';
 import { mountReport } from './ui/report.js';
-import { mountNarrationCard } from './ui/narration.js';
+import { mountNarrationCard, clearNarrationHeight } from './ui/narration.js';
 import { mountEventCard } from './ui/event.js';
 import { investorCards } from './ui/investorCard.js';
 import { payBuyout } from './sim/investors.js';
@@ -695,11 +695,20 @@ function enterReport() {
   });
   // The world's line about the day that just happened, floated above the
   // report rather than gating it -- see src/ui/narration.js. Dismissing it
-  // only clears the card itself; the report underneath (and its own
-  // Continue button) was never blocked by it in the first place.
+  // only clears the card itself and never the report underneath.
+  //
+  // It DID block the report, despite what this comment used to claim. On a
+  // phone the card spans the full column and was landing squarely on the
+  // day's profit -- reported from play as not being able to see the
+  // takings until Dee had been dismissed. The report now reserves exactly
+  // the card's height on narrow screens, so it is floated above a gap
+  // rather than above the figures.
   mountNarrationCard(narrationRoot, {
     narration: dayResult.report.narration,
-    onDismiss: () => narrationRoot.replaceChildren(),
+    onDismiss: () => {
+      narrationRoot.replaceChildren();
+      clearNarrationHeight();
+    },
   });
 }
 
@@ -737,6 +746,7 @@ function onReportContinue() {
 function showInvestorCards(queue) {
   const [card, ...rest] = queue;
   narrationRoot.replaceChildren();
+  clearNarrationHeight();
   mountEventCard(eventRoot, {
     event: card,
     onChoose: (index) => {
@@ -758,6 +768,7 @@ function showPendingEventOrCommit() {
     // The narration card would otherwise float on top of the decision,
     // and the decision is the thing that matters this evening.
     narrationRoot.replaceChildren();
+    clearNarrationHeight();
     mountEventCard(eventRoot, {
       event: pending,
       onChoose: (index) => {
