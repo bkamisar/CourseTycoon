@@ -37,6 +37,7 @@ import {
   CARE_DIVERTED_WHILE_CONDITIONING, conditioningCostPerDay, CHAMPIONSHIP_HOLES,
 } from './tournaments.js';
 import { playField } from './field.js';
+import { championshipUpkeep, crowdHandledFor } from './championshipBuildings.js';
 
 const DAY_START = 420;  // 7:00am
 const DAY_END = 1080;   // 6:00pm
@@ -501,6 +502,12 @@ export function runDay(state, seed) {
   revenue.total = revenue.greenFees + revenue.merchandise + revenue.food;
   costs.foodCost = food.foodCost;
   costs.total += food.foodCost;
+
+  // The championship buildings. They share the amenities array with the
+  // hotel's, and `hotelUpkeep` returns 0 for types it does not know, so
+  // without this line four expensive buildings cost nothing to run.
+  costs.championshipUpkeep = championshipUpkeep(next.resort.amenities);
+  costs.total += costs.championshipUpkeep;
 
   // Act III's run-up bill. Charged only on a day the crew is actually
   // conditioning (see the hoisted `conditioning` above), so a resort that
