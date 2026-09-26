@@ -868,10 +868,22 @@ export function runDay(state, seed) {
       // The next target is named the moment this one is settled, so the
       // player is never in a period whose target they have not seen.
       const recent = [...(next.investors.recentMeasures ?? []), target.measure];
-      // Once all four have been asked, the slate clears and they start
-      // round again — so no measure is ever stale and none is ever
-      // skipped.
-      next.investors.recentMeasures = recent.length >= MEASURES.length ? [] : recent;
+      /*
+       * Once all four have been asked, the slate clears and they start
+       * round again — so no measure is ever stale and none is ever
+       * skipped.
+       *
+       * It clears to the measure just asked rather than to nothing. An
+       * empty slate was handed straight to the next pick, which then had
+       * no memory at all and could ask about the same thing twice in a
+       * row — a one-in-four chance at every cycle boundary, and exactly
+       * what `tests/investors.test.js` forbids. It went unnoticed for as
+       * long as it did because it takes the right seed to land on it --
+       * an unrelated change shifted the rng stream, seed 6 started
+       * failing, and that is the only reason anybody looked.
+       */
+      next.investors.recentMeasures =
+        recent.length >= MEASURES.length ? [target.measure] : recent;
       next.investors.nextTarget = nextTargetFor(next, rng, {
         recent: next.investors.recentMeasures,
         reviewIndex: (target.reviewIndex ?? 0) + 1,

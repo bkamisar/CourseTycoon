@@ -418,3 +418,30 @@ test('no measure can ever produce a threshold of nothing', () => {
     }
   }
 });
+
+test('the cycle boundary never repeats a measure, on any seed', () => {
+  // The no-repeat rule used to hold everywhere except the one place the
+  // slate was cleared: emptying `recentMeasures` after all four had been
+  // asked handed the next pick no memory at all, so it could ask the same
+  // thing twice running. A one-in-four chance at each boundary, which is
+  // why a single-seed test missed it for weeks.
+  //
+  // Driven through pickMeasure directly rather than through runDay, so it
+  // sweeps every seed cheaply and does not depend on where a particular
+  // rng stream happens to land.
+  for (let seed = 0; seed < 200; seed++) {
+    const rng = makeRng(seed);
+    let recent = [];
+    const asked = [];
+    for (let i = 0; i < 12; i++) {
+      const measure = pickMeasure(rng, recent, { hasHotel: true });
+      asked.push(measure);
+      const next = [...recent, measure];
+      recent = next.length >= MEASURES.length ? [measure] : next;
+    }
+    for (let i = 1; i < asked.length; i++) {
+      assert.notEqual(asked[i], asked[i - 1],
+        `seed ${seed}: asked about ${asked[i]} twice running at ${i} (${asked.join(', ')})`);
+    }
+  }
+});
