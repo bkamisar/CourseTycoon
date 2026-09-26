@@ -38,7 +38,7 @@ export const REVIEW_EVERY = 14;
 export const STARTING_CONFIDENCE = 55;
 
 /** The two that only mean anything once beds exist. */
-const HOTEL_MEASURES = new Set(['occupancy', 'revenuePerRoom']);
+const HOTEL_MEASURES = new Set(['revenuePerRoom']);
 
 /**
  * The lowest nightly rate the investors will reason about, so an unset
@@ -48,8 +48,30 @@ const HOTEL_MEASURES = new Set(['occupancy', 'revenuePerRoom']);
  */
 const MIN_JUDGED_RATE = 60;
 
+/**
+ * What they ask about.
+ *
+ * Occupancy was here and is not any more. It could not be failed by
+ * anybody: a hotel is always full by design -- `roomLimit` is a goal
+ * rather than a wall, and demand deliberately exceeds it -- so occupancy
+ * measured 1.0 on every day of every run, and no threshold below 1.0
+ * could discriminate. An investor asking a question whose answer is
+ * always yes is a formality wearing the costume of a test.
+ *
+ * Turf replaces it because it is the same kind of thing -- a standing
+ * condition of the asset they bought into -- and unlike occupancy it
+ * moves. Measured over sixty days it runs from 21 to 100 depending
+ * entirely on the size of the grounds crew:
+ *
+ *   keepers    1    2    3    4    5    6
+ *   9 holes   33   61   84  100  100  100
+ *   18 holes  21   42   61   79   95  100
+ *
+ * So it is a real question with a real answer, and the answer costs wages
+ * every day rather than being a number set once on a pricing screen.
+ */
 export const MEASURES = Object.freeze([
-  'occupancy', 'revenuePerRoom', 'prestige', 'satisfaction',
+  'turf', 'revenuePerRoom', 'prestige', 'satisfaction',
 ]);
 
 /** What each outcome does to confidence. Missing costs more than meeting
@@ -80,7 +102,7 @@ export function confidenceChange(outcome) {
 
 /** Plain-language names, for a card the player actually reads. */
 export const MEASURE_LABEL = Object.freeze({
-  occupancy: 'occupancy',
+  turf: 'turf quality',
   revenuePerRoom: 'revenue per room',
   prestige: 'prestige',
   satisfaction: 'guest satisfaction',
@@ -132,11 +154,9 @@ export const MEASURE_LABEL = Object.freeze({
  * be met.
  */
 const CEILING = Object.freeze({
-  // Occupancy is the odd one out and is left where it is deliberately. A
-  // hotel is always full -- that is the design, see `roomLimit` -- so no
-  // ceiling below 1.0 can make this a test. It is a gimme, and the entry
-  // in docs/known-issues.md says so rather than pretending otherwise.
-  occupancy: 0.95,
+  // Short of perfect: a course held at exactly 100 every day is a resort
+  // with nothing left to ask of it.
+  turf: 95,
   // Measured: a working resort delivers 82-97 prestige and 87-96
   // satisfaction. These used to stop at 90 and 86, BELOW what a resort
   // actually achieves, so the ask could never catch up with the delivery
@@ -193,13 +213,11 @@ function absoluteThreshold(measure, { rooms, roomRate, reviewIndex }) {
   const step = Math.max(0, reviewIndex);
 
   switch (measure) {
-    case 'occupancy':
-      // Downward with size, upward with time. Rounded, because a
-      // threshold printed as 0.8450000000000001 is the interface showing
-      // the player a float instead of a number.
-      return Math.round(clamp(
-        (0.80 + step * 0.02 - Math.min(0.28, beds / 500)) * ramp, 0.45, 0.96
-      ) * 100) / 100;
+    case 'turf':
+      // A properly staffed course sits at 95-100 and a thin crew drifts
+      // into the sixties, so this starts inside what a careless resort
+      // manages and climbs into what only a well-kept one does.
+      return Math.round(clamp(70 + step * 3, 70, 92) * ramp);
     case 'revenuePerRoom': {
       // A full hotel with a third of its beds in suites takes about 1.5x
       // the nightly rate per room, so anything under that is free.
@@ -247,18 +265,14 @@ export function thresholdFor(measure, { rooms, roomRate, reviewIndex, current = 
     : (CEILING[measure] ?? Infinity);
   const asked = Math.min(Math.max(current * IMPROVEMENT, floor), ceiling);
 
-  // Occupancy is a ratio and everything else is a number the player reads
-  // as a whole one.
-  return measure === 'occupancy'
-    ? Math.round(asked * 100) / 100
-    : Math.round(asked);
+  return Math.round(asked);
 }
 
 /** Where a measure stands today, from a day's report and state. */
 export function measureNow(measure, { report, state }) {
   switch (measure) {
-    case 'occupancy':
-      return report?.hotel?.rate ?? 0;
+    case 'turf':
+      return state?.turfQuality ?? 0;
     case 'revenuePerRoom': {
       const beds = report?.hotel?.capacity ?? 0;
       return beds > 0 ? (report?.revenue?.rooms ?? 0) / beds : 0;
@@ -286,7 +300,10 @@ export function measureNow(measure, { report, state }) {
  * here claimed and the line below it did not make.
  */
 export function assessTarget(target, { report, state }) {
-  const hotelMeasure = target.measure === 'occupancy' || target.measure === 'revenuePerRoom';
+  // Only one measure needs a hotel now that occupancy has gone. Turf,
+  // prestige and satisfaction are all facts about a resort whether or not
+  // anybody sleeps in it.
+  const hotelMeasure = target.measure === 'revenuePerRoom';
   if (hotelMeasure && (report?.hotel?.capacity ?? 0) === 0) return 'missed';
 
   const actual = measureNow(target.measure, { report, state });

@@ -29,10 +29,9 @@
 import { MEASURE_LABEL } from '../sim/investors.js';
 
 /** A target in the units the measure is really in, matching the report's
- * own formatting. An occupancy of 0.62 shown as "0.62" hands the player a
- * ratio when it means a percentage. */
+ * own formatting. Money reads as money; everything else is a whole
+ * number out of a hundred. */
 function fmt(measure, value) {
-  if (measure === 'occupancy') return `${Math.round(value * 100)}%`;
   if (measure === 'revenuePerRoom') return `$${Math.round(value)}`;
   return String(Math.round(value));
 }

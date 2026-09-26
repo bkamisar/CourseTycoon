@@ -111,16 +111,16 @@ test('the same measure never comes up twice running', () => {
 test('pickMeasure avoids everything asked about lately', () => {
   for (let seed = 0; seed < 40; seed++) {
     assert.notEqual(pickMeasure(makeRng(seed), ['prestige']), 'prestige');
-    const picked = pickMeasure(makeRng(seed), ['prestige', 'occupancy']);
-    assert.ok(!['prestige', 'occupancy'].includes(picked));
+    const picked = pickMeasure(makeRng(seed), ['prestige', 'turf']);
+    assert.ok(!['prestige', 'turf'].includes(picked));
     // With three spoken for, only one answer remains.
-    assert.equal(pickMeasure(makeRng(seed), ['prestige', 'occupancy', 'satisfaction']),
+    assert.equal(pickMeasure(makeRng(seed), ['prestige', 'turf', 'satisfaction']),
       'revenuePerRoom');
   }
 });
 
 test('all four measures come up before any comes up twice', () => {
-  // Blocking only the previous measure produced prestige, occupancy,
+  // Blocking only the previous measure produced prestige, turf,
   // prestige, revenue, prestige across five reviews — legal, and useless,
   // because prestige moves least and was nearly free three times in five.
   //
@@ -143,12 +143,16 @@ test('all four measures come up before any comes up twice', () => {
     `the first four reviews repeated a measure: ${asked.join(', ')}`);
 });
 
-test('an occupancy threshold is a number, not a float with a tail', () => {
-  for (const beds of [4, 17, 33, 91, 240]) {
-    const t = thresholdFor('occupancy', {
-      rooms: { standard: beds, suite: 0 }, roomRate: 90, reviewIndex: 1,
+test('every threshold is a whole number the player can read', () => {
+  // Occupancy was a ratio and had to be rounded to two places or the card
+  // showed 0.8450000000000001. Turf, prestige and satisfaction are all
+  // out of a hundred and money is money, so nothing should ever carry a
+  // tail now.
+  for (const measure of MEASURES) {
+    const t = thresholdFor(measure, {
+      rooms: { standard: 30, suite: 14 }, roomRate: 300, reviewIndex: 3,
     });
-    assert.equal(t, Math.round(t * 100) / 100, `${beds} rooms gave ${t}`);
+    assert.equal(t, Math.round(t), `${measure} gave ${t}`);
   }
 });
 
@@ -161,18 +165,22 @@ test('meeting pays, and missing costs more', () => {
   assert.ok(Math.abs(confidenceChange('missed')) > confidenceChange('met') * 0.8);
 });
 
-test('a small hotel is expected to be full and a big one is not', () => {
-  // Reads backwards until you see the measurements in spec §8.1: 60 rooms
-  // runs 100% full, 120 runs 63%, 240 runs 31%. A flat target would be
-  // free while the resort is small and impossible once it is large.
-  const small = thresholdFor('occupancy', {
-    rooms: { standard: 10, suite: 2 }, roomRate: 90, reviewIndex: 1,
-  });
-  const large = thresholdFor('occupancy', {
-    rooms: { standard: 160, suite: 80 }, roomRate: 90, reviewIndex: 1,
-  });
-  assert.ok(small > large, 'a boutique hotel should be held to a higher occupancy');
-  assert.ok(small <= 0.92 && large >= 0.4, 'and both should stay inside sane bounds');
+test('THE TURF TARGET IS A QUESTION A CARELESS RESORT FAILS', () => {
+  // Why turf replaced occupancy. Occupancy measured 1.0 on every day of
+  // every run -- a hotel is always full by design -- so no threshold
+  // below 1.0 could tell a well-run resort from a badly-run one.
+  //
+  // Turf moves with the grounds crew and nothing else. Measured over
+  // sixty days: one keeper holds a nine at 33 and an eighteen at 21,
+  // while five hold them at 100 and 95. So the target has to sit above
+  // what a thin crew manages and below what a proper one does.
+  const opts = { rooms: { standard: 30, suite: 14 }, roomRate: 300 };
+  const early = thresholdFor('turf', { ...opts, reviewIndex: 1 });
+  const late = thresholdFor('turf', { ...opts, reviewIndex: 8 });
+
+  assert.ok(early > 60, `an early turf target of ${early} is met by a course nobody is tending`);
+  assert.ok(late <= 95, `a late target of ${late} demands a perfection no course holds every day`);
+  assert.ok(late > early, 'and they should expect more as time goes on');
 });
 
 test('the first review is gentler than the ones after it', () => {
@@ -189,7 +197,7 @@ test('A RESORT WITH NO HOTEL IS NOT JUDGED AS A FAILED ONE', () => {
   // would be the same category error as declaring marshals worthless on a
   // three-hole course; see spec §15b.
   const verdict = assessTarget(
-    { measure: 'occupancy', threshold: 0.6 },
+    { measure: 'revenuePerRoom', threshold: 200 },
     {
       report: { hotel: { capacity: 0, rate: 0 }, revenue: { rooms: 0 } },
       state: newGame(1),
@@ -200,8 +208,8 @@ test('A RESORT WITH NO HOTEL IS NOT JUDGED AS A FAILED ONE', () => {
 
 test('every measure reads what it claims to read', () => {
   const report = { hotel: { capacity: 20, rate: 0.75 }, revenue: { rooms: 1400 } };
-  const state = { prestige: 62, satisfactionHistory: [60, 64, 62] };
-  assert.equal(measureNow('occupancy', { report, state }), 0.75);
+  const state = { prestige: 62, turfQuality: 88, satisfactionHistory: [60, 64, 62] };
+  assert.equal(measureNow('turf', { report, state }), 88);
   assert.equal(measureNow('revenuePerRoom', { report, state }), 70);
   assert.equal(measureNow('prestige', { report, state }), 62);
   assert.equal(measureNow('satisfaction', { report, state }), 62);
@@ -336,7 +344,7 @@ test('CALIBRATION: targets are demanding but not absurd on a real resort', () =>
   // would pass with a prestige target of 5 or of 500.
   //
   // These are the measured figures for a resort being run properly.
-  const running = { prestige: 80, satisfaction: 72, revenuePerRoom: 140, occupancy: 1.0 };
+  const running = { prestige: 80, satisfaction: 72, revenuePerRoom: 140, turf: 96 };
   const rooms = { standard: 20, suite: 10 };
   const roomRate = 95;
 
@@ -377,7 +385,7 @@ test('the first target is never about a hotel the resort has not got', () => {
     const investors = startingInvestors(state, makeRng(seed));
     const target = investors.nextTarget;
     assert.ok(target, `seed ${seed}: the investors must arrive with a target`);
-    assert.ok(!['occupancy', 'revenuePerRoom'].includes(target.measure),
+    assert.equal(target.measure === 'revenuePerRoom', false,
       `seed ${seed}: asked for ${target.measure} from a resort with no rooms`);
     assert.ok(target.threshold > 0,
       `seed ${seed}: ${target.measure} target of ${target.threshold} is no target at all`);
@@ -395,7 +403,7 @@ test('hotel measures come back once there is a hotel', () => {
   for (let i = 0; i < 30; i++) {
     seen.add(nextTargetFor(state, makeRng(500 + i), { recent: [], reviewIndex: i }).measure);
   }
-  assert.ok(seen.has('occupancy') || seen.has('revenuePerRoom'),
+  assert.ok(seen.has('revenuePerRoom'),
     'a resort with rooms has to be asked about them');
 });
 
@@ -462,7 +470,7 @@ test('EVERY MEASURE STOPS ASKING FOR MORE SOMEWHERE', () => {
   for (const measure of MEASURES) {
     let current = measureNow(measure, {
       report: { hotel: { rate: 0.8, capacity: 60 }, revenue: { rooms: 60 * 300 } },
-      state: { prestige: 60, satisfactionHistory: Array(REVIEW_EVERY).fill(60) },
+      state: { prestige: 60, turfQuality: 80, satisfactionHistory: Array(REVIEW_EVERY).fill(60) },
     });
     let previous = current;
     for (let review = 0; review < 40; review++) {
@@ -474,7 +482,7 @@ test('EVERY MEASURE STOPS ASKING FOR MORE SOMEWHERE', () => {
     // Forty fortnights of compounding is over three years. Nothing should
     // have run away to an unreachable number in that time.
     const fullHouse = (40 * 300 + 20 * 780) / 60;   // every bed sold, suites at 2.6x
-    const limit = { occupancy: 1, prestige: 100, satisfaction: 100, revenuePerRoom: fullHouse };
+    const limit = { turf: 100, prestige: 100, satisfaction: 100, revenuePerRoom: fullHouse };
     assert.ok(current <= limit[measure] + 1e-6,
       `${measure} ratcheted to ${current} after forty reviews, past any level a resort can reach `
       + `(${limit[measure]}) -- it has no ceiling`);

@@ -18,11 +18,9 @@ import { PALETTE } from '../render/palette.js';
 import { CONDITIONS } from '../sim/weather.js';
 import { MEASURE_LABEL, measureNow } from '../sim/investors.js';
 
-/** A target, in the units the measure is actually in. An occupancy of
- * 0.62 shown as "0.62" is the interface handing the player a ratio when
- * it means a percentage. */
+/** A target, in the units the measure is actually in: money reads as
+ * money, and everything else is a whole number out of a hundred. */
 function formatTarget(measure, value) {
-  if (measure === 'occupancy') return `${Math.round(value * 100)}%`;
   if (measure === 'revenuePerRoom') return `$${Math.round(value)}`;
   return String(Math.round(value));
 }
