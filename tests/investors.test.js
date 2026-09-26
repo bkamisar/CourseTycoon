@@ -445,3 +445,51 @@ test('the cycle boundary never repeats a measure, on any seed', () => {
     }
   }
 });
+
+test('EVERY MEASURE STOPS ASKING FOR MORE SOMEWHERE', () => {
+  // Each target is "seven per cent better than you are doing now", which
+  // has to stop somewhere or it stops being a relationship and becomes a
+  // countdown. Occupancy, prestige and satisfaction had ceilings from the
+  // start; revenue per room had Infinity, and so was the only one that
+  // ratcheted forever. Measured across 622 reviews it was 58% of every
+  // failure while the other three sat between 4% and 9% -- and after an
+  // unrelated change made rooms scarcer, 87% against 0%.
+  //
+  // Driven by asking repeatedly for an improvement on what was just
+  // delivered, which is exactly what the fortnightly review does.
+  const rooms = { standard: 40, suite: 20 };
+  const roomRate = 300;
+  for (const measure of MEASURES) {
+    let current = measureNow(measure, {
+      report: { hotel: { rate: 0.8, capacity: 60 }, revenue: { rooms: 60 * 300 } },
+      state: { prestige: 60, satisfactionHistory: Array(REVIEW_EVERY).fill(60) },
+    });
+    let previous = current;
+    for (let review = 0; review < 40; review++) {
+      const asked = thresholdFor(measure, { rooms, roomRate, reviewIndex: review, current });
+      // A resort that delivers exactly what was asked, every time.
+      current = asked;
+      previous = asked;
+    }
+    // Forty fortnights of compounding is over three years. Nothing should
+    // have run away to an unreachable number in that time.
+    const fullHouse = (40 * 300 + 20 * 780) / 60;   // every bed sold, suites at 2.6x
+    const limit = { occupancy: 1, prestige: 100, satisfaction: 100, revenuePerRoom: fullHouse };
+    assert.ok(current <= limit[measure] + 1e-6,
+      `${measure} ratcheted to ${current} after forty reviews, past any level a resort can reach `
+      + `(${limit[measure]}) -- it has no ceiling`);
+  }
+});
+
+test('and they stop at a full house rather than at a number', () => {
+  // The ceiling for revenue per room is what the hotel earns with every
+  // bed sold at the rate the player has chosen. Asking for more is asking
+  // them to put the price up, which is their decision and not a target.
+  const rooms = { standard: 40, suite: 20 };
+  const cheap = thresholdFor('revenuePerRoom', { rooms, roomRate: 100, reviewIndex: 9, current: 100000 });
+  const dear = thresholdFor('revenuePerRoom', { rooms, roomRate: 400, reviewIndex: 9, current: 100000 });
+  assert.ok(dear > cheap,
+    'a hotel charging more should be expected to take more per room');
+  // A third in suites at 2.6x is about 1.5x the nightly rate per room.
+  assert.ok(cheap > 100 && cheap < 250, `a $100 room capped at ${cheap}, which is not a full house`);
+});

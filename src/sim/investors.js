@@ -24,7 +24,7 @@
  * to drift.
  */
 import { clamp } from './hole.js';
-import { totalRooms, ROOM_TYPES } from './rooms.js';
+import { totalRooms, ROOM_TYPES, roomCounts, nightlyRate } from './rooms.js';
 
 /** What a sold room fetches, as a share of what it cost. The same haircut
  * demolishing an amenity takes — a mistake should cost something without
@@ -116,12 +116,50 @@ export const MEASURE_LABEL = Object.freeze({
  * which is what a reasonable person does when the thing they wanted more
  * of has run out of room.
  */
+/**
+ * The point at which they stop asking for more.
+ *
+ * Every target is "seven per cent better than you are doing now", which
+ * has to stop somewhere or it becomes a countdown rather than a
+ * relationship. Occupancy, prestige and satisfaction all had a ceiling
+ * from the start. Revenue per room had `Infinity`, and was therefore the
+ * only measure that ratcheted forever -- which is why, measured across
+ * 622 reviews, it accounted for 58% of all failures while the other three
+ * sat between 4% and 9%.
+ *
+ * That made the fortnightly meeting one problem wearing four hats: three
+ * measures you pass by existing, and one that grinds up until it cannot
+ * be met.
+ */
 const CEILING = Object.freeze({
   occupancy: 0.95,
   prestige: 90,
   satisfaction: 86,
-  revenuePerRoom: Infinity,
 });
+
+/**
+ * What a full house is worth per room, at the rate the player is
+ * charging.
+ *
+ * Revenue per room has no natural maximum the way a percentage does, but
+ * it does have an obvious stopping point: every bed sold. Asking for more
+ * than that is not asking the player to run the hotel better, it is
+ * asking them to put the price up -- which is their decision to make and
+ * not a target to be set.
+ *
+ * Suites let for 2.6x a standard room, so a hotel with a third of its
+ * beds in suites takes about 1.5x its nightly rate per room. Computed
+ * from the actual mix rather than assumed, so a resort that builds
+ * nothing but suites is judged on what its own hotel can earn.
+ */
+function fullHousePerRoom({ rooms, roomRate }) {
+  const counts = roomCounts(rooms);
+  const total = counts.standard + counts.suite;
+  if (total <= 0) return Infinity;
+  const takings = counts.standard * nightlyRate('standard', roomRate)
+    + counts.suite * nightlyRate('suite', roomRate);
+  return takings / total;
+}
 
 /** How much better than today they want it. */
 const IMPROVEMENT = 1.07;
@@ -187,7 +225,9 @@ export function thresholdFor(measure, { rooms, roomRate, reviewIndex, current = 
   const floor = absoluteThreshold(measure, { rooms, roomRate, reviewIndex });
   if (current === null || !Number.isFinite(current) || current <= 0) return floor;
 
-  const ceiling = CEILING[measure] ?? Infinity;
+  const ceiling = measure === 'revenuePerRoom'
+    ? fullHousePerRoom({ rooms, roomRate })
+    : (CEILING[measure] ?? Infinity);
   const asked = Math.min(Math.max(current * IMPROVEMENT, floor), ceiling);
 
   // Occupancy is a ratio and everything else is a number the player reads
