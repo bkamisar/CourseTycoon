@@ -153,42 +153,6 @@ crowd-mix reaction to difficulty weaker than the satisfaction-side hit,
 or capping how far conditioning can push a capacity-bound resort's
 appeal), which is balance work outside a wiring task.
 
-### Dee asks for food she is already carrying
-
-**Found:** 2026-09-25, from play. Reported as "what does this prompt nudge me to
-do that I haven't done?" -- which is the tell: the player could not work out
-what was being asked of them, because nothing was.
-
-The line is `dee-5` in `src/sim/narration.js`:
-
-> Three fellas asked if I do food. Told them to take it up with you.
-
-Its `when` is `(c) => c.hasCart` and nothing else, so it fires the moment the
-player owns a beverage cart regardless of whether they sell food anywhere. A
-new game's cart carries three drinks and one food item by default, so the
-first time this line appears Dee is asking the owner for something already on
-her own cart.
-
-The comment directly above her lines states the principle it breaks:
-
-> Dee only speaks if she is actually out there. A voice from an amenity the
-> player has not built is the world telling them about something that does
-> not exist.
-
-Same fault one level down -- gated on the cart existing, not on the thing the
-line is actually about.
-
-The fix wants a food condition on the narration context (`src/sim/narration.js`
-builds it around line 95), something like "no food is sold on the course" --
-true when no `cartable` food item sits in the cart's four slots and no snack
-shack or halfway house exists. `ITEMS[id].cartable` and `MENU_SLOTS` already
-carry everything needed; the context simply never asks.
-
-Worth a sweep of the other `when` clauses at the same time. This one was found
-by a player wondering what they had missed, which is an expensive way to find
-out that a line meant nothing, and it is unlikely to be the only line whose
-premise goes unchecked.
-
 ### The turf self-heals when a resort empties out
 
 **Found:** 2026-09-23, while making play wear the course. **Known and

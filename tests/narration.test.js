@@ -173,3 +173,38 @@ test('the cart shows up in the narration context', () => {
   const after = narrationContext({ report, previousReport: undefined, state: withCart });
   assert.equal(after.hasCart, true);
 });
+
+// --- Nobody describes something that is not there ---------------------
+
+test('EVERY VOICE THAT NEEDS A BUILDING IS GATED ON HAVING ONE', () => {
+  // Dee had this from the day she was written -- a voice from an amenity
+  // the player has not built is the world telling them about something
+  // that does not exist -- and she was the only one. The pro shop had ten
+  // lines, including "Sold a coffee. That was the day.", and nothing
+  // checked whether there was a pro shop.
+  //
+  // Asserted over the speakers rather than line by line, so a new shop
+  // line added later cannot slip through ungated.
+  const NEEDS = { dee: 'hasCart', shop: 'hasShop' };
+  for (const line of LINES) {
+    const gate = NEEDS[line.speaker];
+    if (!gate) continue;
+    assert.ok(String(line.when ?? '').includes(gate),
+      `${line.id} is spoken by ${line.speaker} but does not check ${gate}`);
+  }
+});
+
+test('Dee stops asking for food once there is food', () => {
+  // Reported from play as not being able to work out what was being asked
+  // for, which is the tell: nothing was. The line fired whenever a cart
+  // existed, and a new cart carries a food item by default, so she was
+  // asking the owner for something already in her own cooler.
+  const line = LINES.find((l) => l.id === 'dee-5');
+  assert.ok(line, 'dee-5 should still exist');
+  assert.equal(line.when({ hasCart: true, sellsFood: true }), false,
+    'she must not ask for food the resort already sells');
+  assert.equal(line.when({ hasCart: true, sellsFood: false }), true,
+    'and must still ask when there genuinely is none');
+  assert.equal(line.when({ hasCart: false, sellsFood: false }), false,
+    'and never when she is not out there at all');
+});

@@ -1,5 +1,6 @@
 import { SEGMENTS, SEGMENT_KEYS } from './segments.js';
 import { TARGET_MINUTES_PER_HOLE } from './schedule.js';
+import { ITEMS } from './menu.js';
 
 /**
  * What the world says about the resort.
@@ -101,10 +102,30 @@ export function narrationContext({ report, previousReport, state }) {
     holesOpen,
     nearGate: Boolean(report.gate?.nearGate),
     day: report.day ?? 1,
-    // Dee only speaks if she is actually out there. A voice from an
-    // amenity the player has not built is the world telling them about
-    // something that does not exist.
+    /*
+     * What actually stands on the property, so a voice cannot describe
+     * something that is not there.
+     *
+     * Dee had this from the start -- a voice from an amenity the player
+     * has not built is the world telling them about something that does
+     * not exist -- but she was the only one. The pro shop had ten lines
+     * ("Sold a coffee. That was the day.") and nothing checked whether
+     * there was a pro shop.
+     *
+     * And a gate on the SPEAKER is not enough on its own. Dee's line
+     * about three fellas asking whether she does food fired whenever a
+     * cart existed, including when the cart already had a hot dog on it,
+     * so she was asking the owner for something sitting in her own
+     * cooler. Reported from play as not being able to work out what was
+     * being asked for -- which is the tell, because nothing was.
+     */
     hasCart: state.resort.amenities.some((a) => a.type === 'beverageCart'),
+    hasShop: state.resort.amenities.some((a) => a.type === 'proShop'),
+    // Anywhere on the property with something to eat actually on its
+    // board. A kitchen with nothing in it feeds nobody.
+    sellsFood: state.resort.amenities.some(
+      (a) => (a.menu ?? []).some((id) => ITEMS[id]?.kind === 'food')
+    ),
   };
 }
 
@@ -127,7 +148,7 @@ export const LINES = [
   { id: 'dee-2', speaker: 'dee', text: "Nobody buys anything on the first two holes. Everybody buys on the sixth.", when: (c) => c.hasCart },
   { id: 'dee-3', speaker: 'dee', text: "Group on the fourth waved me off. Group behind them bought six.", when: (c) => c.hasCart },
   { id: 'dee-4', speaker: 'dee', text: "You can tell how the round's going by what they order.", when: (c) => c.hasCart },
-  { id: 'dee-5', speaker: 'dee', text: "Three fellas asked if I do food. Told them to take it up with you.", when: (c) => c.hasCart },
+  { id: 'dee-5', speaker: 'dee', text: "Three fellas asked if I do food. Told them to take it up with you.", when: (c) => c.hasCart && !c.sellsFood },
   { id: 'dee-6', speaker: 'dee', text: "Backed up on the seventh, so I sat there and sold out.", when: (c) => c.hasCart && c.slow },
   { id: 'dee-7', speaker: 'dee', text: "Quiet out there. I did more waving than selling.", when: (c) => c.hasCart && c.quiet },
   { id: 'dee-8', speaker: 'dee', text: "Couldn't get round fast enough today. Everyone wanted something.", when: (c) => c.hasCart && c.busy },
@@ -140,21 +161,21 @@ export const LINES = [
   { id: 'loc-3', speaker: 'starter', text: "Half the sheet booked by people I know by first name.", when: dom('locals') },
   { id: 'loc-4', speaker: 'gus', text: "Fella out there played here twice today. Twice.", when: dom('locals') },
   { id: 'loc-5', speaker: 'regular', text: "It's not fancy. It's ours.", when: dom('locals') },
-  { id: 'loc-6', speaker: 'shop', text: "Sold four gloves and a sleeve of balls. Nobody browses. They know what they want.", when: dom('locals') },
+  { id: 'loc-6', speaker: 'shop', text: "Sold four gloves and a sleeve of balls. Nobody browses. They know what they want.", when: (c) => c.hasShop && dom('locals')(c) },
 
   // --- A serious golfer's course ---------------------------------------
   { id: 'ser-1', speaker: 'visitor', text: "Drove two hours for this. Worth it.", when: dom('serious') },
   { id: 'ser-2', speaker: 'gus', text: "Quiet group on the 3rd. Proper quiet. They were concentrating.", when: dom('serious') },
   { id: 'ser-3', speaker: 'starter', text: "Three single-figure handicaps before nine this morning.", when: dom('serious') },
   { id: 'ser-4', speaker: 'visitor', text: "Asked me what the course record was. I had to go and look.", when: dom('serious') },
-  { id: 'ser-5', speaker: 'shop', text: "Nobody wants a cap. They all want to know the yardages.", when: dom('serious') },
+  { id: 'ser-5', speaker: 'shop', text: "Nobody wants a cap. They all want to know the yardages.", when: (c) => c.hasShop && dom('serious')(c) },
   { id: 'ser-6', speaker: 'gus', text: "Overheard someone call it a proper test. He didn't mean it kindly, but he'll be back.", when: dom('serious') },
 
   // --- A destination course --------------------------------------------
   { id: 'des-1', speaker: 'visitor', text: "Took more photographs than shots. Nearly.", when: dom('destination') },
   { id: 'des-2', speaker: 'gus', text: "Group on the 5th stopped to look at the view. Held everyone up. Couldn't be cross about it.", when: dom('destination') },
   { id: 'des-3', speaker: 'starter', text: "Two foursomes asked if we do this as a package.", when: dom('destination') },
-  { id: 'des-4', speaker: 'shop', text: "They buy the souvenir, not the equipment.", when: dom('destination') },
+  { id: 'des-4', speaker: 'shop', text: "They buy the souvenir, not the equipment.", when: (c) => c.hasShop && dom('destination')(c) },
   { id: 'des-5', speaker: 'visitor', text: "Not sure I played well. Had a lovely afternoon though.", when: dom('destination') },
 
   // --- The crowd is changing -------------------------------------------
@@ -163,7 +184,7 @@ export const LINES = [
   { id: 'shift-loc', speaker: 'gus', text: "More familiar faces this week. Word's got round that it's playable.", when: (c) => c.rising === 'locals' },
   { id: 'shift-loc-2', speaker: 'regular', text: "Brought my brother-in-law. He's not a golfer. He had a nice time.", when: (c) => c.rising === 'locals' },
   { id: 'shift-des', speaker: 'starter', text: "Had someone ask where the nearest hotel was. Second time this week.", when: (c) => c.rising === 'destination' },
-  { id: 'shift-des-2', speaker: 'shop', text: "More cameras than usual out there.", when: (c) => c.rising === 'destination' },
+  { id: 'shift-des-2', speaker: 'shop', text: "More cameras than usual out there.", when: (c) => c.hasShop && (c.rising === 'destination') },
   { id: 'fade-loc', speaker: 'regular', text: "Used to see more of the old crowd. Suppose it's changed.", when: (c) => c.falling === 'locals' },
   { id: 'fade-ser', speaker: 'gus', text: "The good players have gone quiet on us.", when: (c) => c.falling === 'serious' },
 
@@ -172,7 +193,7 @@ export const LINES = [
   { id: 'hard-2', speaker: 'regular', text: "I like a challenge. I don't like that.", when: (c) => c.tooHard },
   { id: 'hard-3', speaker: 'starter', text: "Had two groups ask if there were forward tees. There aren't.", when: (c) => c.tooHard },
   { id: 'hard-4', speaker: 'gus', text: "Someone picked up on the 4th and walked in. Just walked in.", when: (c) => c.tooHard },
-  { id: 'hard-5', speaker: 'shop', text: "Selling a remarkable number of golf balls. Make of that what you will.", when: (c) => c.tooHard },
+  { id: 'hard-5', speaker: 'shop', text: "Selling a remarkable number of golf balls. Make of that what you will.", when: (c) => c.hasShop && (c.tooHard) },
   { id: 'easy-1', speaker: 'visitor', text: "Shot the best round of my life. Not sure it counts.", when: (c) => c.tooEasy },
   { id: 'easy-2', speaker: 'gus', text: "Nobody's been in the trees all day. Feels wrong.", when: (c) => c.tooEasy },
   { id: 'easy-3', speaker: 'visitor', text: "Pleasant enough. Wouldn't make a trip for it.", when: (c) => c.tooEasy },
@@ -191,10 +212,10 @@ export const LINES = [
   // --- How busy it was --------------------------------------------------
   { id: 'quiet-1', speaker: 'starter', text: "Sheet's thin. Had the first tee to myself most of the morning.", when: (c) => c.quiet },
   { id: 'quiet-2', speaker: 'gus', text: "Walked the whole course and saw four people. Peaceful. Not profitable.", when: (c) => c.quiet },
-  { id: 'quiet-3', speaker: 'shop', text: "Sold a coffee. That was the day.", when: (c) => c.quiet },
+  { id: 'quiet-3', speaker: 'shop', text: "Sold a coffee. That was the day.", when: (c) => c.hasShop && (c.quiet) },
   { id: 'busy-1', speaker: 'starter', text: "Every slot gone by ten. Turned people away.", when: (c) => c.busy },
   { id: 'busy-2', speaker: 'gus', text: "Car park's full and there are two cars on the verge.", when: (c) => c.busy },
-  { id: 'busy-3', speaker: 'shop', text: "Ran out of scorecards. Actually ran out.", when: (c) => c.busy },
+  { id: 'busy-3', speaker: 'shop', text: "Ran out of scorecards. Actually ran out.", when: (c) => c.hasShop && (c.busy) },
 
   // --- Pace -------------------------------------------------------------
   { id: 'slow-1', speaker: 'gus', text: "Spent my whole day telling people to keep up. They can't. There's nowhere to go.", when: (c) => c.slow },
@@ -219,7 +240,7 @@ export const LINES = [
   { id: 'press-samey', speaker: 'gazette', text: "One reader writes that the holes rather blur into one another.", when: (c) => c.rating < 55 },
 
   // --- Prestige ---------------------------------------------------------
-  { id: 'prest-1', speaker: 'shop', text: "Someone rang asking if we take society bookings. We've arrived.", when: (c) => c.prestige >= 65 },
+  { id: 'prest-1', speaker: 'shop', text: "Someone rang asking if we take society bookings. We've arrived.", when: (c) => c.hasShop && (c.prestige >= 65) },
   { id: 'prest-2', speaker: 'starter', text: "Had a caller ask how far in advance they need to book. That's new.", when: (c) => c.prestige >= 55 },
   { id: 'prest-low', speaker: 'gus', text: "Man asked me for directions to the golf course. He was standing on it.", when: (c) => c.prestige <= 25 },
 
@@ -227,14 +248,14 @@ export const LINES = [
   { id: 'gate-1', speaker: 'visitor', text: "I'd play again tomorrow, but the nearest motel is forty minutes out.", when: (c) => c.nearGate },
   { id: 'gate-2', speaker: 'starter', text: "Third person this week has asked whether we have rooms.", when: (c) => c.nearGate },
   { id: 'gate-3', speaker: 'gus', text: "Couple drove up from the coast, played, and drove straight back. Seemed a shame.", when: (c) => c.nearGate },
-  { id: 'gate-4', speaker: 'shop', text: "They keep asking where to stay. I keep saying the pub in the village. They keep looking disappointed.", when: (c) => c.nearGate },
+  { id: 'gate-4', speaker: 'shop', text: "They keep asking where to stay. I keep saying the pub in the village. They keep looking disappointed.", when: (c) => c.hasShop && (c.nearGate) },
 
   // --- Always available, so a day is never silent ------------------------
   { id: 'any-1', speaker: 'gus', text: "Nothing to report. Some days that's the report.", when: () => true },
   { id: 'any-2', speaker: 'keeper', text: "Mowed, raked, watered. Same tomorrow.", when: () => true },
   { id: 'any-3', speaker: 'starter', text: "Wind got up around four. Nobody minded much.", when: () => true },
   { id: 'any-4', speaker: 'gus', text: "Found a wedge on the 3rd. It'll be claimed by Thursday. They always are.", when: () => true },
-  { id: 'any-5', speaker: 'shop', text: "Quiet at the counter. Busy on the course. I'll take it.", when: () => true },
+  { id: 'any-5', speaker: 'shop', text: "Quiet at the counter. Busy on the course. I'll take it.", when: (c) => c.hasShop },
   { id: 'any-6', speaker: 'keeper', text: "Moles are back on the 2nd. I'm dealing with it.", when: () => true },
 ];
 
