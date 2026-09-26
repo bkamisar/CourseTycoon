@@ -734,6 +734,21 @@ export function runDay(state, seed) {
     };
     revenue.tournament = result.paid;
     revenue.total += result.paid;
+    /*
+     * And the headline figure, which was settled before the championship
+     * was scored.
+     *
+     * `profit` is computed from revenue and costs several hundred lines
+     * above, and the purse only arrives here -- so on the one day a
+     * resort earns a six-figure cheque, the report announced a loss and
+     * then listed the cheque in its own revenue breakdown directly
+     * underneath. The money itself was always right: `next.money` takes
+     * `profit` and `result.paid` separately.
+     *
+     * Recomputed from the same two totals the breakdown renders, so the
+     * headline cannot drift from the rows again.
+     */
+    report.profit = revenue.total - costs.total;
   }
 
   // What the world says about all this. Positioning here is emergent - the

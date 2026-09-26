@@ -452,3 +452,25 @@ test('the report records what the week was judged on, not only the verdict', () 
   assert.deepEqual(t.band, RUNGS.countyOpen.band, 'and what was being asked for');
   assert.ok(t.field, 'and what they shot');
 });
+
+test('the reported profit and the revenue breakdown agree on a championship day', () => {
+  // The purse is added to revenue.total long after `profit` is computed,
+  // so the report used to announce a loss on the day a resort banked six
+  // figures -- and then list the cheque in its own breakdown directly
+  // underneath. The money was never wrong; the headline was.
+  const state = openFullCourse(actThreeResort(61));
+  state.prestige = 90;
+  state.resort.setup = 53;
+  state.resort.setupTarget = 53;
+  state.turfQuality = 92;
+  state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+
+  const before = state.money;
+  const { state: after, report } = runDay(state, 5600);
+
+  assert.ok(report.tournament.paid > 0, 'sanity: the week paid something');
+  assert.equal(report.profit, report.revenue.total - report.costs.total,
+    'the headline must be the rows it sits above');
+  assert.equal(Math.round(after.money - before), Math.round(report.profit),
+    'and the bank must agree with both');
+});

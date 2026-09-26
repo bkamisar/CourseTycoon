@@ -211,3 +211,56 @@ test('computeReportData wires the crowd rows in, matching crowdRows directly', (
   const previous = day2.state.history[day2.state.history.length - 2];
   assert.deepEqual(data.crowd, crowdRows(day2.report, previous));
 });
+
+// --- Act III ----------------------------------------------------------
+
+test('a championship day puts the tournament on the report', () => {
+  const { state, report } = runDay(newGame(71), 71);
+  report.tournament = {
+    rung: 'countyOpen',
+    met: ['band', 'turf'],
+    missed: ['pace', 'crowd'],
+    paid: 61000, prestige: 4, barDays: 0,
+    setup: 52, band: { low: 45, high: 60 }, turfQuality: 88,
+    field: {
+      averageToPar: 5.4, underPar: 2, best: -2, worst: 14,
+      hardestHole: 14, hardestHoleOverPar: 1.4,
+      averageRoundMinutes: 268, players: 60, par: 72,
+    },
+  };
+  const data = computeReportData(state, report);
+  assert.ok(data.tournament, 'the report must carry the championship');
+  assert.equal(data.tournament.paid, 61000, 'read from the report, not recomputed');
+  assert.equal(data.tournament.conditions.length, 4, 'all four named, met or not');
+  assert.equal(data.tournament.field.averageToPar, 5.4);
+});
+
+test('an ordinary day has no tournament section', () => {
+  const { state, report } = runDay(newGame(72), 72);
+  const data = computeReportData(state, report);
+  assert.equal(data.tournament ?? null, null);
+});
+
+test('the report distinguishes a condition earned from one that paid', () => {
+  // Band gates the rest. A section showing turf as simply "missed" when
+  // the player held it at 94 would be the interface disagreeing with the
+  // simulation; showing it as paid would disagree with the bank.
+  const { state, report } = runDay(newGame(73), 73);
+  report.tournament = {
+    rung: 'countyOpen',
+    met: ['turf', 'pace', 'crowd'],
+    missed: ['band'],
+    paid: 18000, prestige: 2, barDays: 0,
+    setup: 12, band: { low: 45, high: 60 }, turfQuality: 94,
+    field: {
+      averageToPar: 1.1, underPar: 17, best: -8, worst: 9,
+      hardestHole: 2, hardestHoleOverPar: 0.6,
+      averageRoundMinutes: 241, players: 60, par: 72,
+    },
+  };
+  const data = computeReportData(state, report);
+  const turf = data.tournament.conditions.find((c) => c.id === 'turf');
+  assert.equal(turf.met, true, 'the turf was held');
+  assert.equal(turf.paid, false, 'and it paid nothing, because the band was missed');
+  assert.equal(data.tournament.conditions.filter((c) => c.paid).length, 0);
+});

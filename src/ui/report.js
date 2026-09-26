@@ -35,6 +35,7 @@ const WEATHER_SHORT = Object.fromEntries(
 import { ordinal } from '../sim/satisfaction.js';
 import { openHoles } from '../sim/state.js';
 import { TARGET_MINUTES_PER_HOLE } from '../sim/schedule.js';
+import { RUNGS, contractFor } from '../sim/tournaments.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 
 const RATING_SPECS = [
@@ -288,6 +289,48 @@ export function paceVerdict({ avgMinutes, targetMinutes, hadWaits }) {
   };
 }
 
+/**
+ * The championship, as the evening report tells it. Null if there wasn't one.
+ *
+ * Read straight off the report. The figures were settled when the day ran
+ * -- setup starts decaying the next morning, and the state this renders
+ * against has already moved on -- so recomputing any of it here is how an
+ * interface starts describing a different course from the one the field
+ * played.
+ *
+ * `met` and `paid` are kept apart deliberately. The band gates the other
+ * three, so a week can hold its turf at 94 and be paid nothing for it.
+ * Showing that as "missed" would disagree with the player's own eyes;
+ * showing it as paid would disagree with the bank.
+ */
+function tournamentSection(report) {
+  const t = report?.tournament;
+  if (!t) return null;
+  const contract = contractFor(t.rung);
+  const bandMet = (t.met ?? []).includes('band');
+  return {
+    rung: t.rung,
+    label: RUNGS[t.rung]?.label ?? t.rung,
+    paid: t.paid,
+    ceiling: contract?.ceiling ?? 0,
+    baseFee: contract?.baseFee ?? 0,
+    prestige: t.prestige,
+    barDays: t.barDays,
+    setup: t.setup,
+    band: t.band,
+    bandMet,
+    turfQuality: t.turfQuality,
+    field: t.field,
+    conditions: (contract?.bonuses ?? []).map((b) => ({
+      id: b.id,
+      label: b.label,
+      amount: b.amount,
+      met: (t.met ?? []).includes(b.id),
+      paid: bandMet && (t.met ?? []).includes(b.id),
+    })),
+  };
+}
+
 export function computeReportData(state, report) {
   const history = state.history;
   const previous = history.length >= 2 ? history[history.length - 2] : null;
@@ -313,6 +356,9 @@ export function computeReportData(state, report) {
   return {
     day: report.day,
     profit: report.profit,
+    // Act III. Null on every ordinary day, so the report simply does not
+    // draw the section.
+    tournament: tournamentSection(report),
     revenue: report.revenue,
     costs: report.costs,
     ratings,
@@ -402,6 +448,30 @@ function injectStyles() {
         padding-top: calc(22px + var(--narration-height, 0px));
       }
     }
+    .report-champ {
+      border: 1px solid ${PALETTE.ACCENT};
+      border-left: 4px solid ${PALETTE.ACCENT};
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 16px 0;
+    }
+    .report-champ-head {
+      color: ${PALETTE.ACCENT};
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 13px;
+    }
+    .report-champ-setup { margin: 6px 0; }
+    .report-champ-field { margin: 6px 0 10px; opacity: 0.9; }
+    .report-champ-row { display: flex; justify-content: space-between; font-size: 13px; }
+    .report-champ-total {
+      border-top: 1px solid ${PALETTE.UI_DARK};
+      margin-top: 8px; padding-top: 8px; font-weight: bold;
+    }
+    .report-champ-ok { color: ${PALETTE.FAIRWAY}; }
+    .report-champ-held { color: ${PALETTE.UI_LIGHT}; }
+    .report-champ-off { color: ${PALETTE.SAND}; }
     .report-day {
       color: ${PALETTE.UI_LIGHT};
       font-size: 13px;
@@ -886,6 +956,82 @@ export function mountReport(root, { state, report, onContinue } = {}) {
       wrong.appendChild(row);
     }
     screen.appendChild(wrong);
+  }
+
+  // --- The championship, if there was one --------------------------------
+  //
+  // Above the takings, because on the day of a championship the
+  // championship is the news and the green fees are a footnote -- there
+  // were not any, the course was shut.
+  if (data.tournament) {
+    const t = data.tournament;
+    const champ = document.createElement('div');
+    champ.className = 'report-champ';
+
+    const head = document.createElement('div');
+    head.className = 'report-champ-head';
+    head.textContent = t.label;
+    champ.appendChild(head);
+
+    // What the course was and what was asked of it, side by side, so the
+    // verdict underneath has something to be about.
+    const setup = document.createElement('div');
+    setup.className = `report-champ-setup ${t.bandMet ? 'report-champ-ok' : 'report-champ-off'}`;
+    setup.textContent = t.bandMet
+      ? `Set to ${t.setup}, inside the ${t.band.low}-${t.band.high} they wanted.`
+      : `Set to ${t.setup}. They wanted ${t.band.low}-${t.band.high}.`;
+    champ.appendChild(setup);
+
+    // What the field shot: the read-out the whole setup dial exists for.
+    if (t.field) {
+      const f = t.field;
+      const broke = f.underPar === 0 ? 'Nobody broke par.'
+        : f.underPar === 1 ? 'One player broke par.'
+          : `${f.underPar} players broke par.`;
+      const story = document.createElement('div');
+      story.className = 'report-champ-field';
+      story.textContent =
+        `The field averaged ${f.averageToPar.toFixed(1)} over par. ${broke} `
+        + `The ${ordinal(f.hardestHole)} took the most off them. `
+        + `Rounds ran ${Math.round(f.averageRoundMinutes)} minutes.`;
+      champ.appendChild(story);
+    }
+
+    for (const c of t.conditions) {
+      const row = document.createElement('div');
+      row.className = 'report-champ-row';
+      const name = document.createElement('span');
+      // Earned and paid are different things -- the band gates the rest --
+      // and a week can hold its turf and be paid nothing for it.
+      name.textContent = `${c.paid ? '✓' : c.met ? '—' : '✗'} ${c.label}`;
+      name.className = c.paid ? 'report-champ-ok'
+        : c.met ? 'report-champ-held' : 'report-champ-off';
+      const amount = document.createElement('span');
+      amount.textContent = c.paid
+        ? `+$${c.amount.toLocaleString()}`
+        : c.met ? 'earned, unpaid' : '—';
+      amount.className = c.paid ? 'report-champ-ok' : 'report-champ-off';
+      row.append(name, amount);
+      champ.appendChild(row);
+    }
+
+    const total = document.createElement('div');
+    total.className = 'report-champ-row report-champ-total';
+    const totalName = document.createElement('span');
+    totalName.textContent = t.bandMet ? 'The contract paid' : 'Base fee only';
+    const totalValue = document.createElement('span');
+    totalValue.textContent = `$${t.paid.toLocaleString()} of $${t.ceiling.toLocaleString()}`;
+    total.append(totalName, totalValue);
+    champ.appendChild(total);
+
+    if (t.barDays > 0) {
+      const barred = document.createElement('div');
+      barred.className = 'report-champ-off';
+      barred.textContent = `They will give this one to somebody else for ${t.barDays} days.`;
+      champ.appendChild(barred);
+    }
+
+    screen.appendChild(champ);
   }
 
   // --- Revenue / cost breakdown -----------------------------------------
