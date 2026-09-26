@@ -35,6 +35,7 @@ import {
 import {
   nextSetup, setupDifficultyBonus, championshipRoomsSold, scoreTournament,
   CARE_DIVERTED_WHILE_CONDITIONING, conditioningCostPerDay, CHAMPIONSHIP_HOLES,
+  RUNGS,
 } from './tournaments.js';
 import { playField } from './field.js';
 import { championshipUpkeep, crowdHandledFor } from './championshipBuildings.js';
@@ -718,7 +719,19 @@ export function runDay(state, seed) {
       };
     }
     next.tournament = null;
-    report.tournament = { ...result, field };
+    // The conditions the week was judged ON, not only the verdict. The
+    // evening report wants to say "you set it to 53 and they wanted 45-60"
+    // and "the turf finished at 91", and by the time it renders, state has
+    // moved on -- setup starts decaying the next morning. Recorded here,
+    // where the day settled them, so the report reads rather than
+    // re-derives.
+    report.tournament = {
+      ...result,
+      field,
+      setup: Math.round(next.resort.setup ?? 0),
+      band: RUNGS[result.rung].band,
+      turfQuality: Math.round(next.turfQuality),
+    };
     revenue.tournament = result.paid;
     revenue.total += result.paid;
   }

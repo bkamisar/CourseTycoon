@@ -418,3 +418,37 @@ test('the crowd bonus is earned by having somewhere to put them', () => {
   assert.ok(helped.met.includes('crowd'), 'with the property helping, it can');
   assert.ok(helped.paid > bare.paid, 'and the contract should pay more for it');
 });
+
+test('the report records what the week was judged on, not only the verdict', () => {
+  // setup starts decaying the morning after, so a report that reached
+  // into state for it would describe a different course from the one the
+  // field played. Recorded where the day settled it.
+  const state = openFullCourse(actThreeResort(51));
+  state.prestige = 90;
+  state.resort.setup = 53;
+  state.resort.setupTarget = 53;
+  state.turfQuality = 91;
+  state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+
+  const { state: after, report } = runDay(state, 5500);
+  const t = report.tournament;
+
+  // Not the target. A crew that has reached its target stops, and the
+  // day's decay runs before the field tees off, so the course actually
+  // played is always a little under what was asked for -- here 50 against
+  // a target of 53. That is the behaviour; the report must describe it
+  // rather than the intention.
+  assert.equal(t.setup, Math.round(after.resort.setup),
+    'the report must name the course the field actually played');
+  assert.ok(t.setup < 53 && t.setup > 45, `setup drifted to ${t.setup}, outside the plausible range`);
+
+  // The invariant that matters: the number the report prints and the
+  // verdict it prints beside it have to agree. A card saying "set to 50,
+  // they wanted 45-60" next to "band missed" is this project's oldest bug.
+  assert.equal(t.met.includes('band'), t.setup >= t.band.low && t.setup <= t.band.high,
+    `report says setup ${t.setup} against band ${t.band.low}-${t.band.high}, but band met is ${t.met.includes('band')}`);
+
+  assert.equal(t.turfQuality, Math.round(after.turfQuality), 'and what they left the turf at');
+  assert.deepEqual(t.band, RUNGS.countyOpen.band, 'and what was being asked for');
+  assert.ok(t.field, 'and what they shot');
+});
