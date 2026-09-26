@@ -98,6 +98,9 @@ export function newGame(seed) {
     // every evening afterwards too, and a letter that arrives every night
     // is not a letter.
     actThreeArrived: false,
+    // Act III is passed by hosting a national properly, not by hosting
+    // one. See the gate in day.js.
+    actThreePassed: false,
     satisfactionHistory: [],
     // Which narration lines have been shown lately, so the world does not
     // repeat itself while it still has something new to say.
@@ -195,6 +198,7 @@ export function deserialize(text) {
   if (parsed.tournament === undefined) parsed.tournament = null;
   if (!Array.isArray(parsed.tournamentsHosted)) parsed.tournamentsHosted = [];
   if (typeof parsed.actThreeArrived !== 'boolean') parsed.actThreeArrived = false;
+  if (typeof parsed.actThreePassed !== 'boolean') parsed.actThreePassed = false;
   // A save written before HISTORY_LIMIT existed can carry hundreds of
   // days and be too large to write back. Trimmed on the way in so it
   // shrinks on the first load rather than a fortnight later.

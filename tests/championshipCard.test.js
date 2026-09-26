@@ -113,3 +113,21 @@ test('the field is described, since it is what the dial was for', () => {
   assert.match(card.field, /9\.1|nine/i, 'what the field averaged');
   assert.match(card.field, /17/, 'and which hole took the most off them');
 });
+
+test('passing the act gets its own card, after the write-up', () => {
+  // A gate the player cannot see is a dead end rather than an ending.
+  const report = {
+    day: 300,
+    actThreePassed: true,
+    tournament: {
+      rung: 'national', met: ['band', 'turf', 'pace', 'crowd'], missed: [],
+      paid: 500000, prestige: 18, barDays: 0,
+      setup: 86, band: RUNGS.national.band, turfQuality: 90,
+      field: { averageToPar: 9.1, underPar: 0, best: 1, hardestHole: 17, averageRoundMinutes: 284 },
+    },
+  };
+  const cards = championshipCards(report, { act: 3 });
+  assert.equal(cards.length, 2, 'the week, then what the week meant');
+  assert.match(cards[0].id, /result/);
+  assert.match(cards[1].id, /passed/);
+});

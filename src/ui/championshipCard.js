@@ -150,5 +150,24 @@ export function championshipCards(report, state) {
     });
   }
 
+  // --- The act is finished --------------------------------------------
+  //
+  // After the write-up, because the write-up is about the week and this is
+  // about what the week meant.
+  if (report.actThreePassed) {
+    cards.push({
+      id: 'championship-act-passed',
+      kicker: 'A NATIONAL OPEN, HOSTED',
+      speaker: 'The governing body',
+      prompt:
+        'A different letter this time, and a shorter one. They thank you for the week, they '
+        + 'note that the course held up, and they say -- in the flattest possible terms, which '
+        + 'from them is effusive -- that they would have no hesitation in coming back. '
+        + 'Somewhere between the county open and this, the place stopped being a resort that '
+        + 'hosts championships and became a championship venue that takes guests.',
+      choices: acknowledge('Frame it'),
+    });
+  }
+
   return cards;
 }

@@ -474,3 +474,66 @@ test('the reported profit and the revenue breakdown agree on a championship day'
   assert.equal(Math.round(after.money - before), Math.round(report.profit),
     'and the bank must agree with both');
 });
+
+// --- Act III's gate ---------------------------------------------------
+
+function nationalReady(seed) {
+  const state = openFullCourse(actThreeResort(seed));
+  state.act = 3;
+  state.prestige = 90;
+  state.turfQuality = 95;
+  for (const type of ['grandstands', 'overflowParking', 'mediaCentre',
+    'hospitalityPavilion', 'shortCourse', 'brewPub', 'functionRoom']) {
+    state.resort.amenities.push({ id: type, type, menu: [] });
+  }
+  return state;
+}
+
+test('hosting a national properly passes Act III', () => {
+  const state = nationalReady(41);
+  state.resort.setup = 86;
+  state.resort.setupTarget = 86;
+  state.tournament = { rung: 'national', day: state.day, resolved: false };
+
+  const { state: after, report } = runDay(state, 5400);
+  assert.ok(report.tournament.met.includes('band'), 'sanity: the week went well');
+  assert.equal(after.actThreePassed, true, 'a good national should finish the act');
+  assert.equal(report.actThreePassed, true, 'and the evening should say so');
+});
+
+test('a botched national does not pass Act III', () => {
+  // The other side. Hosting is not passing, or the gate is just an
+  // attendance record.
+  const state = nationalReady(42);
+  state.resort.setup = 5;
+  state.resort.setupTarget = 0;
+  state.turfQuality = 30;
+  state.tournament = { rung: 'national', day: state.day, resolved: false };
+
+  const { state: after } = runDay(state, 5410);
+  assert.ok(!(after.actThreePassed ?? false),
+    'turning up is not the same as delivering');
+});
+
+test('a county open never passes Act III, however perfect', () => {
+  const state = nationalReady(43);
+  state.resort.setup = 52;
+  state.resort.setupTarget = 52;
+  state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+  const { state: after, report } = runDay(state, 5420);
+  assert.ok(report.tournament.met.includes('band'), 'sanity: a good county week');
+  assert.ok(!(after.actThreePassed ?? false), 'the gate is the national, not the ladder');
+});
+
+test('passing Act III is announced once and then stays passed', () => {
+  const state = nationalReady(44);
+  state.resort.setup = 86;
+  state.resort.setupTarget = 86;
+  state.tournament = { rung: 'national', day: state.day, resolved: false };
+  const first = runDay(state, 5430);
+  assert.equal(first.report.actThreePassed, true);
+  const second = runDay(first.state, 5431);
+  assert.equal(second.state.actThreePassed, true, 'it does not come undone');
+  assert.equal(second.report.actThreePassed ?? false, false,
+    'but it is not announced every evening afterwards');
+});

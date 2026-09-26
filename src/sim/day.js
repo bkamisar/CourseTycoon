@@ -749,6 +749,22 @@ export function runDay(state, seed) {
      * headline cannot drift from the rows again.
      */
     report.profit = revenue.total - costs.total;
+
+    /*
+     * Act III's gate: a national, hosted properly.
+     *
+     * "Properly" is the band, because the band is the whole act. A course
+     * that was never set for a championship did not stage one -- which is
+     * why it gates the bonuses too -- and turning up is not delivering.
+     *
+     * Recorded once. The act stays passed afterwards, but the evening
+     * only announces it the once.
+     */
+    if (result.rung === 'national' && result.met.includes('band')
+        && !next.actThreePassed) {
+      next.actThreePassed = true;
+      report.actThreePassed = true;
+    }
   }
 
   // What the world says about all this. Positioning here is emergent - the
