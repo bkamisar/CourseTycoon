@@ -34,7 +34,7 @@ import {
 } from './hotelAmenities.js';
 import {
   nextSetup, setupDifficultyBonus, championshipRoomsSold, scoreTournament,
-  CARE_DIVERTED_WHILE_CONDITIONING, conditioningCostPerDay,
+  CARE_DIVERTED_WHILE_CONDITIONING, conditioningCostPerDay, CHAMPIONSHIP_HOLES,
 } from './tournaments.js';
 import { playField } from './field.js';
 
@@ -942,6 +942,25 @@ export function runDay(state, seed) {
         buyoutDemand: null,
         bought: false,
       };
+    }
+  }
+
+  /**
+   * Act III opens when the investors are settled and the course is a
+   * championship course.
+   *
+   * Either ending qualifies. A resort that was liquidated is poorer and
+   * has fewer rooms, which makes the act harder, but the governing body
+   * does not read balance sheets.
+   *
+   * `holes` is this day's open holes, computed earlier in this function.
+   */
+  const settled = Boolean(next.investors?.bought || next.investors?.liquidated);
+  if (next.act === 2 && settled && holes.length >= CHAMPIONSHIP_HOLES) {
+    next.act = 3;
+    if (!next.actThreeArrived) {
+      next.actThreeArrived = true;
+      report.actThreeArrived = true;
     }
   }
 

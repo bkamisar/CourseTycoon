@@ -93,6 +93,11 @@ export function newGame(seed) {
     // the ladder knows what opens next (nextRungFor) and a save that
     // never hosts anything still has the field to append to.
     tournamentsHosted: [],
+    // Act III's invitation fires once, the evening the investors settle.
+    // Stored rather than derived, because "are they settled now" is true
+    // every evening afterwards too, and a letter that arrives every night
+    // is not a letter.
+    actThreeArrived: false,
     satisfactionHistory: [],
     // Which narration lines have been shown lately, so the world does not
     // repeat itself while it still has something new to say.
@@ -189,6 +194,7 @@ export function deserialize(text) {
   if (typeof parsed.resort?.setupTarget !== 'number') parsed.resort.setupTarget = 0;
   if (parsed.tournament === undefined) parsed.tournament = null;
   if (!Array.isArray(parsed.tournamentsHosted)) parsed.tournamentsHosted = [];
+  if (typeof parsed.actThreeArrived !== 'boolean') parsed.actThreeArrived = false;
   // A save written before HISTORY_LIMIT existed can carry hundreds of
   // days and be too large to write back. Trimmed on the way in so it
   // shrinks on the first load rather than a fortnight later.

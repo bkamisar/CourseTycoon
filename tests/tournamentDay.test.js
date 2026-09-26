@@ -355,3 +355,42 @@ test('a botched championship pays close to base, not 58% of the ceiling', () => 
       `${rungId}: paid ${result.paid}, expected exactly the ${rung.baseFee} base fee`);
   }
 });
+
+// --- Act III's entry point --------------------------------------------
+
+test('settling with the investors opens Act III, once', () => {
+  for (const ending of ['bought', 'liquidated']) {
+    const state = openFullCourse(actThreeResort(21));
+    state.act = 2;
+    state.prestige = 80;
+    state.investors = { confidence: 50, principal: 200000, bought: false, liquidated: false };
+    state.investors[ending] = true;
+
+    const first = runDay(state, 5200);
+    assert.equal(first.state.act, 3, `${ending} should open Act III`);
+    assert.equal(first.report.actThreeArrived, true, `${ending} should announce it`);
+
+    const second = runDay(first.state, 5201);
+    assert.equal(second.state.act, 3);
+    assert.equal(second.report.actThreeArrived ?? false, false,
+      'the invitation must not arrive twice');
+  }
+});
+
+test('an unsettled Act II stays in Act II', () => {
+  const state = openFullCourse(actThreeResort(22));
+  state.act = 2;
+  state.investors = { confidence: 50, principal: 200000, bought: false, liquidated: false };
+  const { state: after, report } = runDay(state, 5210);
+  assert.equal(after.act, 2, 'still answering to the investors');
+  assert.equal(report.actThreeArrived ?? false, false);
+});
+
+test('a three-hole resort is not invited, however well it is run', () => {
+  const state = actThreeResort(23);
+  state.act = 2;
+  state.prestige = 90;
+  state.investors = { confidence: 90, principal: 200000, bought: true, liquidated: false };
+  const { state: after } = runDay(state, 5220);
+  assert.equal(after.act, 2, 'three holes cannot host a championship');
+});
