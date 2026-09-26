@@ -4,7 +4,7 @@ import { newGame } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeRng } from '../src/sim/rng.js';
 import {
-  REVIEW_EVERY, STARTING_CONFIDENCE, MEASURES, confidenceChange, thresholdFor, assessTarget, pickMeasure, startingInvestors, measureNow, SETTLEMENT_DAYS, buyoutPrice, payBuyout, forceLiquidation, nextTargetFor,
+  REVIEW_EVERY, STARTING_CONFIDENCE, MEASURES, settlementDue, PATIENCE_REVIEWS, PATIENCE_CONFIDENCE, confidenceChange, thresholdFor, assessTarget, pickMeasure, startingInvestors, measureNow, SETTLEMENT_DAYS, buyoutPrice, payBuyout, forceLiquidation, nextTargetFor,
 } from '../src/sim/investors.js';
 import { totalRooms } from '../src/sim/rooms.js';
 
@@ -500,4 +500,44 @@ test('and they stop at a full house rather than at a number', () => {
     'a hotel charging more should be expected to take more per room');
   // A third in suites at 2.6x is about 1.5x the nightly rate per room.
   assert.ok(cheap > 100 && cheap < 250, `a $100 room capped at ${cheap}, which is not a full house`);
+});
+
+test('a resort that is neither brilliant nor failing still gets an ending', () => {
+  // The offer needed confidence 85 and the demand needed 0, which left a
+  // wide middle with no ending at all: about half of all runs at a viable
+  // price neither settled nor failed inside 260 days. Not lost -- just
+  // going round the same fortnightly meeting for ever, which is the one
+  // shape this act should not have.
+  const middling = {
+    confidence: PATIENCE_CONFIDENCE + 3,
+    principal: 180000,
+    bought: false,
+    goodReviews: 0,                       // never impressed anybody
+    nextTarget: { reviewIndex: PATIENCE_REVIEWS },
+  };
+  const out = settlementDue(middling, 200);
+  assert.ok(out, 'a resort doing adequately for long enough has to be let out');
+  assert.equal(out.kind, 'offer');
+  assert.equal(out.reason, 'patience', 'and the card needs to know which kind of offer it is');
+
+  // Not before the time is served.
+  const early = settlementDue({ ...middling, nextTarget: { reviewIndex: PATIENCE_REVIEWS - 1 } }, 200);
+  assert.equal(early, null, 'patience is time served, not a lower bar from day one');
+
+  // And not for a resort that never persuaded them of anything. Coasting
+  // from the starting confidence is not "adequate returns".
+  const coasting = settlementDue({ ...middling, confidence: STARTING_CONFIDENCE }, 200);
+  assert.equal(coasting, null, `confidence ${STARTING_CONFIDENCE} is where they started, not progress`);
+});
+
+test('and being impressed is still the faster way out', () => {
+  // Two routes, and the quick one should stay quick: a resort that has
+  // genuinely won them over does not wait out the clock.
+  const impressive = {
+    confidence: 90, principal: 180000, bought: false, goodReviews: 2,
+    nextTarget: { reviewIndex: 2 },
+  };
+  const out = settlementDue(impressive, 100);
+  assert.ok(out, 'high confidence and two good reviews should bring an offer');
+  assert.equal(out.reason, 'impressed');
 });

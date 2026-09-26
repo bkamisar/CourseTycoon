@@ -26,7 +26,7 @@
  * this project produces more than any other, and one that would be
  * especially ugly here, since these cards are the act's voice.
  */
-import { MEASURE_LABEL } from '../sim/investors.js';
+import { MEASURE_LABEL, PATIENCE_REVIEWS } from '../sim/investors.js';
 
 /** A target in the units the measure is really in, matching the report's
  * own formatting. Money reads as money; everything else is a whole
@@ -143,9 +143,22 @@ export function investorCards(report, state) {
       kicker: offer ? 'AN OFFER' : 'THEY WANT OUT',
       speaker: 'The investors',
       prompt: offer
-        ? 'They have watched this place run well for long enough to think it does not '
-          + `need them. They will sell you their stake for $${demand.amount.toLocaleString()}. `
-          + `The offer stands until day ${demand.dueDay}, and after that it is simply gone.`
+        ? (demand.reason === 'patience'
+          // Two different evenings. They are leaving either because you
+          // impressed them or because they have simply had what they came
+          // for, and a card that said "run well" to a resort scraping by
+          // would be the game flattering the player for no reason.
+          // The count comes from the simulation rather than the prose. A
+          // card that says "nine" because somebody typed nine is one
+          // constant away from lying to the player.
+          ? `Nothing has gone wrong, exactly. You have sat through ${PATIENCE_REVIEWS} of these `
+            + 'meetings now, the place has done roughly what they expected of it and not a '
+            + 'great deal more, and there is somewhere else they would rather their money was. '
+            + `They will sell you their stake for $${demand.amount.toLocaleString()}, and `
+            + `the offer stands until day ${demand.dueDay}.`
+          : 'They have watched this place run well for long enough to think it does not '
+            + `need them. They will sell you their stake for $${demand.amount.toLocaleString()}. `
+            + `The offer stands until day ${demand.dueDay}, and after that it is simply gone.`)
         : demand.final
           ? 'Nobody raises their voice. They have lost confidence in how this place is '
             + 'run and they are not interested in being bought out of it — the money was '

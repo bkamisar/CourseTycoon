@@ -415,6 +415,30 @@ export function startingInvestors(state, rng, { principal = 180000 } = {}) {
 /** Held at or above this for two reviews running and they will sell. */
 export const OFFER_CONFIDENCE = 85;
 
+/**
+ * The second route out, for a resort that is neither brilliant nor
+ * failing.
+ *
+ * The offer needed confidence 85 and the demand needed 0, which left a
+ * wide middle with no ending at all: measured, about half of all runs at
+ * a viable price neither settled nor failed inside 260 days. They were
+ * not lost -- confidence simply never climbed the thirty points from a
+ * start of 55, and the fortnightly meeting went round for ever.
+ *
+ * Investors have a horizon. Nine fortnightly reviews is about four months
+ * of adequate returns, after which they take their money and go -- not
+ * because they are delighted but because they have had what they came for
+ * and there is somewhere else to put it.
+ * So time served at a reasonable standard is a way out, and a resort
+ * doing moderately well gets an ending of its own rather than a
+ * relationship with no end.
+ *
+ * Deliberately above the starting 55: coasting from day one is not
+ * "adequate returns", it is having never persuaded them of anything.
+ */
+export const PATIENCE_REVIEWS = 9;
+export const PATIENCE_CONFIDENCE = 62;
+
 /** Days to find the money, either way. Long enough to sell something. */
 export const SETTLEMENT_DAYS = 14;
 
@@ -462,11 +486,23 @@ export function settlementDue(investors, day) {
       final: true,
     };
   }
-  if ((investors.goodReviews ?? 0) >= 2 && investors.confidence >= OFFER_CONFIDENCE) {
+  const reviews = investors.nextTarget?.reviewIndex ?? 0;
+  const impressed = (investors.goodReviews ?? 0) >= 2
+    && investors.confidence >= OFFER_CONFIDENCE;
+  // Or simply done: long enough at a decent standard that they would
+  // rather have the money than the stake. See PATIENCE_REVIEWS.
+  const finished = reviews >= PATIENCE_REVIEWS
+    && investors.confidence >= PATIENCE_CONFIDENCE;
+  if (impressed || finished) {
     return {
       kind: 'offer',
       amount: buyoutPrice(investors, { offered: true }),
       dueDay: day + SETTLEMENT_DAYS,
+      // Which of the two brought them to it, so the card can say the
+      // right thing: being bought out because they are impressed and
+      // being bought out because they are finished are different
+      // evenings.
+      reason: impressed ? 'impressed' : 'patience',
     };
   }
   return null;
