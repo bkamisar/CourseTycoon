@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ITEMS, ITEM_IDS, MENU_SLOTS, itemsFor, BREW_PUB_ONLY, COCKTAIL_BAR_ONLY,
+  ITEMS, ITEM_IDS, MENU_SLOTS, itemsFor, BREW_PUB_ONLY, COCKTAIL_BAR_ONLY, CART_ONLY,
 } from '../src/sim/menu.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import {
@@ -20,7 +20,10 @@ test('every item in the catalogue is fully specified', () => {
     assert.ok(item, `${id} missing`);
     assert.equal(item.id, id, `${id}: id does not match its key`);
     assert.ok(item.name && item.name.length > 2, `${id}: no name`);
-    assert.ok(item.kind === 'food' || item.kind === 'drink', `${id}: bad kind`);
+    // 'goods' is the third: things bought at the counter and not consumed
+    // -- cigarettes, a sleeve of balls. They carry no kitchen load and are
+    // kept out of the rooms that exist to serve a plate.
+    assert.ok(['food', 'drink', 'goods'].includes(item.kind), `${id}: bad kind`);
     assert.ok(item.price > 0, `${id}: no price`);
     assert.ok(item.cost > 0 && item.cost < item.price, `${id}: cost must be positive and under price`);
     assert.ok(Number.isInteger(item.prep) && item.prep >= 0, `${id}: bad prep`);
@@ -75,10 +78,13 @@ test('each amenity accepts the right items', () => {
   assert.ok(shack.every((id) => ITEMS[id].prep <= 1), 'snack shack has no line cook');
   const cart = itemsFor('beverageCart');
   assert.ok(cart.every((id) => ITEMS[id].cartable), 'cart got something it cannot carry');
-  // The restaurant serves anything that is not somebody else's own. Two
+  // The restaurant serves anything that is not somebody else's own. Three
   // venues now have exclusive lists, and what makes each of them a place
-  // rather than a second bar is that nowhere else pours their drinks.
-  const general = ITEM_IDS.filter((id) => !BREW_PUB_ONLY.has(id) && !COCKTAIL_BAR_ONLY.has(id));
+  // rather than a second bar is that nowhere else pours their drinks --
+  // the cart included, since a round poured off the back of a buggy by
+  // the person driving it is not something a dining room can plate.
+  const general = ITEM_IDS.filter((id) =>
+    !BREW_PUB_ONLY.has(id) && !COCKTAIL_BAR_ONLY.has(id) && !CART_ONLY.has(id));
   assert.deepEqual(itemsFor('restaurant'), general,
     'the restaurant should serve everything that is not exclusive to somewhere else');
 
@@ -170,10 +176,23 @@ test('NO MENU PLEASES EVERY CROWD — swept exhaustively', () => {
   }
 });
 
-test('a cart can never satisfy destination guests', () => {
-  // Not declared anywhere — it falls out of the fact that what guests want
-  // is exactly what cannot ride on a cart. Pinned because it is what gives
-  // the restaurant and the cart distinct jobs.
+test('a cart is always a worse night out than sitting down', () => {
+  // This used to read "a cart can never satisfy destination guests" and
+  // cap at 0.75, on the grounds that what guests want is exactly what
+  // cannot ride on a cart.
+  //
+  // Shots poured off the back of the buggy by the person driving it are
+  // the exception that the old wording could not express: the cart is not
+  // carrying the thing guests want, the cart IS the thing guests want.
+  // So the rule is now the one it was always standing in for -- a cart
+  // must stay clearly worse for guests than anywhere they can sit down.
+  //
+  // It still is, comfortably. With the shots stocked a cart tops out at
+  // 0.80 against 0.94 for a snack shack, 0.96 for a restaurant and 0.99
+  // for a halfway house or a dining room. Raising the limit to 0.82
+  // leaves that margin intact; raising it past about 0.86 would not,
+  // which is why the shots sit at 0.85 appeal rather than the 0.95 they
+  // were first written with.
   function* combinations(pool, size, start = 0, acc = []) {
     if (acc.length === size) { yield acc; return; }
     for (let i = start; i < pool.length; i++) yield* combinations(pool, size, i + 1, [...acc, pool[i]]);
@@ -182,5 +201,16 @@ test('a cart can never satisfy destination guests', () => {
   for (const menu of combinations(itemsFor('beverageCart'), MENU_SLOTS.beverageCart)) {
     best = Math.max(best, menuPull(menu, 'destination'));
   }
-  assert.ok(best < 0.75, `a cart reached ${best.toFixed(2)} pull with guests; it should top out near 0.68`);
+  assert.ok(best < 0.82, `a cart reached ${best.toFixed(2)} pull with guests`);
+
+  // And the half of it that matters: still the worst place on the
+  // property to be a guest.
+  for (const sitDown of ['snackShack', 'restaurant', 'halfwayHouse']) {
+    let theirs = 0;
+    for (const menu of combinations(itemsFor(sitDown), MENU_SLOTS[sitDown])) {
+      theirs = Math.max(theirs, menuPull(menu, 'destination'));
+    }
+    assert.ok(theirs > best + 0.1,
+      `a ${sitDown} reaches ${theirs.toFixed(2)} and a cart ${best.toFixed(2)}; the cart has stopped being the poor relation`);
+  }
 });

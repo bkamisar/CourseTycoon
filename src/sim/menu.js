@@ -49,6 +49,23 @@ const ITEM_LIST = [
   // It pays for that by pleasing almost nobody on a golfing holiday.
   // Destination guests did not fly in for a tin of this.
   ['whiteMonster',      'White Monster',      'drink',  5,  1.5, 0, true,  0.75, 0.65, 0.15, 2,  8],
+
+  // --- Three ways to commit to one crowd ------------------------------
+  //
+  // Every other item on this list is a compromise: it suits one segment
+  // best and does something for the other two. These three are not. Each
+  // is adored by exactly one crowd and refused by the rest, which makes
+  // them the only way to build a board that is deliberately not for
+  // everybody.
+  //
+  // They work because `menuPull` takes the mean and then moves it halfway
+  // to the best item, so ONE specialist on a mixed board barely registers
+  // -- a board of three different specialists gives every crowd about
+  // 0.65. Committing means giving the whole counter over to it, which is
+  // the decision these exist to offer.
+  ['cigarettes',        'Cigarettes',         'goods', 14,  9,   0, true,  0.95, 0.10, 0.05, 2,  1],
+  ['cartGirlShots',     'Shots with the cart girl', 'drink', 24, 7, 0, true, 0.15, 0.10, 0.85, 5,  2],
+  ['proV1s',            'Sleeve of Pro V1s',  'goods', 18, 11,   0, true,  0.20, 0.95, 0.15, 3,  1],
   ['transfusion',       'Transfusion',        'drink', 12,  5,   0, true,  0.90, 0.80, 0.70, 4,  5],
   ['espresso',          'Espresso',           'drink',  4,  1,   1, false, 0.30, 0.60, 0.90, 2,  6],
   ['wineByGlass',       'Wine by the glass',  'drink', 14,  5,   0, false, 0.10, 0.30, 1.00, 3,  3],
@@ -179,10 +196,18 @@ export const COCKTAIL_BAR_ONLY = Object.freeze(new Set([
   'oldFashioned', 'negroni', 'manhattan', 'martini', 'espressoMartini',
 ]));
 
+/**
+ * The cart's own. A round of shots poured off the back of a buggy by the
+ * person driving it is not a thing a dining room can sell -- the cart IS
+ * the product, and without it the item is just an expensive drink.
+ */
+export const CART_ONLY = new Set(['cartGirlShots']);
+
 /** The list a venue owns outright, if it owns one. */
 export function exclusiveTo(type) {
   if (type === 'brewPub') return BREW_PUB_ONLY;
   if (type === 'cocktailBar') return COCKTAIL_BAR_ONLY;
+  if (type === 'beverageCart') return CART_ONLY;
   return null;
 }
 
@@ -192,6 +217,7 @@ export function itemsFor(type) {
     const item = ITEMS[id];
     if (BREW_PUB_ONLY.has(id)) return type === 'brewPub';
     if (COCKTAIL_BAR_ONLY.has(id)) return type === 'cocktailBar';
+    if (CART_ONLY.has(id)) return type === 'beverageCart';
     if (type === 'snackShack') return item.prep <= 1;
     if (type === 'beverageCart') return item.cartable;
     // A dining room is not a place you order a hot dog, and price alone
@@ -204,7 +230,9 @@ export function itemsFor(type) {
     // stops where a plate starts needing a tablecloth.
     if (type === 'brewPub') {
       if (item.kind === 'drink') return id !== 'wineByGlass' && id !== 'espresso';
-      return item.price <= 16;
+      // Food only past this point. The price line is about plates, and
+      // without this a packet of cigarettes clears it on a technicality.
+      return item.kind === 'food' && item.price <= 16;
     }
     // Drinks only, which is the whole idea of a bar.
     if (type === 'cocktailBar') return item.kind === 'drink';

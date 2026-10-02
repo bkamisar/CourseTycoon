@@ -387,6 +387,29 @@ const espressoMartini = [
   '.....oo.....', '....oooo....', '...oooooo...', '............',
 ];
 
+// --- Things you buy but do not eat ------------------------------------
+
+/** A soft pack, open, with two drawn halfway out. */
+const cigarettes = [
+  '............', '...WW..WW...', '...oWooWo...', '..oooooooo..',
+  '..oWWWWWWo..', '..oWWWWWWo..', '..oWRRRRWo..', '..oWRRRRWo..',
+  '..oWWWWWWo..', '..oWWWWWWo..', '..oooooooo..', '............',
+];
+
+/** Two shot glasses, poured. */
+const cartGirlShots = [
+  '............', '............', '..oooo.oooo.', '..oAAo.oAAo.',
+  '..oAAo.oAAo.', '..oAAo.oAAo.', '..oAAo.oAAo.', '...oo...oo..',
+  '..oooo.oooo.', '............', '............', '............',
+];
+
+/** A sleeve, with the three of them showing through it. */
+const proV1s = [
+  '............', '...oooooo...', '...oWWWWo...', '...oWooWo...',
+  '...oWWWWo...', '...oWooWo...', '...oWWWWo...', '...oWooWo...',
+  '...oWWWWo...', '...oRRRRo...', '...oooooo...', '............',
+];
+
 export const FOOD_SPRITES = {
   domesticCan, whiteMonster, draught, craftAle, arnoldPalmer, bottledWater, transfusion,
   espresso, wineByGlass,
@@ -396,6 +419,7 @@ export const FOOD_SPRITES = {
   whiskeySour, oldFashioned, negroni, manhattan, martini, espressoMartini, candyBar, trailMix, turkeyWrap, chickenCaesarWrap,
   hotDog, breakfastSandwich, chiliBowl, burgerFries, clubSandwich,
   seasonalSalad, oysters, lobsterRoll, steakFrites,
+  cigarettes, cartGirlShots, proV1s,
 };
 
 /**
