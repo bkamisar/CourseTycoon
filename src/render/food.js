@@ -51,6 +51,16 @@ const domesticCan = [
   '...oGGGGo...', '...oGGGGo...', '...oooooo...', '............',
 ];
 
+/**
+ * A tall white tin with a green flash. Reads as "the white one" beside
+ * the domestic can, which is red, rather than as a second lager.
+ */
+const whiteMonster = [
+  '............', '....oooo....', '...oGGGGo...', '...oWWWWo...',
+  '...oWLLWo...', '...oWLLWo...', '...oWLLWo...', '...oWLLWo...',
+  '...oWWWWo...', '...oGGGGo...', '...oooooo...', '............',
+];
+
 const draught = [
   '............', '..oooooooo..', '..oWWWWWWo..', '..oWWWWWWo..',
   '..oAAAAAAo..', '..oABAAAAo..', '..oABAAAAo..', '..oAAAAAAo..',
@@ -378,7 +388,7 @@ const espressoMartini = [
 ];
 
 export const FOOD_SPRITES = {
-  domesticCan, draught, craftAle, arnoldPalmer, bottledWater, transfusion,
+  domesticCan, whiteMonster, draught, craftAle, arnoldPalmer, bottledWater, transfusion,
   espresso, wineByGlass,
   pilsner, caskBitter, stout, hazyIpa, sourAle,
   hefeweizen, brownAle, porter, beerFlight,
