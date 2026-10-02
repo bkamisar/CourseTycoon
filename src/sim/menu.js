@@ -38,7 +38,7 @@ const ITEM_LIST = [
   ['craftAle',          'Craft ale',          'drink', 11,  4,   0, true,  0.50, 0.80, 0.70, 3,  4],
   ['arnoldPalmer',      'Arnold Palmer',      'drink',  5,  1,   0, true,  0.80, 0.70, 0.60, 2,  5],
   ['bottledWater',      'Bottled water',      'drink',  3,  0.5, 0, true,  0.60, 0.90, 0.50, 1,  5],
-  // A drink that does a food's job. Every other drink on the list is
+  // For a friend. A drink that does a food's job. Every other drink on the list is
   // worth 4 or 5 to a tiring golfer and espresso tops them at 6, which it
   // needs a kitchen line to pour; this gives 8 and needs nothing. The
   // cold wraps manage 9 with no kitchen either, so it is not the only way
@@ -48,7 +48,7 @@ const ITEM_LIST = [
   //
   // It pays for that by pleasing almost nobody on a golfing holiday.
   // Destination guests did not fly in for a tin of this.
-  ['whiteMonster',      'The white can',      'drink',  5,  1.5, 0, true,  0.75, 0.65, 0.15, 2,  8],
+  ['whiteMonster',      'White Monster',      'drink',  5,  1.5, 0, true,  0.75, 0.65, 0.15, 2,  8],
   ['transfusion',       'Transfusion',        'drink', 12,  5,   0, true,  0.90, 0.80, 0.70, 4,  5],
   ['espresso',          'Espresso',           'drink',  4,  1,   1, false, 0.30, 0.60, 0.90, 2,  6],
   ['wineByGlass',       'Wine by the glass',  'drink', 14,  5,   0, false, 0.10, 0.30, 1.00, 3,  3],

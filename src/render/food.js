@@ -52,8 +52,8 @@ const domesticCan = [
 ];
 
 /**
- * A tall white tin with a green flash. Reads as "the white one" beside
- * the domestic can, which is red, rather than as a second lager.
+ * A tall white tin with a green flash. Slimmer than the domestic can and
+ * a different colour from it, so the two do not read as the same drink.
  */
 const whiteMonster = [
   '............', '....oooo....', '...oGGGGo...', '...oWWWWo...',
