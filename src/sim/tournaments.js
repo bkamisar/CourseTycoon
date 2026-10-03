@@ -73,6 +73,36 @@ export const CHAMPIONSHIP_HOLES = 18;
  * narrowing every fairway to 40 yards reaches 45.5, to 34 reaches 54, to 26
  * reaches 64.4. So each rung asks for some redesign and none asks for a
  * rebuild.
+ *
+ * `baseFee` and `purseCeiling` were doubled on 2026-10-03, every rung by
+ * the same factor: County $18k / $100k -> $36k / $200k, Regional $30k /
+ * $240k -> $60k / $480k, National $55k / $500k -> $110k / $1M. The
+ * author's rule: a ladder played near-perfectly should roughly break
+ * even against never bidding, and a sloppy one should lose. Measured by
+ * `node tools/actThree.js --seeds 8` (the table is above `playActThree`
+ * in tools/operator.js): at the old purses hosting lost on all eight
+ * seeds, by $625k-$1.28M, and the two near-perfect seeds lost $698k (6)
+ * and $625k (8) on $693k and $651k of contracts -- so the money needed
+ * to be about twice what it was. After: seed 6 -$5k, seed 8 +$26k, and
+ * every seed that missed a week still loses, by $424k-$1.14M.
+ *
+ * One factor rather than weighting toward the National, because the cost
+ * of each rung against what a near-perfect week of it actually collected
+ * was nearly flat. Cost is the run-up against never-bid ordinary profit
+ * (mean of 8 seeds), plus round days at ~$27.6k each, plus required
+ * buildings: County $115k + $55k = $170k against $100k paid (1.7x);
+ * Regional $258k + $83k + $103k = $444k against $240k (1.85x); National
+ * $317k + $110k + $200k = $627k against the $353k the best weeks took
+ * (1.8x). The National's full ceiling would be only 1.25x, but no seed
+ * reached it: pace was missed there on every seed, and the crowd was
+ * never met because the operator never builds the short course, without
+ * which its property holds 11,600 of the National's 12,000 gallery
+ * (`galleryFor`). Weighting toward the National would have paid for
+ * bonuses nobody measured being earned.
+ *
+ * Base stays the same share of the ceiling (18%, 12.5%, 11%), so a missed
+ * target still pays well under half -- and still loses: a miss pays $36k
+ * to $110k against the same run-up and closed days.
  */
 const LIST = [
   {
@@ -86,8 +116,8 @@ const LIST = [
     rounds: 2,
     minDifficulty: 45,
     target: { low: -3, high: 3 },
-    baseFee: 18000,
-    purseCeiling: 100000,
+    baseFee: 36000,
+    purseCeiling: 200000,
     prepPerDay: 1600,
   },
   {
@@ -101,8 +131,8 @@ const LIST = [
     rounds: 3,
     minDifficulty: 55,
     target: { low: 2, high: 8 },
-    baseFee: 30000,
-    purseCeiling: 240000,
+    baseFee: 60000,
+    purseCeiling: 480000,
     prepPerDay: 3200,
   },
   {
@@ -116,8 +146,8 @@ const LIST = [
     rounds: 4,
     minDifficulty: 65,
     target: { low: 14, high: 20 },
-    baseFee: 55000,
-    purseCeiling: 500000,
+    baseFee: 110000,
+    purseCeiling: 1000000,
     prepPerDay: 5400,
   },
 ];

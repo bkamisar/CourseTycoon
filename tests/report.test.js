@@ -8,6 +8,7 @@ import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
 import { SEGMENT_KEYS, SEGMENTS } from '../src/sim/segments.js';
 import { makeHole } from '../src/sim/hole.js';
 import { newWeek, championshipStatus } from '../src/sim/championshipWeek.js';
+import { RUNGS } from '../src/sim/tournaments.js';
 
 test('computeReportData reads profit and the revenue/cost breakdown straight from the report', () => {
   const { state, report } = runDay(newGame(1), 1);
@@ -260,7 +261,7 @@ test('the report distinguishes a condition earned from one that paid', () => {
     rung: 'countyOpen',
     met: ['turf', 'pace', 'crowd'],
     missed: ['target'],
-    paid: 18000, prestige: 2, barDays: 0,
+    paid: RUNGS.countyOpen.baseFee, prestige: 2, barDays: 0,
     setup: 12, band: { low: 45, high: 60 }, turfQuality: 94,
     week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [] },
     difficulty: 47, minDifficulty: 45, difficultyMet: true,
@@ -350,7 +351,7 @@ test('a course measured just under the floor reads under it, not rounded up to i
   const { state, report } = runDay(newGame(78), 78);
   report.tournament = {
     rung: 'countyOpen', met: [], missed: ['target'],
-    paid: 18000, prestige: 0, barDays: 0, setup: 40, band: { low: 45, high: 60 },
+    paid: RUNGS.countyOpen.baseFee, prestige: 0, barDays: 0, setup: 40, band: { low: 45, high: 60 },
     turfQuality: 90, field: null,
     week: { rounds: 2, winningTotal: 3, target: { low: -4, high: 2 }, roundLog: [] },
     difficulty: 44.9, minDifficulty: 45, difficultyMet: false,

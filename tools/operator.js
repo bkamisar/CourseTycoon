@@ -726,40 +726,42 @@ function buildFor(state, rungId) {
  * Measured 2026-10-03, `node tools/actThree.js --seeds 8` (green fee 80,
  * interval 14, room rate 300; Acts I and II played by this operator, then
  * 240 days hosted against the same resort never bidding). Every seed
- * climbed the whole ladder. Winning total against target, H = hit:
+ * climbed the whole ladder. Winning total against target, H = hit; paid
+ * and worth at the purses doubled the same day (see the rung list in
+ * tournaments.js), with the original purses' worth beside it:
  *
- *   seed  County      Regional    National       paid     hosting worth
- *     1   +2  H       +9  miss    +19 H         $466,750    -$894,665
- *     2   +3  H       +3  H       +22 miss      $336,600    -$961,005
- *     3   +2  H *     +1  miss    +21 miss ^*   $146,460  -$1,282,393
- *     4   +3  H       +12 miss ^  +14 H         $466,750    -$890,585
- *     5    0  H       +7  H       +21 miss ^    $336,600    -$936,719
- *     6    0  H       +7  H       +18 H         $693,150    -$698,354
- *     7   -2  H       +6  H       +23 miss ^    $336,600  -$1,035,376
- *     8   +2  H       +6  H       +15 H         $651,150    -$624,962
+ *   seed  County    Regional    National       paid       worth    (old purse)
+ *     1   +2 H      +9  miss    +19 H          $933,500    -$427,915   (-$894,665)
+ *     2   +3 H      +3  H       +22 miss       $673,200    -$624,405   (-$961,005)
+ *     3   +2 H *    +1  miss    +21 miss ^*    $292,920  -$1,135,933 (-$1,282,393)
+ *     4   +3 H      +12 miss ^  +14 H          $933,500    -$423,835   (-$890,585)
+ *     5    0 H      +7  H       +21 miss ^     $673,200    -$600,119   (-$936,719)
+ *     6    0 H      +7  H       +18 H        $1,386,300      -$5,204   (-$698,354)
+ *     7   -2 H      +6  H       +23 miss ^     $673,200    -$698,776 (-$1,035,376)
+ *     8   +2 H      +6  H       +15 H        $1,302,300     +$26,188   (-$624,962)
  *
  *   ^ under the floor: a decision event closed two holes on the first
  *     round's morning, and the operator narrows to the floor exactly, so
  *     the playable sixteen measured 53.4 (Regional) or 62.6 (National).
+ *     See docs/known-issues.md.
  *   * turf lost (77 and 74 against 78); every other week held it with
  *     the eight-keeper crew (79-95).
  *
- * Profit per day, all eight seeds within a few hundred dollars: run-up
- * $14.5-15.9k, round days -$0.6k to -$1.7k (the course is closed), and
- * ordinary $25.4-26.1k against $26.0-26.6k never bidding. So hosting
- * LOST on every seed, by $0.62M-$1.28M, against +$61k-$167k before the
- * week existed. The run-up's 63 days cost about $0.64-0.75M against
- * ordinary trade (a narrowed course takes ~$7k a day off it, measured on
- * seed 1, plus the prep bill and the extra keepers), the nine round days
- * about $0.25M, and the remaining $0.27-0.36M (by difference, not
- * itemised) is the championship buildings and their upkeep, mostly. The
- * ladder's whole ceiling is $840k. The purse is the author's call (spec
- * §9), not this operator's.
+ * The purse moved nothing but money: every week's score, pins and turf,
+ * and every per-day profit figure, came out identical at both purses. Profit per day, all
+ * eight seeds within a few hundred dollars: run-up $14.5-15.9k, round
+ * days -$0.6k to -$1.7k (the course is closed), and ordinary $25.4-26.1k
+ * against $26.0-26.6k never bidding. The 63 run-up days cost about
+ * $0.64-0.75M against ordinary trade (a narrowed course takes ~$7k a day
+ * off it, measured on seed 1, plus the prep bill and the extra keepers),
+ * the nine round days about $0.25M, and the remaining $0.27-0.36M (by
+ * difference, not itemised) is the championship buildings and their
+ * upkeep, mostly. Before the week existed hosting won by $61k-$167k.
  *
  * The first run of this measurement, before `widenBack`, left the course
  * narrowed to the National's floor for the rest of the run and reported
- * hosting $1.78M-$2.32M worse than never bidding -- the operator's
- * omission, not the game's.
+ * hosting $1.78M-$2.32M worse than never bidding at the old purses --
+ * the operator's omission, not the game's.
  */
 export function playActThree(startState, {
   greenFee, teeInterval, roomRate, suiteShare = 0.3, days = 200, seed = 1,

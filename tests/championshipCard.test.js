@@ -113,7 +113,7 @@ test('the field is described, since it is what the dial was for', () => {
     day: 94,
     tournament: {
       rung: 'national', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
-      paid: 500000, prestige: 18, barDays: 0,
+      paid: RUNGS.national.purseCeiling, prestige: 18, barDays: 0,
       setup: 86, band: RUNGS.national.band, turfQuality: 90,
       field: { averageToPar: 9.1, underPar: 0, best: 1, hardestHole: 17, averageRoundMinutes: 284 },
       difficulty: 47, minDifficulty: 45, difficultyMet: true,
@@ -132,7 +132,7 @@ test('passing the act gets its own card, after the write-up', () => {
     actThreePassed: true,
     tournament: {
       rung: 'national', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
-      paid: 500000, prestige: 18, barDays: 0,
+      paid: RUNGS.national.purseCeiling, prestige: 18, barDays: 0,
       setup: 86, band: RUNGS.national.band, turfQuality: 90,
       field: { averageToPar: 9.1, underPar: 0, best: 1, hardestHole: 17, averageRoundMinutes: 284 },
       difficulty: 47, minDifficulty: 45, difficultyMet: true,
@@ -150,7 +150,7 @@ test('the write-up is about the winning score, round by round', () => {
     day: 95,
     tournament: {
       rung: 'regional', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
-      paid: 240000, prestige: 11, barDays: 0, setup: 70,
+      paid: RUNGS.regional.purseCeiling, prestige: 11, barDays: 0, setup: 70,
       band: RUNGS.regional.band, turfQuality: 86, difficulty: 57, minDifficulty: 55, difficultyMet: true,
       field: { averageToPar: 6, underPar: 1, best: -1, hardestHole: 12, averageRoundMinutes: 270 },
       week: {
@@ -176,7 +176,7 @@ test('the winning score is the week, never the last round\'s best', () => {
     day: 95,
     tournament: {
       rung: 'regional', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
-      paid: 240000, prestige: 11, barDays: 0, setup: 70,
+      paid: RUNGS.regional.purseCeiling, prestige: 11, barDays: 0, setup: 70,
       band: RUNGS.regional.band, turfQuality: 86, difficulty: 57, minDifficulty: 55, difficultyMet: true,
       field: { averageToPar: 6, underPar: 1, best: -1, hardestHole: 12, averageRoundMinutes: 270 },
       week: { rounds: 3, winningTotal: 5, target: { low: 2, high: 8 }, roundLog: [] },
@@ -217,7 +217,7 @@ test('a course under the floor is told as that, not as a scoring miss', () => {
     day: 96,
     tournament: {
       rung: 'national', met: ['turf'], missed: ['target', 'pace', 'crowd'],
-      paid: 55000, prestige: -18, barDays: 120, setup: 86,
+      paid: RUNGS.national.baseFee, prestige: -18, barDays: 120, setup: 86,
       band: RUNGS.national.band, turfQuality: 90, difficulty: 61.4, minDifficulty: 65, difficultyMet: false,
       field: { averageToPar: 8, underPar: 0, best: 2, hardestHole: 4, averageRoundMinutes: 290 },
       week: { rounds: 4, winningTotal: 14, target: { low: 12, high: 18 }, roundLog: [] },
@@ -251,7 +251,7 @@ function weekPrompt(roundLog, extra = {}) {
     day: 98,
     tournament: {
       rung: 'regional', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
-      paid: 240000, prestige: 11, barDays: 0, setup: 70,
+      paid: RUNGS.regional.purseCeiling, prestige: 11, barDays: 0, setup: 70,
       band: RUNGS.regional.band, turfQuality: 86, difficulty: 57, minDifficulty: 55, difficultyMet: true,
       field: { averageToPar: 6, underPar: 1, best: -1, hardestHole: 12 },
       week: { rounds: roundLog.length, winningTotal: 2, target: { low: 0, high: 4 }, roundLog },
