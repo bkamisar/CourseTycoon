@@ -20,7 +20,7 @@ import { shopCapacity, PER_SHOP_STAFF, BASE_SHOP_CAPACITY } from '../sim/shop.js
 import { PER_COOK, BASE_CAPACITY } from '../sim/kitchen.js';
 import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups, demolitionRefund } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
-import { holeStats } from '../sim/hole.js';
+import { holeStats, courseDifficultyOf } from '../sim/hole.js';
 import { marshalPaceFactor } from '../sim/day.js';
 import { openHoles } from '../sim/state.js';
 import { courseRating } from '../sim/ratings.js';
@@ -689,7 +689,7 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
         const holes = openHoles(current);
         if (holes.length === 0) return { total: 0 };
         const rating = courseRating(holes, current.turfQuality);
-        const courseDifficulty = holes.reduce((s, h) => s + holeStats(h).difficulty, 0) / holes.length;
+        const courseDifficulty = courseDifficultyOf(holes);
         const averageScenery = holes.reduce((s, h) => s + holeStats(h).scenery, 0) / holes.length;
         const recentHistory = current.satisfactionHistory.slice(-3);
         const recentSatisfaction = recentHistory.length

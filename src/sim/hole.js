@@ -73,10 +73,10 @@ export function holeStats(hole) {
 /**
  * How hard the course plays, 0-100: the mean of its holes.
  *
- * One definition, because three places need it -- the crowd's appeal in
- * `day.js`, a championship's minimum in `tournaments.js`, and the HUD -- and
- * three copies of an average are three chances to disagree about whether a
- * course qualifies.
+ * One definition, because several places need it -- the crowd's appeal in
+ * `day.js`, the demand preview in `panels.js`, and a championship's minimum
+ * difficulty, which will read it too -- and separate copies of an average are
+ * chances to disagree about whether a course qualifies.
  */
 export function courseDifficultyOf(holes) {
   if (!holes.length) return 0;

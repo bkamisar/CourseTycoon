@@ -331,4 +331,5 @@ test('the target includes both edges and nothing outside them', () => {
   assert.equal(withinTarget(-5, target), false);
   assert.equal(withinTarget(3, target), false);
   assert.equal(withinTarget(null, target), false, 'no rounds played is not a winner');
+  assert.equal(withinTarget(undefined, target), false);
 });
