@@ -91,7 +91,7 @@ function weekStory(week) {
   const a = toParText(first.leaderToPar);
   const b = toParText(last.leaderToPar);
   const lead = first.leaderToPar === last.leaderToPar
-    ? `The lead was ${a} after the first round and never moved.`
+    ? `The lead was ${a} after the first round and the same at the end.`
     : `The lead was ${a} after the first round and ${b} by the end.`;
   return lead + steer;
 }

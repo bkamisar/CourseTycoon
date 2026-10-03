@@ -267,7 +267,7 @@ test('the lead is a score, not a person who gave something back', () => {
   assert.match(moved, /The lead was -1 after the first round and \+2 by the end\./);
   assert.doesNotMatch(moved, /gave back|found|leader was/i);
   const still = weekPrompt([round(1, 2, 'fair'), round(2, 2, 'fair')]);
-  assert.match(still, /The lead was \+2 after the first round and never moved\./);
+  assert.match(still, /The lead was \+2 after the first round and the same at the end./);
 });
 
 test('the pins are called harder or easier against the first round, only when that is true', () => {
