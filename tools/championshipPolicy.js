@@ -2,7 +2,7 @@
  * How a competent host plays the championship week. Written to be shared
  * by the operator (tools/operator.js) and the calibration
  * (tools/calibrateWeek.js), so the two cannot measure different players.
- * The calibration uses it; the operator does not yet.
+ * Both use it (the operator since 2026-10-03).
  */
 import { courseDifficultyOf } from '../src/sim/hole.js';
 import { RUNGS } from '../src/sim/tournaments.js';

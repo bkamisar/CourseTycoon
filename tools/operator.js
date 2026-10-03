@@ -63,6 +63,9 @@ import {
 import {
   CHAMPIONSHIP_BUILDINGS, CHAMPIONSHIP_BUILDING_IDS, crowdHandledFor,
 } from '../src/sim/championshipBuildings.js';
+import { normaliseWeek, weekUnderWay, withPins } from '../src/sim/championshipWeek.js';
+import { weatherOn, effectsOf } from '../src/sim/weather.js';
+import { narrowToDifficulty, reactivePins } from './championshipPolicy.js';
 
 /**
  * Cash kept in hand at all times. Without a buffer the operator spends
@@ -125,9 +128,16 @@ export const LEVERS_NOT_PULLED = [
   'Act II: declining the buyout to keep playing. It settles the moment it '
   + 'can afford to, so nothing here measures a resort that chooses to '
   + 'stay under investment.',
-  'Act III: hiring grounds staff FOR a championship. It conditions with '
-  + 'whatever crew the course already needed, so nothing here says whether '
-  + 'staffing up for a week is worth it.',
+  'Act III: sizing the championship crew to the rung. It hires up to '
+  + 'CHAMPIONSHIP_CREW keepers for every booking and keeps them afterwards, '
+  + 'so nothing here says whether a seven-keeper County Open, or laying '
+  + 'the extra hands off between weeks, is the better play.',
+  'Act III: redesigning a hole for a championship any way but narrowing '
+  + 'its fairway. It only narrows, so nothing here says whether bunkers, '
+  + 'water or a re-routed hole are a better way to reach the floor.',
+  'Act III: setting the pins by anything but the reacting policy in '
+  + 'championshipPolicy.js. The same one the calibration measured, so the '
+  + 'two agree; a host who reads the field differently is not measured.',
   'Act III: declining to cover the gallery. It buys until the crowd fits '
   + 'whenever it can afford to, so nothing here measures a host who decides '
   + 'a stand costs more than the bonus it unlocks.',
@@ -506,28 +516,87 @@ export function playActTwo(startState, {
 // =====================================================================
 
 /**
+ * The grounds crew a booked championship gets, whatever the rung.
+ *
+ * `spendTheMorning` sizes the crew to the public's wear, `(holes * 1.4 +
+ * groups * 0.45) / 6.8`, which is about six keepers on a busy eighteen. It
+ * cannot see the two things a booking adds: the run-up diverts 40% of their
+ * care to conditioning (CARE_DIVERTED_WHILE_CONDITIONING) on every booked
+ * day, and on round days sixty players on firm greens wear the course
+ * harder (FIELD_WEAR_PER_SETUP) while 30% of the care is still diverted.
+ *
+ * Measured 2026-10-03, reviewing this operator: with the six the ordinary rule
+ * hires, the turf fails at every rung -- County ends ~71, Regional ~67,
+ * National 63-66, against the 78 the contract expects. A ladder run with
+ * that crew would report "the turf bonus is never earned" as a property of
+ * the game when it is this operator's hiring, the same trap as the marshal
+ * that was never hired in Act I. With the turf arriving at 80, seven hold
+ * the County and the Regional and eight the National; nine from a settled
+ * course reached 93-96 at the National. So eight, at every rung: the
+ * smallest crew that holds all three, rather than a per-rung figure tuned
+ * to the edge of each.
+ */
+export const CHAMPIONSHIP_CREW = 8;
+
+/** Hires up to CHAMPIONSHIP_CREW groundskeepers, all at once, if the
+ * buffer allows. A host who has just won a bid staffs for it that morning
+ * rather than one hand a day. Never fires anybody. */
+function crewUpFor(state) {
+  while (countRole(state, 'groundskeeper') < CHAMPIONSHIP_CREW && state.money > BUFFER) {
+    state.resort.staff.push({ role: 'groundskeeper' });
+  }
+}
+
+/**
  * A competent host, on the same terms as the operator above.
  *
  * Bids for the next rung as soon as it is eligible, and asks for the
  * middle of that rung's band.
  *
- * Aiming at the midpoint is the obvious competent play rather than a
- * clever one: it is the value furthest from both edges, and a host who
- * asked for anything else would need a reason this operator does not
- * have. What it does NOT do is manage the crew to get there — it
- * conditions with whatever staff the course already needed, so a run
- * reports whether an ordinary resort arrives in its band by accident,
- * which is the question worth asking.
+ * The band is guidance now, not the judge (the judge is the winning total
+ * since 2026-10-03), but it is still where a host sets the course: the
+ * calibration's targets were measured at the band's midpoint, so a host
+ * asking for anything else would be playing a week nobody calibrated.
  *
  * Setting the target matters more than it looks. setupTarget defaults to
  * 0 and conditioning is gated on being below it, so an operator that
  * never set one would carry a resort through a whole ladder with the
- * course never hardening, miss every band, and report Act III as
- * unwinnable. That is the trap that let Act I ship broken: a thing
- * measured where it cannot work, reported as a property of the thing.
+ * course never hardening, and report Act III as unwinnable. That is the
+ * trap that let Act I ship broken: a thing measured where it cannot work,
+ * reported as a property of the thing.
+ *
+ * While a championship is booked it does three more things, all from
+ * `championshipPolicy.js` or stated here, so the operator and the
+ * calibration (`tools/calibrateWeek.js`) play the same host:
+ *
+ *   - Hires the crew the week needs (CHAMPIONSHIP_CREW, above), because
+ *     the ordinary morning's rule does not see the run-up or the field.
+ *   - In the run-up, narrows fairways until the course meets the rung's
+ *     minimum difficulty -- the cheapest redesign there is. Also done the
+ *     morning the bid is won. The editor locks once the week starts, so
+ *     this has to be finished before the first round, and it is: one
+ *     morning's narrowing reaches any floor the corridors can reach.
+ *   - Each round's morning, sets the pins from the leader against the
+ *     target and today's sky (`reactivePins`), the call a player makes.
+ *
+ * Returns true only on the morning a bid is won.
  */
 export function spendTheTournamentMorning(state, { holesOpen }) {
-  if (state.tournament && !state.tournament.resolved) return false;
+  const booked = state.tournament && !state.tournament.resolved ? state.tournament : null;
+  if (booked) {
+    crewUpFor(state);
+    if (weekUnderWay(state)) {
+      // The morning call: read the leader against the target, and the sky.
+      const week = normaliseWeek(booked);
+      const sky = effectsOf(weatherOn(state.weatherSeed ?? 1, state.day));
+      state.tournament = withPins(week, reactivePins({ week, spread: sky.spread }));
+    } else {
+      // The run-up: bring the course up to the floor before the first
+      // morning, by the cheapest redesign there is -- narrower fairways.
+      narrowToDifficulty(state.resort.courses[0].holes, RUNGS[booked.rung].minDifficulty);
+    }
+    return false;
+  }
   const next = nextRungFor(state.tournamentsHosted ?? []);
   if (!next) return false;
 
@@ -538,11 +607,13 @@ export function spendTheTournamentMorning(state, { holesOpen }) {
   // been of the cheapest rung and nothing else.
   buildFor(state, next);
 
-  const booked = bidFor(state, next, { holesOpen });
-  if (!booked) return false;
-  state.tournament = booked;
+  const booking = bidFor(state, next, { holesOpen });
+  if (!booking) return false;
+  state.tournament = booking;
   const band = RUNGS[next].band;
   state.resort.setupTarget = Math.round((band.low + band.high) / 2);
+  crewUpFor(state);
+  narrowToDifficulty(state.resort.courses[0].holes, RUNGS[next].minDifficulty);
   return true;
 }
 
@@ -602,6 +673,10 @@ function buildFor(state, rungId) {
  */
 export function playActThree(startState, {
   greenFee, teeInterval, roomRate, suiteShare = 0.3, days = 200, seed = 1,
+  // False is the never-bid baseline: the same resort under the same
+  // operator, with the tournament morning skipped entirely, so the
+  // difference between the two runs is what hosting was worth.
+  host = true,
 }) {
   let state = startState;
   let last = null;
@@ -622,11 +697,17 @@ export function playActThree(startState, {
   let pendingRunUpTakings = 0;
   let pendingRunUpProfit = 0;
   let pendingRunUpDays = 0;
+  // Round days, the closed days the field plays. Kept apart from both of
+  // the above because the week is now two to four days with no public
+  // trade, and folding them into "ordinary" would hide that cost.
+  let weekTakings = 0;
+  let weekProfit = 0;
+  let weekDays = 0;
 
   for (let day = 0; day < days; day++) {
     spendTheMorning(state, { greenFee, teeInterval });
     spendTheHotelMorning(state, { roomRate, suiteShare });
-    if (spendTheTournamentMorning(state, { holesOpen: openCount(state) })) bids += 1;
+    if (host && spendTheTournamentMorning(state, { holesOpen: openCount(state) })) bids += 1;
 
     // Whether the course is being hardened today, read BEFORE the day
     // runs, so a resolving championship's own day is not counted as a
@@ -649,18 +730,20 @@ export function playActThree(startState, {
       state = applyEventChoice(state, pending.id, index);
     }
 
-    // The contract's own money is excluded from the takings figure.
-    // Counting it as a day's takings would answer "was the week worth it"
-    // with the fee that is the thing being asked about.
+    // The contract's own money is excluded from both figures. Counting it
+    // as a day's takings would answer "was the week worth it" with the fee
+    // that is the thing being asked about.
     //
-    // `report.profit` needs no such subtraction, and this is a trap worth
-    // stating: `day.js` computes `profit` BEFORE the contract is scored
-    // and then pushes the fee into the same `revenue` object afterwards,
-    // so on a championship day `report.profit` already excludes the fee
-    // while `report.revenue.total` includes it. Subtracting it from both
-    // double-counts it and reports a losing tournament as a winning one.
-    const trade = result.report.revenue.total - (result.report.revenue.tournament ?? 0);
-    const dayProfit = result.report.profit;
+    // This comment used to say `report.profit` needed no subtraction,
+    // because `day.js` computed it before the contract was scored. That
+    // stopped being true when day.js began recomputing the headline after
+    // the purse (commit 53d5b73, "fix the profit it showed"): on the last
+    // round's day `report.profit` now includes the fee, as
+    // `report.revenue.total` does, so both are corrected here. The purse
+    // is counted once, in `contractIncome`, and the money at the end.
+    const fee = result.report.revenue.tournament ?? 0;
+    const trade = result.report.revenue.total - fee;
+    const dayProfit = result.report.profit - fee;
     takings += trade;
     profit += dayProfit;
     if (conditioning) {
@@ -670,7 +753,11 @@ export function playActThree(startState, {
       runUpTakings += trade;
       runUpProfit += dayProfit;
       runUpDays += 1;
-    } else if (!result.report.tournamentDay) {
+    } else if (result.report.tournamentDay) {
+      weekTakings += trade;
+      weekProfit += dayProfit;
+      weekDays += 1;
+    } else {
       ordinaryTakings += trade;
       ordinaryProfit += dayProfit;
       ordinaryDays += 1;
@@ -681,13 +768,22 @@ export function playActThree(startState, {
       const contract = contractFor(hosted.rung);
       tournaments.push({
         rung: hosted.rung,
-        day: state.day - 1,
-        // The setup the course actually arrived at. Read off the state
-        // after the day rather than guessed from the crew, because the
-        // whole point is that the operator does not aim.
+        // The first round's day: the week ends on the day after the last.
+        day: state.day - hosted.week.rounds,
+        // The setup the course was held at. Guidance now, not the judge
+        // (the winning total is), recorded because it is what the field
+        // played on and the calibration was measured at the band's middle.
         setup: Math.round((state.resort.setup ?? 0) * 10) / 10,
         band: RUNGS[hosted.rung].band,
         inTarget: hosted.met.includes('target'),
+        winningTotal: hosted.week.winningTotal,
+        target: hosted.week.target,
+        rounds: hosted.week.rounds,
+        pins: hosted.week.roundLog.map((r) => r.pins),
+        difficulty: hosted.difficulty,
+        difficultyMet: hosted.difficultyMet,
+        turfMet: hosted.met.includes('turf'),
+        keepers: countRole(state, 'groundskeeper'),
         met: hosted.met,
         missed: hosted.missed,
         paid: hosted.paid,
@@ -734,6 +830,9 @@ export function playActThree(startState, {
     runUpDays,
     runUpTakingsPerDay: runUpDays ? Math.round(runUpTakings / runUpDays) : 0,
     runUpProfitPerDay: runUpDays ? Math.round(runUpProfit / runUpDays) : 0,
+    weekDays,
+    weekTakingsPerDay: weekDays ? Math.round(weekTakings / weekDays) : 0,
+    weekProfitPerDay: weekDays ? Math.round(weekProfit / weekDays) : 0,
     ordinaryDays,
     ordinaryTakingsPerDay: ordinaryDays ? Math.round(ordinaryTakings / ordinaryDays) : 0,
     ordinaryProfitPerDay: ordinaryDays ? Math.round(ordinaryProfit / ordinaryDays) : 0,

@@ -2,6 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { WAGES, AMENITIES } from '../src/sim/economy.js';
+import { newGame } from '../src/sim/state.js';
+import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
+import { TEMPLATE_NAMES } from '../src/sim/templates.js';
+import { RUNGS } from '../src/sim/tournaments.js';
+import { newWeek, recordRound } from '../src/sim/championshipWeek.js';
+import { spendTheTournamentMorning } from '../tools/operator.js';
 
 const operatorSource = readFileSync(new URL('../tools/operator.js', import.meta.url), 'utf8');
 
@@ -52,4 +58,48 @@ test('the operator declares what it deliberately does not do', () => {
     'the operator must state its own blind spots, or its numbers will be read as complete');
   const declared = operatorSource.slice(operatorSource.indexOf('LEVERS_NOT_PULLED'));
   assert.ok(declared.length > 200, 'the declaration should actually say something');
+});
+
+// --- Act III: hosting a championship week -------------------------------
+
+function actThreeCourse(seed) {
+  const state = newGame(seed);
+  state.act = 3;
+  state.money = 600000;
+  state.prestige = 90;
+  state.resort.courses[0].holes = state.resort.courses[0].holes.map((h, i) => ({
+    ...makeHole(TEMPLATE_NAMES[i % TEMPLATE_NAMES.length], i + 1), open: true,
+  }));
+  return state;
+}
+
+test('during the run-up the operator redesigns the course up to the rung\'s floor', () => {
+  const state = actThreeCourse(3);
+  state.tournament = newWeek('regional', state.day + 10);
+  spendTheTournamentMorning(state, { holesOpen: 18 });
+  const holes = state.resort.courses[0].holes.filter((h) => h.open);
+  assert.ok(courseDifficultyOf(holes) >= RUNGS.regional.minDifficulty);
+});
+
+test('during the week the operator sets the pins from the leader', () => {
+  const state = actThreeCourse(4);
+  let week = newWeek('national', state.day - 1);
+  // Two rounds in and far under: a host reading this toughens the pins.
+  week = recordRound(week, { handicaps: [0], playerToPar: [-6], entry: {} });
+  week = recordRound(week, { handicaps: [0], playerToPar: [-6], entry: {} });
+  state.tournament = week;
+  spendTheTournamentMorning(state, { holesOpen: 18 });
+  assert.ok(['tough', 'brutal'].includes(state.tournament.roundSettings.pins));
+});
+
+test('a booked national makes the operator hire a crew that can hold the turf through it', () => {
+  // The ordinary rule (spendTheMorning) sizes the crew to the public's
+  // wear, about six on a full eighteen, and six lose the turf at every
+  // rung once the run-up and the field are added. A measurement run with
+  // six would report the turf failing as a property of the game.
+  const state = actThreeCourse(5);
+  state.tournament = newWeek('national', state.day + 10);
+  spendTheTournamentMorning(state, { holesOpen: 18 });
+  const keepers = state.resort.staff.filter((m) => m.role === 'groundskeeper').length;
+  assert.ok(keepers >= 8, `a booked national left the operator with ${keepers} groundskeepers`);
 });
