@@ -116,10 +116,11 @@ test('wind reaches the field', () => {
 test('wet weather slows the field', () => {
   // With tee times far enough apart that nothing queues, a round is just
   // the sum of its holes and pace scales it exactly. Heavy rain is pace
-  // 1.16 on the sky; the field feels half of that slowdown, 1.08.
+  // 1.16 on the sky, and the field feels all of it: only the scoring
+  // spread is damped (FIELD_WEATHER_EFFECT).
   const a = playField(makeRng(43), course(), { setup: 60, pace: 1, teeInterval: 30 });
   const b = playField(makeRng(43), course(), { setup: 60, pace: 1.16, teeInterval: 30 });
-  assert.ok(Math.abs(b.averageRoundMinutes / a.averageRoundMinutes - 1.08) < 0.01,
+  assert.ok(Math.abs(b.averageRoundMinutes / a.averageRoundMinutes - 1.16) < 0.01,
     `heavy rain (pace 1.16) made rounds ${b.averageRoundMinutes / a.averageRoundMinutes} times as long`);
 });
 
