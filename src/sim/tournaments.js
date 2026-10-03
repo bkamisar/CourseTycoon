@@ -173,6 +173,48 @@ export const SETUP_DECAY_PER_DAY = 3.5;
  */
 export const CARE_DIVERTED_WHILE_CONDITIONING = 0.4;
 
+/**
+ * On a round day the crew are cutting holes, mowing greens twice and
+ * raking bunkers behind the field, so less of their time holds the turf.
+ *
+ * This REPLACES `CARE_DIVERTED_WHILE_CONDITIONING` on a round day rather
+ * than stacking on it, and it is lower: with the public off the course
+ * the crew have no tee sheet to work around. The round day's real cost
+ * is carried by the field's traffic (`FIELD_WEAR_PER_SETUP`), not by
+ * this. Tried at 0.5 (above the run-up's 0.4, which reads more naturally)
+ * and rejected, measured 2026-10-03 on the national below: ten keepers
+ * finished on 73-74 at the field wear set here and only 79-80 with it
+ * cut to 1.0, so ten became the bare minimum rather than a crew with
+ * margin, and the nine that hold a national's turf through the run-up
+ * (tests/tournamentDay.test.js) would lose it in every week they hosted.
+ */
+export const CARE_DIVERTED_DURING_ROUNDS = 0.3;
+
+/**
+ * How much harder sixty championship players are on firm, fast greens
+ * than the same traffic on a soft course. Field traffic is multiplied by
+ * 1 + this x setup / 100.
+ *
+ * Set by measurement against tests/tournamentDay.test.js: six keepers who
+ * arrive at a national with the turf just above TURF_EXPECTED must lose it
+ * by the last round, and ten must hold it. Both pass at the first values
+ * tried (this 1.5, CARE_DIVERTED_DURING_ROUNDS 0.3); nothing was tuned.
+ * Measured 2026-10-03, a national held at setup 86 on its minimum course,
+ * turf arriving at 80, final turf after the fourth round on seeds 90 / 91
+ * / 92:
+ *
+ *    6 keepers   62  63  63   (8 to 9 lost on the first round)
+ *    7 keepers   72  73  72
+ *    8 keepers   81  82  82
+ *    9 keepers   91  92  91
+ *   10 keepers  100 100 100
+ *
+ * Roughly ten points of final turf per keeper, so the line falls between
+ * seven and eight: the dial stays a dial on round days rather than a
+ * cliff, and both tests clear it by a wide margin rather than a lucky one.
+ */
+export const FIELD_WEAR_PER_SETUP = 1.5;
+
 /** What one day of work adds, given the crew. */
 export function setupClimb(keepers = 0) {
   return Math.max(0, keepers) * SETUP_PER_KEEPER;

@@ -34,10 +34,10 @@ import {
 } from './hotelAmenities.js';
 import {
   nextSetup, setupDifficultyBonus, championshipRoomsSold, scoreTournament,
-  CARE_DIVERTED_WHILE_CONDITIONING, conditioningCostPerDay, CHAMPIONSHIP_HOLES,
-  RUNGS,
+  CARE_DIVERTED_WHILE_CONDITIONING, CARE_DIVERTED_DURING_ROUNDS, FIELD_WEAR_PER_SETUP,
+  conditioningCostPerDay, CHAMPIONSHIP_HOLES, RUNGS,
 } from './tournaments.js';
-import { playField, drawFieldHandicaps } from './field.js';
+import { playField, drawFieldHandicaps, FIELD_GROUPS } from './field.js';
 import {
   normaliseWeek, recordRound, winningTotal, weekFinished,
 } from './championshipWeek.js';
@@ -646,10 +646,32 @@ export function runDay(state, seed) {
    * so trade while conditioning never measured below trade on an ordinary
    * day. Holding counts: keeping greens firm is the same hours as making
    * them firm, and it is what the crew does every day of the week itself.
+   *
+   * A round day costs more than that, mostly in wear: the field's own
+   * traffic is worn in, scaled up on a firm course by
+   * `FIELD_WEAR_PER_SETUP`, and the crew's diversion becomes
+   * `CARE_DIVERTED_DURING_ROUNDS` in place of the run-up's share. Both are
+   * in tournaments.js, with the measurements that set them.
    */
-  const wearRate = holes.length * 1.4 + groupCount * 0.45;
+  // A round day: the public are kept off, and sixty players on firm greens
+  // take their place. Without this the closed week was the quietest the
+  // turf ever had, and "greens that die by Saturday" could not happen.
+  //
+  // The field's round itself is played further down, after this wear has
+  // been applied, so on a round day the field plays on turf that already
+  // includes its own wear, and the round log's `turfAfter` is this
+  // post-wear figure. Tolerated rather than reordered: it is the evening's
+  // turf the report and the judge read, and the difference is one day's
+  // wear.
+  const fieldTraffic = championshipToday
+    ? FIELD_GROUPS * (1 + FIELD_WEAR_PER_SETUP * (next.resort.setup ?? 0) / 100)
+    : 0;
+  const wearRate = holes.length * 1.4 + (groupCount + fieldTraffic) * 0.45;
   const wear = wearRate * (next.turfQuality / 100);
-  const care = keepers * 6.8 * (preparing ? 1 - CARE_DIVERTED_WHILE_CONDITIONING : 1);
+  const careDiverted = championshipToday ? CARE_DIVERTED_DURING_ROUNDS
+    : preparing ? CARE_DIVERTED_WHILE_CONDITIONING
+      : 0;
+  const care = keepers * 6.8 * (1 - careDiverted);
   // Rain waters the course for free; a run of clear days bakes it. A wet
   // week costs money and leaves the turf better than it found it, which
   // is a trade rather than a punishment.

@@ -811,3 +811,37 @@ test('a booked course already at its target stays there, and holding it is bille
   }
   assert.equal(state.tournament, null, 'sanity: the week was played through');
 });
+
+// --- The turf during the week -----------------------------------------
+
+/** A national on its first morning, turf at `turf`, `keepers` on the crew. */
+function nationalWeekWith(keepers, turf, seed) {
+  const state = atMinimum(nationalReady(seed), 'national');
+  state.resort.staff = state.resort.staff.filter((m) => m.role !== 'groundskeeper');
+  for (let i = 0; i < keepers; i++) state.resort.staff.push({ role: 'groundskeeper' });
+  state.resort.setup = 86;
+  state.resort.setupTarget = 86;
+  state.turfQuality = turf;
+  state.tournament = newWeek('national', state.day);
+  return state;
+}
+
+test('greens that arrive only just good enough die by the last round', () => {
+  // The Act III spec's promise: "greens that die by Saturday". The course
+  // is shut to the public, so before this the week was the quietest the
+  // turf had ever had and could only improve.
+  for (const seed of [90, 91, 92]) {
+    const t = playWeek(nationalWeekWith(6, TURF_EXPECTED + 2, seed), 9000 + seed).report.tournament;
+    assert.ok(t.turfQuality < TURF_EXPECTED,
+      `seed ${seed}: six keepers held the turf at ${t.turfQuality} through a national`);
+    assert.ok(!t.met.includes('turf'));
+  }
+});
+
+test('a crew with real margin holds the turf through the week', () => {
+  for (const seed of [90, 91, 92]) {
+    const t = playWeek(nationalWeekWith(10, TURF_EXPECTED + 2, seed), 9000 + seed).report.tournament;
+    assert.ok(t.turfQuality >= TURF_EXPECTED,
+      `seed ${seed}: ten keepers let the turf fall to ${t.turfQuality}`);
+  }
+});
