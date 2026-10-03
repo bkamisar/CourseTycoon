@@ -17,6 +17,7 @@ import { playHole } from './round.js';
 import { holeStats } from './hole.js';
 import { setupDifficultyBonus } from './tournaments.js';
 import { scheduleRounds } from './schedule.js';
+import { pinHandicap } from './championshipWeek.js';
 
 /** Players in the field. Enough that an average means something and few
  * enough that a week is not a thousand simulated rounds. */
@@ -27,7 +28,7 @@ export const FIELD_SIZE = 60;
  * plays an unrealistically quick hole and, worse, has nobody ahead of it to
  * queue behind — so pace of play could never actually fail. */
 const GROUP_SIZE = 3;
-const FIELD_GROUPS = FIELD_SIZE / GROUP_SIZE;
+export const FIELD_GROUPS = FIELD_SIZE / GROUP_SIZE;
 
 /** Default gap between tee times, in minutes. A standing setting the
  * player sets on resort ops and can widen for a championship week — see
@@ -39,6 +40,18 @@ const FIELD_HANDICAP_LOW = 0;
 const FIELD_HANDICAP_HIGH = 6;
 
 /**
+ * Sixty championship handicaps, drawn once for a week.
+ *
+ * Drawn per round, the totals at the end of a four-round week would belong
+ * to nobody -- player seven on Thursday and player seven on Sunday would be
+ * different golfers. Still nameless: an index and a handicap.
+ */
+export function drawFieldHandicaps(rng) {
+  return Array.from({ length: FIELD_SIZE }, () =>
+    FIELD_HANDICAP_LOW + rng.int(FIELD_HANDICAP_HIGH - FIELD_HANDICAP_LOW + 1));
+}
+
+/**
  * Plays one round of a championship and reports how the course played.
  *
  * `setup` and `turfQuality` are the two things the player controls; the
@@ -46,6 +59,7 @@ const FIELD_HANDICAP_HIGH = 6;
  */
 export function playField(rng, holes, {
   setup = 0, turfQuality = 100, teeInterval = DEFAULT_TEE_INTERVAL,
+  pins = 'fair', spread = 1, pace = 1, handicaps = null,
 } = {}) {
   const par = holes.reduce((sum, h) => sum + holeStats(h).par, 0);
   // A conditioned course plays longer and less forgiving. `playHole`
@@ -64,27 +78,37 @@ export function playField(rng, holes, {
   // which puts a county setup (45-60) at five or six over and a national
   // (80-92) at nine or ten. /5 flattened it to a 4-stroke total spread;
   // /1 had the field 22 over and nobody near par.
-  const handicapAdjust = setupDifficultyBonus(setup) / 3;
+  //
+  // Pins sit on the same scale, added on top: see PINS in
+  // championshipWeek.js for why they are a third of what was first tried.
+  const handicapAdjust = setupDifficultyBonus(setup) / 3 + pinHandicap(pins);
   // Worn greens putt less true. Honestly small: measured across the whole
   // turf range this moves the field 0.2 strokes, so it is texture rather
   // than a lever. Turf is judged as its own contract condition instead.
   const puttAdjust = (100 - turfQuality) / 100;
 
-  const toPar = [];
+  // Indexed by player, in field order, so a week can add round to round.
+  const playerToPar = new Array(FIELD_SIZE).fill(0);
   const holeStrokes = holes.map(() => 0);
   const holePar = holes.map((h) => holeStats(h).par);
   // Minutes a group spends on each hole, summed across every group so the
   // average below is the clean per-hole time `scheduleRounds` expects —
   // the same shape `day.js` builds for the resort's own tee sheet.
   const holeMinutesTotal = holes.map(() => 0);
+  // Every shot, kept for the playback. This used to be thrown away, which
+  // is why a championship played to an empty course on screen.
+  const rawEvents = [];
 
   for (let g = 0; g < FIELD_GROUPS; g++) {
     const groupStrokes = new Array(GROUP_SIZE).fill(0);
     const guests = [];
     for (let i = 0; i < GROUP_SIZE; i++) {
       const id = g * GROUP_SIZE + i;
-      const handicap = FIELD_HANDICAP_LOW
-        + rng.int(FIELD_HANDICAP_HIGH - FIELD_HANDICAP_LOW + 1);
+      // A field passed in is the week's; with none, draw one as before so
+      // a single round still works on its own.
+      const handicap = handicaps
+        ? handicaps[id]
+        : FIELD_HANDICAP_LOW + rng.int(FIELD_HANDICAP_HIGH - FIELD_HANDICAP_LOW + 1);
       guests.push({
         id, name: 'competitor', handicap, wallet: 0,
         segment: 'serious', patience: 100, energy: 100,
@@ -93,18 +117,24 @@ export function playField(rng, holes, {
     const group = { id: g, guests };
 
     holes.forEach((hole, i) => {
+      // `spread` is the day's weather, the same multiplier the resort's
+      // own golfers play in. It was always computed on a championship day
+      // and the field ignored it.
       const played = playHole(rng, hole, group, {
-        carts: false, handicapAdjust, puttAdjust, spread: 1,
+        carts: false, handicapAdjust, puttAdjust, spread,
       });
       holeMinutesTotal[i] += played.minutes;
       holeStrokes[i] += played.totalStrokes;
       played.scores.forEach((score, idx) => { groupStrokes[idx] += score.strokes; });
+      rawEvents.push({ groupIndex: g, holeIndex: i, events: played.events });
     });
 
-    groupStrokes.forEach((strokes) => toPar.push(strokes - par));
+    groupStrokes.forEach((strokes, idx) => {
+      playerToPar[g * GROUP_SIZE + idx] = strokes - par;
+    });
   }
 
-  toPar.sort((a, b) => a - b);
+  const toPar = [...playerToPar].sort((a, b) => a - b);
   const average = toPar.reduce((s, v) => s + v, 0) / toPar.length;
 
   // Which hole took the most off the field, relative to its par.
@@ -120,7 +150,10 @@ export function playField(rng, holes, {
   // pace failable — a hole slower than the gap between tee times backs
   // the whole field up behind it, exactly as `day.js` models the resort's
   // ordinary tee sheet.
-  const averageHoleMinutes = holeMinutesTotal.map((total) => total / FIELD_GROUPS);
+  //
+  // `pace` is the weather's: rain and wind slow a round, and nothing on a
+  // championship day used to read it.
+  const averageHoleMinutes = holeMinutesTotal.map((total) => (total / FIELD_GROUPS) * pace);
   const schedule = scheduleRounds({
     groupCount: FIELD_GROUPS,
     teeInterval,
@@ -144,5 +177,10 @@ export function playField(rng, holes, {
     bottleneckHole: schedule.bottleneckHoleIndex === null
       ? null
       : schedule.bottleneckHoleIndex + 1,
+    playerToPar,
+    // For the renderer, and only the renderer. `day.js` strips this before
+    // anything is saved: twenty threeballs' shots are thousands of events,
+    // and the report history keeps fourteen days.
+    playback: { schedule, rawEvents, holeMinutes: averageHoleMinutes },
   };
 }

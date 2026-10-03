@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { makeRng } from '../src/sim/rng.js';
 import { makeHole } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
-import { playField, FIELD_SIZE } from '../src/sim/field.js';
+import { playField, FIELD_SIZE, FIELD_GROUPS, drawFieldHandicaps } from '../src/sim/field.js';
 import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
 
 function course(count = 18) {
@@ -77,4 +77,64 @@ test('a slower bottleneck hole is reported, or none when nothing queues', () => 
   assert.ok(jammed.bottleneckHole >= 1 && jammed.bottleneckHole <= 18);
   assert.ok(jammed.slowestRoundMinutes >= jammed.averageRoundMinutes,
     'nobody finishes faster than the field average');
+});
+
+test('pins move the field, by a stroke or two and not by a setup\'s worth', () => {
+  const handicaps = drawFieldHandicaps(makeRng(40));
+  const play = (pins) => playField(makeRng(41), course(), { setup: 70, turfQuality: 85, pins, handicaps });
+  const easy = play('easy').averageToPar;
+  const brutal = play('brutal').averageToPar;
+  assert.ok(brutal > easy + 1, `brutal ${brutal} against easy ${easy}`);
+  assert.ok(brutal < easy + 4, 'pins fine-tune; they are not a second setup dial');
+});
+
+test('wind reaches the field', () => {
+  // Weather was always computed on a championship day and the field
+  // ignored it. Blowing hard is spread 1.45, clear is 0.95 (weather.js).
+  const handicaps = drawFieldHandicaps(makeRng(42));
+  let calm = 0;
+  let windy = 0;
+  for (const seed of [1, 2, 3, 4]) {
+    calm += playField(makeRng(seed), course(), { setup: 60, handicaps, spread: 0.95 }).averageToPar;
+    windy += playField(makeRng(seed), course(), { setup: 60, handicaps, spread: 1.45 }).averageToPar;
+  }
+  assert.ok(windy > calm + 2, `windy ${windy / 4} against calm ${calm / 4}`);
+});
+
+test('wet weather slows the field', () => {
+  const a = playField(makeRng(43), course(), { setup: 60, pace: 1 });
+  const b = playField(makeRng(43), course(), { setup: 60, pace: 1.16 });
+  assert.ok(b.averageRoundMinutes > a.averageRoundMinutes,
+    'heavy rain (pace 1.16) must make rounds longer');
+});
+
+test('a field passed in is the field that plays', () => {
+  const scratch = new Array(FIELD_SIZE).fill(0);
+  const hackers = new Array(FIELD_SIZE).fill(6);
+  const good = playField(makeRng(44), course(), { setup: 50, handicaps: scratch });
+  const poor = playField(makeRng(44), course(), { setup: 50, handicaps: hackers });
+  assert.ok(good.averageToPar < poor.averageToPar);
+});
+
+test('every player\'s score is returned in field order', () => {
+  const round = playField(makeRng(45), course(), { setup: 55 });
+  assert.equal(round.playerToPar.length, FIELD_SIZE);
+  assert.equal(Math.min(...round.playerToPar), round.best);
+  const mean = round.playerToPar.reduce((s, v) => s + v, 0) / FIELD_SIZE;
+  assert.equal(Number(mean.toFixed(2)), round.averageToPar);
+});
+
+test('the field\'s shots are kept for the playback', () => {
+  const holes = course();
+  const round = playField(makeRng(46), holes, { setup: 55 });
+  assert.equal(round.playback.schedule.rounds.length, FIELD_GROUPS, 'twenty threeballs tee off');
+  assert.equal(round.playback.rawEvents.length, FIELD_GROUPS * holes.length);
+  assert.equal(round.playback.holeMinutes.length, holes.length);
+  assert.ok(round.playback.rawEvents.some((b) => b.events.some((e) => e.type === 'shot')));
+});
+
+test('drawing a field gives sixty championship handicaps', () => {
+  const field = drawFieldHandicaps(makeRng(47));
+  assert.equal(field.length, FIELD_SIZE);
+  assert.ok(field.every((h) => Number.isInteger(h) && h >= 0 && h <= 6));
 });
