@@ -252,7 +252,7 @@ function weekSection(data, state, commit) {
 
   const pinsLabel = document.createElement('div');
   pinsLabel.className = 'champ-detail';
-  pinsLabel.textContent = `Pins — ${b.weather.note}`;
+  pinsLabel.textContent = `${b.weather.note} Where do the pins go?`;
   wrap.appendChild(pinsLabel);
 
   const pins = document.createElement('div');

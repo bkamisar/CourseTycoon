@@ -6,7 +6,8 @@
  * straight off `state` or off a `src/sim/ratings.js` call, never computed
  * here. Course rating in particular mirrors exactly what `src/sim/day.js`
  * does for the same state (rating is 0 with no open holes, otherwise
- * `courseRating(openHoles(state), state.turfQuality)`), so the HUD figure
+ * `courseRating(playableHoles(state), state.turfQuality)` -- the open holes
+ * less any a decision event has closed), so the HUD figure
  * always agrees with what the day's own report will say.
  *
  * Satisfaction is the one figure here that isn't derived from `state`
@@ -20,7 +21,7 @@
  */
 import { PALETTE } from '../render/palette.js';
 import { withinBand } from '../sim/tournaments.js';
-import { openHoles } from '../sim/state.js';
+import { playableHoles } from '../sim/state.js';
 import { championshipStatus } from '../sim/championshipWeek.js';
 import { toParText } from './toPar.js';
 import { courseRating } from '../sim/ratings.js';
@@ -73,7 +74,7 @@ function tournamentReadout(state) {
 }
 
 export function computeHudData(state) {
-  const holes = openHoles(state);
+  const holes = playableHoles(state);
   const lastReport = state.history.length ? state.history[state.history.length - 1] : null;
   const rating = holes.length
     ? courseRating(holes, state.turfQuality, lastReport?.crowd ?? null)
@@ -292,7 +293,7 @@ export function mountHud(root) {
         // leader, and "leads —" is noise on a line with room for little.
         const pace = t.leaderToPar === null ? ''
           : ` · leads ${toParText(t.leaderToPar)} · on pace ${toParText(t.projectedTotal)}`;
-        tournament.textContent = `R${t.round}/${t.rounds}${pace}`
+        tournament.textContent = `${t.short} R${t.round}/${t.rounds}${pace}`
           + ` (target ${toParText(t.target.low)}…${toParText(t.target.high)})`;
         // `difficultyMet` here is the judge's own: live on the first
         // morning, then the figure it settled. Once that says the course
