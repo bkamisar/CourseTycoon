@@ -63,6 +63,23 @@ damaging its greens, recovers, and draws them back. It is realistic and
 it works against "hard to dig out of". Left deliberately; revisit if a
 collapse ever feels too easy to recover from.
 
+### A course set exactly at the floor fails it when holes close on the first morning
+
+**Found:** 2026-10-03, measuring the championship ladder (`tools/actThree.js`).
+Seen by the operator, not yet by a player.
+
+A championship measures the course's difficulty on the first round's morning,
+over the holes playing that day. If a decision event has closed holes then (a
+drain dug out, a tree down), the course is measured on the shorter layout, and
+the closed holes are the last ones. A course narrowed to exactly the rung's
+floor -- the HUD showing 65.0 against 65 -- then reads 62.6 on sixteen holes,
+and the week fails the floor, and with it the target, the bonuses and the
+rung, whatever the winner shoots. The player cannot fix it that morning,
+because the editor locks when the week starts. In the 8-seed measurement it
+happened in 4 of 24 weeks (one Regional at 53.4, three Nationals at 62.6).
+Narrowing to exactly the floor leaves no margin for it. Related to "A round
+played on a short course counts as a full one" below.
+
 ### A round played on a short course counts as a full one
 
 **Found:** 2026-10-03, in review of the championship week. Not seen in play yet.

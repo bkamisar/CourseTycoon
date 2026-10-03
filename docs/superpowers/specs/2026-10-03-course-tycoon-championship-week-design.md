@@ -378,11 +378,28 @@ the shop, against a hotel selling championship rooms. The plan measures one
 complete week per rung — run-up and rounds — against the same days without a
 bid, and reports it.
 
-The target: hosting a rung and landing the winner in range still beats never
-bidding (otherwise the act penalises playing it), but by noticeably less than
-it does today. If a passed National earns less than not bidding, the purse is
-retuned, not the closure. Wider Act III money pressure belongs to the run-up
-spec.
+The target was: hosting a rung and landing the winner in range still beats
+never bidding, but by noticeably less than it did (+$61k to +$167k across the
+ladder). Measured 2026-10-03 (`node tools/actThree.js --seeds 8`, the table
+above `playActThree` in `tools/operator.js`), it overshot: at the old purses
+hosting the whole ladder lost to never bidding on all eight seeds, by $625k to
+$1.28M, the near-perfect ladders included. The run-up on a course narrowed to
+the floor, the closed round days and the buildings cost about $1.3M; the whole
+ladder's ceiling was $840k.
+
+**The author's decision:** a ladder played near-perfectly should roughly break
+even against never bidding, and a sloppy one should lose. So the purse was
+retuned, not the closure: every rung's base fee and ceiling doubled (County
+$36k / $200k, Regional $60k / $480k, National $110k / $1M), one factor because
+each rung's cost against what a near-perfect week of it collected was nearly
+flat (1.7x, 1.85x, 1.8x; the reasoning is above the rung list in
+`tournaments.js`).
+
+Measured after: the two seeds that hit every week finished at -$5k and +$26k
+against never bidding; the six that missed a week lost $424k to $1.14M. So Act
+III is no longer a money-maker: a championship pays for itself only when it is
+done well, and its reward is prestige and the act. Wider Act III money pressure
+belongs to the run-up spec.
 
 ## 10. Cards
 
