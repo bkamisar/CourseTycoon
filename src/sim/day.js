@@ -788,6 +788,7 @@ export function runDay(state, seed) {
         setup: Math.round(next.resort.setup ?? 0),
         averageToPar: field.averageToPar,
         hardestHole: field.hardestHole,
+        underPar: field.underPar,
         averageRoundMinutes: field.averageRoundMinutes,
         paceOnTarget,
         turfAfter: Math.round(next.turfQuality),
@@ -841,7 +842,10 @@ export function runDay(state, seed) {
         setup: Math.round(next.resort.setup ?? 0),
         band: rung.band,
         turfQuality: Math.round(next.turfQuality),
-        difficulty: Math.round(played.difficulty * 10) / 10,
+        // Floored to a tenth, not rounded: 44.96 against a floor of 45 is
+        // a miss, and rounding it to 45.0 printed "measured 45, asked for
+        // at least 45" beside a verdict that said otherwise.
+        difficulty: Math.floor(played.difficulty * 10) / 10,
         minDifficulty: rung.minDifficulty,
         difficultyMet: played.difficultyMet,
         week: {

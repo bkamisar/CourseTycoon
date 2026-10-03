@@ -322,6 +322,9 @@ function tournamentSection(report) {
     winningTotal: t.week?.winningTotal ?? null,
     target: t.week?.target ?? null,
     difficulty: t.difficulty,
+    // One decimal, because the judge compares unfloored: a course at 44.9
+    // against a floor of 45 must not print as "45".
+    difficultyText: typeof t.difficulty === 'number' ? t.difficulty.toFixed(1) : '',
     minDifficulty: t.minDifficulty,
     difficultyMet: t.difficultyMet !== false,
     turfQuality: t.turfQuality,
@@ -350,6 +353,17 @@ function trackingFor(leader, round, rounds, target) {
   return 'on';
 }
 
+/**
+ * The field's average to par as a golfer says it: "+6.2", "0.4 under par".
+ * Rounded to a tenth first so a value that rounds to nothing reads "even
+ * par" rather than "+0.0".
+ */
+function averageText(n) {
+  const tenth = Math.round(n * 10) / 10;
+  if (tenth === 0) return 'even par';
+  return tenth > 0 ? `+${tenth.toFixed(1)}` : `${Math.abs(tenth).toFixed(1)} under par`;
+}
+
 /** One round of a championship week, read off the day's report. Null on
  * every other day. */
 function roundSection(report) {
@@ -361,13 +375,19 @@ function roundSection(report) {
     rounds: r.rounds,
     target: r.target,
     leaderText: toParText(r.leaderToPar),
+    // Over the whole week, from the same function the HUD and the sheet use:
+    // the leader's partial total means nothing beside a target that is for
+    // the week.
+    projected: projectTotal(r.leaderToPar, r.round, r.rounds),
     averageToPar: r.averageToPar,
+    averageText: averageText(r.averageToPar),
+    underPar: r.underPar ?? null,
     hardestHole: r.hardestHole,
     averageRoundMinutes: r.averageRoundMinutes,
     paceOnTarget: r.paceOnTarget,
     turfAfter: r.turfAfter,
     weatherLabel: effectsOf(r.weather).label,
-    pinsLabel: PINS[r.pins]?.label ?? 'Fair',
+    pinsLabel: PINS[r.pins]?.label ?? r.pins,
     tracking: trackingFor(r.leaderToPar, r.round, r.rounds, r.target),
     final: r.round >= r.rounds,
   };
@@ -1014,14 +1034,25 @@ export function mountReport(root, { state, report, onContinue } = {}) {
 
     const story = document.createElement('div');
     story.className = 'report-champ-field';
+    const targetText = `${toParText(r.target.low)} to ${toParText(r.target.high)}`;
+    // The leader's partial total is not comparable to a target that is for
+    // the week, so mid-week the line carries the projection beside it, and
+    // the last round says what the winner actually finished on.
+    const standing = r.final
+      ? `The winner finished at ${r.leaderText}; the target was ${targetText}.`
+      : `The leader is ${r.leaderText} after ${r.round} ${r.round === 1 ? 'round' : 'rounds'}`
+        + `${r.projected === null ? '' : `, on pace for ${toParText(r.projected)}`}; the target is ${targetText}.`;
     const heading = r.final ? ''
-      : r.tracking === 'under' ? ' The field is taking it apart: the winner is heading under the target.'
-        : r.tracking === 'over' ? ' Nobody can score: the winner is heading over the target.'
+      : r.tracking === 'under' ? ' Scoring is running low: the winner is on pace to finish under the target.'
+        : r.tracking === 'over' ? ' Scoring is running high: the winner is on pace to finish over the target.'
           : ' On course for the target.';
+    const broke = r.underPar === null ? ''
+      : r.underPar === 0 ? ' Nobody broke par.'
+        : r.underPar === 1 ? ' One player broke par.'
+          : ` ${r.underPar} players broke par.`;
     story.textContent = `${r.weatherLabel}, ${r.pinsLabel.toLowerCase()} pins. `
-      + `The leader is ${r.leaderText}; the target is ${toParText(r.target.low)} to ${toParText(r.target.high)}.`
-      + `${heading} The field averaged ${r.averageToPar.toFixed(1)} over and the ${ordinal(r.hardestHole)} `
-      + `played hardest. Rounds took ${Math.round(r.averageRoundMinutes)} minutes`
+      + `${standing}${heading} The field averaged ${r.averageText} and the ${ordinal(r.hardestHole)} `
+      + `played hardest.${broke} Rounds took ${Math.round(r.averageRoundMinutes)} minutes`
       + `${r.paceOnTarget ? '' : ', which is over the pace target'}; the turf is at ${r.turfAfter}.`;
     round.appendChild(story);
     screen.appendChild(round);
@@ -1048,28 +1079,20 @@ export function mountReport(root, { state, report, onContinue } = {}) {
     // verdict, so the verdict line no longer quotes it.
     const setup = document.createElement('div');
     setup.className = `report-champ-setup ${t.targetMet ? 'report-champ-ok' : 'report-champ-off'}`;
-    setup.textContent = !t.target ? ''
-      : !t.difficultyMet
-      ? `The course measured ${Math.floor(t.difficulty)} on the first morning. They asked for at least ${t.minDifficulty}.`
-      : t.targetMet
-        ? `Won at ${toParText(t.winningTotal)}, inside the ${toParText(t.target.low)} to ${toParText(t.target.high)} they wanted.`
-        : `Won at ${toParText(t.winningTotal)}. They wanted ${toParText(t.target.low)} to ${toParText(t.target.high)}.`;
-    champ.appendChild(setup);
-
-    // What the field shot: the read-out the whole setup dial exists for.
-    if (t.field) {
-      const f = t.field;
-      const broke = f.underPar === 0 ? 'Nobody broke par.'
-        : f.underPar === 1 ? 'One player broke par.'
-          : `${f.underPar} players broke par.`;
-      const story = document.createElement('div');
-      story.className = 'report-champ-field';
-      story.textContent =
-        `The field averaged ${f.averageToPar.toFixed(1)} over par. ${broke} `
-        + `The ${ordinal(f.hardestHole)} took the most off them. `
-        + `Rounds ran ${Math.round(f.averageRoundMinutes)} minutes.`;
-      champ.appendChild(story);
+    // Nothing to say without a target to say it against (a report from
+    // before the week existed), and an empty line is not worth a row.
+    if (t.target) {
+      setup.textContent = !t.difficultyMet
+        ? `The course measured ${t.difficultyText} on the first morning. They asked for at least ${t.minDifficulty}.`
+        : t.targetMet
+          ? `Won at ${toParText(t.winningTotal)}, inside the ${toParText(t.target.low)} to ${toParText(t.target.high)} they wanted.`
+          : `Won at ${toParText(t.winningTotal)}. They wanted ${toParText(t.target.low)} to ${toParText(t.target.high)}.`;
+      champ.appendChild(setup);
     }
+
+    // No field paragraph here: `t.field` is the last round's alone, and the
+    // round block above has already said how that round went. Repeating it
+    // under the week's verdict read as if it were the week.
 
     for (const c of t.conditions) {
       const row = document.createElement('div');

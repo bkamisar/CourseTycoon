@@ -6,6 +6,8 @@ import { computeReportData, paceVerdict, crowdRows } from '../src/ui/report.js';
 import { ordinal } from '../src/sim/satisfaction.js';
 import { TARGET_MINUTES_PER_HOLE } from '../src/sim/schedule.js';
 import { SEGMENT_KEYS, SEGMENTS } from '../src/sim/segments.js';
+import { makeHole } from '../src/sim/hole.js';
+import { newWeek, championshipStatus } from '../src/sim/championshipWeek.js';
 
 test('computeReportData reads profit and the revenue/cost breakdown straight from the report', () => {
   const { state, report } = runDay(newGame(1), 1);
@@ -287,7 +289,9 @@ test('a round day carries a round section, read off the round log', () => {
   assert.equal(r.round, 2);
   assert.equal(r.rounds, 4);
   assert.equal(r.leaderText, '+7');
+  assert.equal(r.projected, 14, 'the whole-week pace, shown beside a target that is for the week');
   assert.equal(r.weatherLabel, 'Blowing hard');
+  assert.equal(r.averageText, '+6.2');
   assert.equal(r.pinsLabel, 'Tough');
   assert.equal(r.tracking, 'on', 'leading +7 after two of four projects to +14, inside 12 to 18');
 });
@@ -308,4 +312,66 @@ test('tracking says which way the winner is heading', () => {
 test('an ordinary day has no round section', () => {
   const { state, report } = runDay(newGame(76), 76);
   assert.equal(computeReportData(state, report).tournamentRound, null);
+});
+
+test('the round section reads the whole-week projection the HUD and the sheet read', () => {
+  // A real round day, so a drift between the report's projection and
+  // championshipStatus's (they once rounded separately) fails here rather
+  // than as a morning where the HUD says "on pace" and the report "over".
+  const templates = ['shortPar3', 'waterPar3', 'straightPar4', 'doglegPar4', 'longPar5', 'reachablePar5'];
+  const state = newGame(77);
+  state.act = 3;
+  state.money = 400000;
+  state.prestige = 80;
+  state.resort.courses[0].holes = state.resort.courses[0].holes.map((h, i) => ({
+    ...makeHole(templates[i % templates.length], i + 1), open: true,
+  }));
+  state.tournament = newWeek('countyOpen', state.day);
+
+  const first = runDay(state, 7700);
+  const r1 = computeReportData(first.state, first.report).tournamentRound;
+  assert.ok(r1, 'a round day carries the section');
+  assert.equal(r1.round, 1);
+  assert.equal(r1.final, false, 'one round of two is not the last');
+  assert.equal(r1.projected, championshipStatus(first.state).projectedTotal);
+  assert.notEqual(r1.projected, null);
+  assert.equal(r1.underPar, first.report.tournamentRound.underPar);
+  assert.equal(typeof r1.underPar, 'number', 'how many broke par travels with the round');
+
+  const last = runDay(first.state, 7701);
+  const r2 = computeReportData(last.state, last.report).tournamentRound;
+  assert.equal(r2.round, 2);
+  assert.equal(r2.final, true, 'the last round of a County week is final');
+  assert.equal(r2.projected, last.report.tournament.week.winningTotal,
+    'on the last round the projection is the winning total itself');
+});
+
+test('a course measured just under the floor reads under it, not rounded up to it', () => {
+  const { state, report } = runDay(newGame(78), 78);
+  report.tournament = {
+    rung: 'countyOpen', met: [], missed: ['target'],
+    paid: 18000, prestige: 0, barDays: 0, setup: 40, band: { low: 45, high: 60 },
+    turfQuality: 90, field: null,
+    week: { rounds: 2, winningTotal: 3, target: { low: -4, high: 2 }, roundLog: [] },
+    difficulty: 44.9, minDifficulty: 45, difficultyMet: false,
+  };
+  const t = computeReportData(state, report).tournament;
+  assert.equal(t.difficultyMet, false);
+  assert.ok(Number(t.difficultyText) < t.minDifficulty,
+    `printed ${t.difficultyText} must read below ${t.minDifficulty}`);
+});
+
+test('an unknown pin setting is named as it is, not passed off as fair', () => {
+  const { state, report } = runDay(newGame(79), 79);
+  report.tournamentRound = {
+    rung: 'countyOpen', rounds: 2, round: 1, target: { low: -4, high: 2 },
+    weather: 'fair', pins: 'sadistic', leaderToPar: -1, averageToPar: 0.04,
+    hardestHole: 2, averageRoundMinutes: 250, paceOnTarget: true, turfAfter: 90,
+  };
+  const r = computeReportData(state, report).tournamentRound;
+  assert.equal(r.pinsLabel, 'sadistic');
+  assert.equal(r.averageText, 'even par');
+  report.tournamentRound.averageToPar = -0.4;
+  assert.equal(computeReportData(state, report).tournamentRound.averageText, '0.4 under par');
+  assert.equal(r.underPar, null, 'an entry from before underPar was kept says nothing about it');
 });
