@@ -37,7 +37,10 @@ import {
   CARE_DIVERTED_WHILE_CONDITIONING, conditioningCostPerDay, CHAMPIONSHIP_HOLES,
   RUNGS,
 } from './tournaments.js';
-import { playField } from './field.js';
+import { playField, drawFieldHandicaps } from './field.js';
+import {
+  normaliseWeek, recordRound, winningTotal, weekFinished,
+} from './championshipWeek.js';
 import {
   championshipUpkeep, crowdHandledFor, championshipTrade,
 } from './championshipBuildings.js';
@@ -687,89 +690,139 @@ export function runDay(state, seed) {
     complaints,
     gate,
   };
+  // The field's shots, for the renderer. Null on every ordinary day.
+  let fieldPlayback = null;
   report.tournamentDay = championshipToday;
 
-  // Act III. The week resolves on the day it was booked for. Judged on
-  // the four conditions the contract named when it was signed, each of
-  // which is something the player did rather than a hidden score.
+  // Act III. A championship is two to four rounds by rung, each an ordinary
+  // closed day. This plays today's round, adds it to the week, and only on
+  // the last round judges the contract -- on the four conditions it named
+  // when it was signed, each of which is something the player did rather
+  // than a hidden score.
   if (championshipToday) {
+    const week = normaliseWeek(next.tournament);
+    const rung = RUNGS[week.rung];
+    // Drawn once, on the first round, and carried in the week thereafter,
+    // so the same sixty play every round and their totals add up.
+    const handicaps = week.field?.handicaps ?? drawFieldHandicaps(rng);
     // The field the flow-shop scheduler was always missing: the same
     // congestion rule that paces the resort's own tee sheet, pointed at
     // 20 championship threeballs instead. Played on the day's own rng so
     // a replay of this seed plays out the same tournament.
-    const field = playField(rng, holes, {
+    const { playback, playerToPar, ...field } = playField(rng, holes, {
       setup: next.resort.setup ?? 0,
       turfQuality: next.turfQuality,
       teeInterval,
+      pins: week.roundSettings.pins,
+      spread: sky.spread,
+      pace: sky.pace,
+      handicaps,
     });
-    const result = scoreTournament(next.tournament.rung, {
-      setup: next.resort.setup ?? 0,
-      turfQuality: next.turfQuality,
-      // Pace is the existing flow-shop target, pointed at a new audience.
-      // No grace period here — the 10% the resort's own tee sheet gets is
-      // what made this condition unfailable, and officials don't give it.
-      paceOnTarget: field.averageRoundMinutes <= holes.length * TARGET_MINUTES_PER_HOLE,
-      // Whether the gallery this rung draws has somewhere to be. A rung's
-      // REQUIRED buildings are deliberately not enough on their own -- see
-      // `championshipBuildings.js` -- so this is a decision rather than a
-      // consequence of having been allowed to bid.
-      crowdHandled: crowdHandledFor(next.resort.amenities, next.tournament.rung),
-    });
-    next.money += result.paid;
-    next.prestige = clamp(next.prestige + result.prestige, 0, 100);
-    next.tournamentsHosted = [...(next.tournamentsHosted ?? []), result.rung];
-    if (result.barDays > 0) {
-      next.tournamentBars = {
-        ...(next.tournamentBars ?? {}),
-        [result.rung]: next.day + result.barDays,
-      };
-    }
-    next.tournament = null;
-    // The conditions the week was judged ON, not only the verdict. The
-    // evening report wants to say "you set it to 53 and they wanted 45-60"
-    // and "the turf finished at 91", and by the time it renders, state has
-    // moved on -- setup starts decaying the next morning. Recorded here,
-    // where the day settled them, so the report reads rather than
-    // re-derives.
-    report.tournament = {
-      ...result,
-      field,
-      setup: Math.round(next.resort.setup ?? 0),
-      band: RUNGS[result.rung].band,
-      turfQuality: Math.round(next.turfQuality),
-    };
-    revenue.tournament = result.paid;
-    revenue.total += result.paid;
-    /*
-     * And the headline figure, which was settled before the championship
-     * was scored.
-     *
-     * `profit` is computed from revenue and costs several hundred lines
-     * above, and the purse only arrives here -- so on the one day a
-     * resort earns a six-figure cheque, the report announced a loss and
-     * then listed the cheque in its own revenue breakdown directly
-     * underneath. The money itself was always right: `next.money` takes
-     * `profit` and `result.paid` separately.
-     *
-     * Recomputed from the same two totals the breakdown renders, so the
-     * headline cannot drift from the rows again.
-     */
-    report.profit = revenue.total - costs.total;
+    fieldPlayback = playback;
+    // Pace is the existing flow-shop target, pointed at a new audience.
+    // No grace period here — the 10% the resort's own tee sheet gets is
+    // what made this condition unfailable, and officials don't give it.
+    const paceOnTarget = field.averageRoundMinutes <= holes.length * TARGET_MINUTES_PER_HOLE;
 
-    /*
-     * Act III's gate: a national, hosted properly.
-     *
-     * "Properly" is the band, because the band is the whole act. A course
-     * that was never set for a championship did not stage one -- which is
-     * why it gates the bonuses too -- and turning up is not delivering.
-     *
-     * Recorded once. The act stays passed afterwards, but the evening
-     * only announces it the once.
-     */
-    if (result.rung === 'national' && result.met.includes('band')
-        && !next.actThreePassed) {
-      next.actThreePassed = true;
-      report.actThreePassed = true;
+    const played = recordRound(week, {
+      handicaps,
+      playerToPar,
+      entry: {
+        weather: weatherKey,
+        pins: week.roundSettings.pins,
+        setup: Math.round(next.resort.setup ?? 0),
+        averageToPar: field.averageToPar,
+        hardestHole: field.hardestHole,
+        averageRoundMinutes: field.averageRoundMinutes,
+        paceOnTarget,
+        turfAfter: Math.round(next.turfQuality),
+      },
+    });
+    // Every round day gets one, the last included, so the evening report
+    // can always say how today went before it says how the week went.
+    report.tournamentRound = {
+      rung: played.rung,
+      rounds: played.rounds,
+      target: rung.target,
+      ...played.roundLog.at(-1),
+    };
+
+    if (!weekFinished(played)) {
+      next.tournament = played;
+    } else {
+      const result = scoreTournament(played.rung, {
+        setup: next.resort.setup ?? 0,
+        turfQuality: next.turfQuality,
+        // Officials judge the week, and one slow round is a slow week.
+        paceOnTarget: played.roundLog.every((r) => r.paceOnTarget),
+        // Whether the gallery this rung draws has somewhere to be. A rung's
+        // REQUIRED buildings are deliberately not enough on their own -- see
+        // `championshipBuildings.js` -- so this is a decision rather than a
+        // consequence of having been allowed to bid.
+        crowdHandled: crowdHandledFor(next.resort.amenities, played.rung),
+      });
+      next.money += result.paid;
+      next.prestige = clamp(next.prestige + result.prestige, 0, 100);
+      next.tournamentsHosted = [...(next.tournamentsHosted ?? []), result.rung];
+      if (result.barDays > 0) {
+        next.tournamentBars = {
+          ...(next.tournamentBars ?? {}),
+          [result.rung]: next.day + result.barDays,
+        };
+      }
+      next.tournament = null;
+      // The conditions the week was judged ON, not only the verdict. The
+      // evening report wants to say "you set it to 53 and they wanted 45-60"
+      // and "the turf finished at 91", and by the time it renders, state has
+      // moved on -- setup starts decaying the next morning. Recorded here,
+      // where the day settled them, so the report reads rather than
+      // re-derives.
+      report.tournament = {
+        ...result,
+        field,
+        setup: Math.round(next.resort.setup ?? 0),
+        band: rung.band,
+        turfQuality: Math.round(next.turfQuality),
+        week: {
+          rounds: played.rounds,
+          roundLog: played.roundLog,
+          winningTotal: winningTotal(played),
+          target: rung.target,
+        },
+      };
+      revenue.tournament = result.paid;
+      revenue.total += result.paid;
+      /*
+       * And the headline figure, which was settled before the championship
+       * was scored.
+       *
+       * `profit` is computed from revenue and costs several hundred lines
+       * above, and the purse only arrives here -- so on the one day a
+       * resort earns a six-figure cheque, the report announced a loss and
+       * then listed the cheque in its own revenue breakdown directly
+       * underneath. The money itself was always right: `next.money` takes
+       * `profit` and `result.paid` separately.
+       *
+       * Recomputed from the same two totals the breakdown renders, so the
+       * headline cannot drift from the rows again.
+       */
+      report.profit = revenue.total - costs.total;
+
+      /*
+       * Act III's gate: a national, hosted properly.
+       *
+       * "Properly" is the band, because the band is the whole act. A course
+       * that was never set for a championship did not stage one -- which is
+       * why it gates the bonuses too -- and turning up is not delivering.
+       *
+       * Recorded once. The act stays passed afterwards, but the evening
+       * only announces it the once.
+       */
+      if (result.rung === 'national' && result.met.includes('band')
+          && !next.actThreePassed) {
+        next.actThreePassed = true;
+        report.actThreePassed = true;
+      }
     }
   }
 
@@ -1038,7 +1091,11 @@ export function runDay(state, seed) {
   return {
     state: next,
     report,
-    timeline: buildTimeline(schedule, rawEvents, pacedHoleMinutes),
+    timeline: fieldPlayback
+      // The field, on a round day. The same shape the resort's own day
+      // produces, so the playback screen needs no second path.
+      ? buildTimeline(fieldPlayback.schedule, fieldPlayback.rawEvents, fieldPlayback.holeMinutes)
+      : buildTimeline(schedule, rawEvents, pacedHoleMinutes),
   };
 }
 

@@ -4,6 +4,7 @@ import { newGame, serialize, deserialize } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeHole } from '../src/sim/hole.js';
 import { RUNGS, RUN_UP_DAYS, TURF_EXPECTED } from '../src/sim/tournaments.js';
+import { newWeek, withPins } from '../src/sim/championshipWeek.js';
 
 /** A resort that has finished Act II, which is where Act III begins. */
 function actThreeResort(seed = 3) {
@@ -35,6 +36,21 @@ function openFullCourse(state) {
     open: true,
   }));
   return state;
+}
+
+/**
+ * Plays a booked championship to the end and returns the final day.
+ *
+ * A championship used to resolve on the day it was booked for. It is now
+ * two to four rounds, so a test that ran one `runDay` and looked for a
+ * result would find a round report and no verdict.
+ */
+function playWeek(state, seed) {
+  let out = runDay(state, seed);
+  for (let i = 1; i < 10 && out.state.tournament && !out.state.tournament.resolved; i++) {
+    out = runDay(out.state, seed + i);
+  }
+  return out;
 }
 
 test('a new game carries tournament state that survives a save', () => {
@@ -136,7 +152,7 @@ test('after the championship resolves, lowering the target still lets setup fall
   state.turfQuality = 88;
   state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
 
-  const resolved = runDay(state, 4400).state;
+  const resolved = playWeek(state, 4400).state;
   assert.equal(resolved.tournament, null, 'the booking is spent');
 
   resolved.resort.setupTarget = 10;
@@ -317,7 +333,7 @@ test('the championship resolves, pays, and does not happen twice', () => {
   state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
   const before = state.money;
 
-  const first = runDay(state, 3500);
+  const first = playWeek(state, 3500);
   state = first.state;
   assert.ok(first.report.tournament, 'the report has to carry the result');
   assert.ok(state.money > before, 'and the contract has to pay');
@@ -325,7 +341,7 @@ test('the championship resolves, pays, and does not happen twice', () => {
   assert.ok((state.tournamentsHosted ?? []).includes('countyOpen'),
     'and it is recorded as hosted, so the next rung opens');
 
-  const second = runDay(state, 3501);
+  const second = runDay(state, 3510);
   assert.equal(second.report.tournament ?? null, null,
     'a championship must not resolve twice');
   assert.equal(second.report.tournamentDay, false, 'and the course reopens');
@@ -361,7 +377,7 @@ test('a botched championship pays close to base, not 58% of the ceiling', () => 
   for (const rungId of ['countyOpen', 'national']) {
     const state = neglectedResort(17);
     state.tournament = { rung: rungId, day: state.day, resolved: false };
-    const { report } = runDay(state, 3700);
+    const { report } = playWeek(state, 3700);
     const result = report.tournament;
     const rung = RUNGS[rungId];
 
@@ -432,7 +448,7 @@ test('the crowd bonus is earned by having somewhere to put them', () => {
     state.turfQuality = 95;
     for (const type of types) state.resort.amenities.push({ id: type, type, menu: [] });
     state.tournament = { rung: 'national', day: state.day, resolved: false };
-    return runDay(state, 5300).report.tournament;
+    return playWeek(state, 5300).report.tournament;
   }
 
   const four = ['grandstands', 'overflowParking', 'mediaCentre', 'hospitalityPavilion'];
@@ -456,17 +472,21 @@ test('the report records what the week was judged on, not only the verdict', () 
   state.turfQuality = 91;
   state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
 
-  const { state: after, report } = runDay(state, 5500);
+  const { state: after, report } = playWeek(state, 5500);
   const t = report.tournament;
 
   // Not the target. A crew that has reached its target stops, and the
-  // day's decay runs before the field tees off, so the course actually
-  // played is always a little under what was asked for -- here 50 against
-  // a target of 53. That is the behaviour; the report must describe it
-  // rather than the intention.
+  // day's decay runs before the field tees off, so a course sitting on its
+  // target plays a little under it -- the first round here played 50
+  // against a target of 53. The next morning it is below the target, so
+  // the crew climbs back, capped at 53, and the last round played at 53.
+  // Measured 2026-10-03: 49.5 then 53. When this was a single day the
+  // assertion was "always under 53"; across a week the course see-saws
+  // between the target and one day's decay below it. The report must
+  // describe the course played on the day it judged, whichever that was.
   assert.equal(t.setup, Math.round(after.resort.setup),
     'the report must name the course the field actually played');
-  assert.ok(t.setup < 53 && t.setup > 45, `setup drifted to ${t.setup}, outside the plausible range`);
+  assert.ok(t.setup <= 53 && t.setup > 45, `setup drifted to ${t.setup}, outside the plausible range`);
 
   // The invariant that matters: the number the report prints and the
   // verdict it prints beside it have to agree. A card saying "set to 50,
@@ -484,15 +504,16 @@ test('the reported profit and the revenue breakdown agree on a championship day'
   // so the report used to announce a loss on the day a resort banked six
   // figures -- and then list the cheque in its own breakdown directly
   // underneath. The money was never wrong; the headline was.
-  const state = openFullCourse(actThreeResort(61));
+  let state = openFullCourse(actThreeResort(61));
   state.prestige = 90;
   state.resort.setup = 53;
   state.resort.setupTarget = 53;
   state.turfQuality = 92;
   state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
+  state = runDay(state, 5599).state;           // round 1 of 2
 
   const before = state.money;
-  const { state: after, report } = runDay(state, 5600);
+  const { state: after, report } = runDay(state, 5600);   // round 2, the verdict
 
   assert.ok(report.tournament.paid > 0, 'sanity: the week paid something');
   assert.equal(report.profit, report.revenue.total - report.costs.total,
@@ -521,7 +542,7 @@ test('hosting a national properly passes Act III', () => {
   state.resort.setupTarget = 86;
   state.tournament = { rung: 'national', day: state.day, resolved: false };
 
-  const { state: after, report } = runDay(state, 5400);
+  const { state: after, report } = playWeek(state, 5400);
   assert.ok(report.tournament.met.includes('band'), 'sanity: the week went well');
   assert.equal(after.actThreePassed, true, 'a good national should finish the act');
   assert.equal(report.actThreePassed, true, 'and the evening should say so');
@@ -536,7 +557,7 @@ test('a botched national does not pass Act III', () => {
   state.turfQuality = 30;
   state.tournament = { rung: 'national', day: state.day, resolved: false };
 
-  const { state: after } = runDay(state, 5410);
+  const { state: after } = playWeek(state, 5410);
   assert.ok(!(after.actThreePassed ?? false),
     'turning up is not the same as delivering');
 });
@@ -546,7 +567,7 @@ test('a county open never passes Act III, however perfect', () => {
   state.resort.setup = 52;
   state.resort.setupTarget = 52;
   state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
-  const { state: after, report } = runDay(state, 5420);
+  const { state: after, report } = playWeek(state, 5420);
   assert.ok(report.tournament.met.includes('band'), 'sanity: a good county week');
   assert.ok(!(after.actThreePassed ?? false), 'the gate is the national, not the ladder');
 });
@@ -556,10 +577,103 @@ test('passing Act III is announced once and then stays passed', () => {
   state.resort.setup = 86;
   state.resort.setupTarget = 86;
   state.tournament = { rung: 'national', day: state.day, resolved: false };
-  const first = runDay(state, 5430);
+  const first = playWeek(state, 5430);
   assert.equal(first.report.actThreePassed, true);
-  const second = runDay(first.state, 5431);
+  const second = runDay(first.state, 5440);
   assert.equal(second.state.actThreePassed, true, 'it does not come undone');
   assert.equal(second.report.actThreePassed ?? false, false,
     'but it is not announced every evening afterwards');
+});
+
+test('each rung is a week of rounds, closed every day, resolved on the last', () => {
+  for (const rungId of ['countyOpen', 'regional', 'national']) {
+    let state = openFullCourse(actThreeResort(70));
+    state.resort.setup = RUNGS[rungId].band.low + 5;
+    state.resort.setupTarget = state.resort.setup;
+    state.tournament = newWeek(rungId, state.day);
+    const rounds = RUNGS[rungId].rounds;
+    for (let r = 1; r <= rounds; r++) {
+      const { state: after, report } = runDay(state, 7000 + r);
+      assert.equal(report.tournamentDay, true, `${rungId} round ${r}: the course is shut`);
+      assert.equal(report.groupsPlayed, 0);
+      assert.equal(report.tournamentRound.round, r);
+      assert.equal(report.tournamentRound.rounds, rounds);
+      if (r < rounds) {
+        assert.equal(report.tournament ?? null, null, `${rungId}: no verdict after round ${r}`);
+        assert.equal(after.tournament.roundsPlayed, r);
+      } else {
+        assert.ok(report.tournament, `${rungId}: the verdict arrives with the last round`);
+        assert.equal(after.tournament, null);
+      }
+      state = after;
+    }
+    assert.equal(runDay(state, 7100).report.tournamentDay, false, 'and then the course reopens');
+  }
+});
+
+test('the same sixty play every round', () => {
+  let state = openFullCourse(actThreeResort(71));
+  state.tournament = newWeek('national', state.day);
+  state = runDay(state, 7200).state;
+  const handicaps = state.tournament.field.handicaps;
+  const totalsAfterOne = state.tournament.field.totals;
+  state = runDay(state, 7201).state;
+  assert.deepEqual(state.tournament.field.handicaps, handicaps);
+  assert.notDeepEqual(state.tournament.field.totals, totalsAfterOne, 'and their totals grow');
+});
+
+test('the pins set before a round are the pins it is played with', () => {
+  let state = openFullCourse(actThreeResort(72));
+  state.tournament = newWeek('regional', state.day);
+  state = runDay(state, 7300).state;
+  state.tournament = withPins(state.tournament, 'brutal');
+  const { state: after, report } = runDay(state, 7301);
+  assert.equal(report.tournamentRound.pins, 'brutal');
+  assert.equal(after.tournament.roundSettings.pins, 'brutal', 'and they stay set');
+});
+
+test('each round is played in that day\'s weather and says so', () => {
+  const state = openFullCourse(actThreeResort(73));
+  state.tournament = newWeek('countyOpen', state.day);
+  const { report } = runDay(state, 7400);
+  assert.equal(report.tournamentRound.weather, report.weather.key);
+});
+
+test('the playback shows the field', () => {
+  // A championship used to play to an empty course on screen.
+  const state = openFullCourse(actThreeResort(74));
+  state.tournament = newWeek('countyOpen', state.day);
+  const { timeline } = runDay(state, 7500);
+  assert.equal(timeline.filter((e) => e.type === 'teeOff').length, 20);
+  assert.ok(timeline.some((e) => e.type === 'shot'));
+});
+
+test('nothing the playback needs is saved into the report history', () => {
+  const state = openFullCourse(actThreeResort(75));
+  state.tournament = newWeek('countyOpen', state.day);
+  const { report } = playWeek(state, 7600);
+  assert.equal(report.tournament.field.playback, undefined);
+  assert.equal(report.tournament.field.playerToPar, undefined);
+});
+
+test('a save taken between rounds finishes the week identically', () => {
+  let state = openFullCourse(actThreeResort(76));
+  state.resort.setup = 86;
+  state.resort.setupTarget = 86;
+  state.tournament = newWeek('national', state.day);
+  state = runDay(state, 7700).state;
+  state = runDay(state, 7701).state;
+
+  const straight = runDay(runDay(state, 7702).state, 7703).report.tournament;
+  const reloaded = deserialize(serialize(state));
+  const resumed = runDay(runDay(reloaded, 7702).state, 7703).report.tournament;
+  assert.deepEqual(resumed, straight);
+});
+
+test('the week\'s pace is every round, not the last', () => {
+  const state = openFullCourse(actThreeResort(77));
+  state.tournament = newWeek('regional', state.day);
+  const { report } = playWeek(state, 7800);
+  const everyRound = report.tournament.week.roundLog.every((r) => r.paceOnTarget);
+  assert.equal(report.tournament.met.includes('pace'), everyRound);
 });
