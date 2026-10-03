@@ -1,7 +1,8 @@
 /**
- * How a competent host plays the championship week. Shared by the
- * operator (tools/operator.js) and the calibration (tools/calibrateWeek.js)
- * so the two cannot measure different players.
+ * How a competent host plays the championship week. Written to be shared
+ * by the operator (tools/operator.js) and the calibration
+ * (tools/calibrateWeek.js), so the two cannot measure different players;
+ * neither uses it yet. For now the tests narrow their courses with it.
  */
 import { courseDifficultyOf } from '../src/sim/hole.js';
 import { RUNGS } from '../src/sim/tournaments.js';

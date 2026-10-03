@@ -357,13 +357,13 @@ test('the championship resolves, pays, and does not happen twice', () => {
 
 /**
  * A resort that neglected every lever it controls for the week: never
- * conditioned (setup stuck near zero, missing every band), no
+ * conditioned (setup stuck near zero), no
  * groundskeepers so the turf stays wrecked, and a tee interval left tight
  * enough that the field backs up behind itself. Before pace was wired to
  * the field this still cleared roughly 58% of the ceiling on the pace
  * bonus alone, because `report.averageRoundMinutes` was hardcoded 0 on a
  * closed course and 0 is never over target. It should now clear exactly
- * the base fee and nothing more: missing the band pays base only, even
+ * the base fee and nothing more: missing the target pays base only, even
  * though `crowd` (hardcoded true until Plan 2's infrastructure — see
  * docs/known-issues.md) is still individually "met".
  */
@@ -383,12 +383,16 @@ function neglectedResort(seed) {
 
 test('a botched championship pays close to base, not 58% of the ceiling', () => {
   for (const rungId of ['countyOpen', 'national']) {
-    const state = neglectedResort(17);
+    // Narrowed to the rung's minimum, so the course passes the floor and
+    // the miss below is the winner's total. On the template course the
+    // floor alone failed it, and this test stopped testing the judge.
+    const state = atMinimum(neglectedResort(17), rungId);
     state.tournament = { rung: rungId, day: state.day, resolved: false };
     const { report } = playWeek(state, 3700);
     const result = report.tournament;
     const rung = RUNGS[rungId];
 
+    assert.equal(result.difficultyMet, true, `${rungId}: sanity: the course is at the minimum`);
     assert.ok(!result.met.includes('target'),
       `${rungId}: an unconditioned, untended week must miss the target`);
     assert.ok(!result.met.includes('turf'), `${rungId}: wrecked turf must miss the turf bonus`);
@@ -399,7 +403,7 @@ test('a botched championship pays close to base, not 58% of the ceiling', () => 
     assert.ok(ratio < 0.5,
       `${rungId}: a three-condition failure still paid ${(ratio * 100).toFixed(1)}% of the ceiling`);
     // `crowd` is still individually "met" (hardcoded true — not this
-    // task's fix), but the band is missed, and the band gates everything
+    // task's fix), but the target is missed, and it gates everything
     // past the base fee. So the floor is the base fee exactly, not the
     // base fee plus crowd's own share.
     assert.equal(result.paid, rung.baseFee,
@@ -474,7 +478,9 @@ test('the report records what the week was judged on, not only the verdict', () 
   // setup starts decaying the morning after, so a report that reached
   // into state for it would describe a different course from the one the
   // field played. Recorded where the day settled it.
-  const state = openFullCourse(actThreeResort(51));
+  // At the County minimum, so the verdict below turns on the winning total
+  // rather than failing on the floor whatever the field shot.
+  const state = atMinimum(openFullCourse(actThreeResort(51)), 'countyOpen');
   state.prestige = 90;
   // Above the target, so the course is easing down all week and the
   // course played is not the number on the dial.
@@ -613,17 +619,68 @@ test('the course is measured against the minimum on the first morning', () => {
   assert.equal(playWeek(enough, 8000).report.tournament.difficultyMet, true);
 });
 
+test('a save taken mid-week before the course was measured is measured on its next round', () => {
+  // Saves from before the measurement existed carry a week with rounds
+  // played and no `difficulty`. Keyed on round 1, the measurement never
+  // ran for them, and a null `difficultyMet` failed the floor on a course
+  // that was well over it.
+  let state = atMinimum(nationalReady(47), 'national');
+  state.resort.setup = 86;
+  state.resort.setupTarget = 86;
+  state.tournament = newWeek('national', state.day);
+  state = runDay(state, 8200).state;
+  assert.equal(state.tournament.roundsPlayed, 1, 'sanity: one round in');
+  delete state.tournament.difficulty;
+  delete state.tournament.difficultyMet;
+
+  const t = playWeek(state, 8201).report.tournament;
+  assert.equal(t.difficultyMet, true, 'a course at the minimum passes the floor');
+  assert.ok(t.difficulty >= RUNGS.national.minDifficulty,
+    `and the report carries the measurement, not a zero (${t.difficulty})`);
+});
+
 test('a harder course plays harder', () => {
-  // Same seed, same setup, same pins: only the design differs.
-  const play = (rungId) => {
-    const state = rungId ? atMinimum(openFullCourse(actThreeResort(81)), rungId)
-      : openFullCourse(actThreeResort(81));
+  /*
+   * Averaged over seeds, because the design moves the winner only a little.
+   * Measured 2026-10-03, a County week (two rounds, setup 60, fair pins) on
+   * the template course (40.8) against the same course narrowed to 65:
+   *
+   *   - over 64 seeds the winner was 1.4 strokes higher at 65, and the
+   *     field's two-round average 1.7 higher;
+   *   - in blocks of eight seeds the field's gap stayed between +1.4 and
+   *     +2.1, but the winner's ran from -1.0 (seeds 81-88, the ones this
+   *     test first used) to +4.3. The winner of sixty is the noisiest
+   *     number in the week.
+   *
+   * So the field's average is asserted, and the winner over 24 seeds
+   * (+1.6 on these). An earlier version asserted a two-stroke gap on one
+   * seed and passed by luck. The honest reading: difficulty barely moves
+   * the winner. The rung's minimum works mainly as a floor -- a venue too
+   * easy to be one -- and setup and pins are what steer the total.
+   */
+  const play = (narrowed, seed) => {
+    const state = narrowed ? atMinimum(openFullCourse(actThreeResort(seed)), 'national')
+      : openFullCourse(actThreeResort(seed));
     state.resort.setup = 60;
     state.resort.setupTarget = 60;
     state.tournament = newWeek('countyOpen', state.day);
-    return playWeek(state, 8100).report.tournament.week.winningTotal;
+    // Same seed, same setup, same pins: only the design differs.
+    let out = runDay(state, 8100 + seed * 10);
+    let fieldToPar = out.report.tournamentRound.averageToPar;
+    for (let i = 1; i < 10 && out.state.tournament && !out.state.tournament.resolved; i++) {
+      out = runDay(out.state, 8100 + seed * 10 + i);
+      fieldToPar += out.report.tournamentRound.averageToPar;
+    }
+    return { winner: out.report.tournament.week.winningTotal, field: fieldToPar };
   };
-  assert.ok(play('national') > play(null) + 2, 'a course narrowed to 65 must score higher than one at 41');
+  const seeds = Array.from({ length: 24 }, (_, i) => 81 + i);
+  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const hard = seeds.map((s) => play(true, s));
+  const easy = seeds.map((s) => play(false, s));
+  const fieldGap = mean(hard.map((r) => r.field)) - mean(easy.map((r) => r.field));
+  const winnerGap = mean(hard.map((r) => r.winner)) - mean(easy.map((r) => r.winner));
+  assert.ok(fieldGap > 0, `the field averaged ${fieldGap.toFixed(2)} strokes higher on a course at 65 than at 41`);
+  assert.ok(winnerGap > 0, `the winner averaged ${winnerGap.toFixed(2)} strokes higher on a course at 65 than at 41`);
 });
 
 test('each rung is a week of rounds, closed every day, resolved on the last', () => {

@@ -163,6 +163,10 @@ test('the contract lists every bonus before it is signed', () => {
  * (see scoreTournament). These build each week from the target rather than
  * from a hard-coded score, so re-measuring a rung's target in calibration
  * cannot leave a test passing for a reason it no longer states.
+ *
+ * Each passes `difficultyMet: true` explicitly. It defaults to false so a
+ * caller that forgets the measurement fails, and a test that forgot it
+ * would be testing the floor rather than the winner.
  */
 const COUNTY = RUNGS.countyOpen.target;
 const NATIONAL = RUNGS.national.target;
@@ -170,14 +174,14 @@ const inside = (t) => Math.round((t.low + t.high) / 2);
 
 test('a perfect week earns the ceiling and a shambles earns the base', () => {
   const perfect = scoreTournament('countyOpen', {
-    winningTotal: inside(COUNTY), turfQuality: 88, paceOnTarget: true, crowdHandled: true,
+    winningTotal: inside(COUNTY), difficultyMet: true, turfQuality: 88, paceOnTarget: true, crowdHandled: true,
   });
   assert.equal(perfect.paid, RUNGS.countyOpen.purseCeiling);
   assert.equal(perfect.met.length, 4);
   assert.ok(perfect.prestige > 0, 'and it should be worth something in reputation');
 
   const shambles = scoreTournament('countyOpen', {
-    winningTotal: COUNTY.low - 9, turfQuality: 40, paceOnTarget: false, crowdHandled: false,
+    winningTotal: COUNTY.low - 9, difficultyMet: true, turfQuality: 40, paceOnTarget: false, crowdHandled: false,
   });
   assert.equal(shambles.paid, RUNGS.countyOpen.baseFee);
   assert.equal(shambles.met.length, 0);
@@ -190,7 +194,7 @@ test('a winner over the target misses as surely as one under it', () => {
   // can score. Both are a week that did not test the field properly.
   for (const total of [COUNTY.low - 1, COUNTY.high + 1]) {
     const result = scoreTournament('countyOpen', {
-      winningTotal: total, turfQuality: 88, paceOnTarget: true, crowdHandled: true,
+      winningTotal: total, difficultyMet: true, turfQuality: 88, paceOnTarget: true, crowdHandled: true,
     });
     assert.ok(!result.met.includes('target'), `${total} is outside ${COUNTY.low} to ${COUNTY.high}`);
     assert.equal(result.paid, RUNGS.countyOpen.baseFee);
@@ -207,7 +211,7 @@ test('missing the target pays base only, even when turf, pace and crowd all hit 
   // whatever else went right that week. Asserted both directions on the
   // identical turf/pace/crowd inputs, so this cannot pass by only ever
   // checking the failing side.
-  const common = { turfQuality: 88, paceOnTarget: true, crowdHandled: true };
+  const common = { difficultyMet: true, turfQuality: 88, paceOnTarget: true, crowdHandled: true };
   const missed = scoreTournament('countyOpen', { ...common, winningTotal: COUNTY.high + 5 });
   assert.deepEqual([...missed.met].sort(), ['crowd', 'pace', 'turf'],
     'turf, pace and crowd are still individually met and reported as such');
@@ -231,11 +235,14 @@ test('a course under the rung\'s minimum is a miss whatever the winner shot', ()
 
   const met = scoreTournament('national', { ...common, difficultyMet: true });
   assert.ok(met.met.includes('target'));
+
+  const unsaid = scoreTournament('national', common);
+  assert.ok(!unsaid.met.includes('target'), 'a caller that never measured the course fails the floor');
 });
 
 test('a good week is never barred', () => {
   const good = scoreTournament('regional', {
-    winningTotal: inside(RUNGS.regional.target), turfQuality: 85, paceOnTarget: true, crowdHandled: true,
+    winningTotal: inside(RUNGS.regional.target), difficultyMet: true, turfQuality: 85, paceOnTarget: true, crowdHandled: true,
   });
   assert.equal(good.barDays, 0);
 });
@@ -292,7 +299,7 @@ test('the target governs the money, the reputation AND the rung', () => {
   // Prestige used to average the four conditions, so a National that
   // failed the gate scored three of four and came away NINE points better
   // off -- having failed the only thing the week was about.
-  const common = { turfQuality: 95, paceOnTarget: true, crowdHandled: true };
+  const common = { difficultyMet: true, turfQuality: 95, paceOnTarget: true, crowdHandled: true };
   const delivered = scoreTournament('national', { winningTotal: inside(NATIONAL), ...common });
   const notDelivered = scoreTournament('national', { winningTotal: NATIONAL.low - 12, ...common });
 
@@ -313,7 +320,7 @@ test('inside the target, the other three decide how much credit you get', () => 
   // fumbled its turf should earn less than one that did everything, and
   // still more than one whose week never tested the field at all.
   const hit = (extra) => scoreTournament('national', {
-    winningTotal: inside(NATIONAL), turfQuality: 95, paceOnTarget: true, crowdHandled: true, ...extra,
+    winningTotal: inside(NATIONAL), difficultyMet: true, turfQuality: 95, paceOnTarget: true, crowdHandled: true, ...extra,
   });
   const perfect = hit({});
   const scruffy = hit({ turfQuality: 40, paceOnTarget: false });

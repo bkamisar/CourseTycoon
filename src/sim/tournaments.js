@@ -422,7 +422,11 @@ export const BAR_DAYS = 120;
  * the field cannot be properly tested on a course too easy to be the venue.
  */
 export function scoreTournament(rungId, {
-  winningTotal = null, difficultyMet = true,
+  winningTotal = null,
+  // False, not true: a caller that forgets to say the course was measured
+  // fails the gate rather than quietly passing it, the same way `newWeek`
+  // starts the measurement at null.
+  difficultyMet = false,
   turfQuality = 0, paceOnTarget = false, crowdHandled = false,
 } = {}) {
   const rung = rungFor(rungId);

@@ -726,13 +726,18 @@ export function runDay(state, seed) {
     const week = normaliseWeek(next.tournament);
     const rung = RUNGS[week.rung];
     // The course the field meets on the first morning is the course judged
-    // against the rung's minimum. Measured once: holes are locked for the
-    // week (championshipWeek.weekUnderWay), so later rounds cannot differ.
-    const measured = week.roundsPlayed === 0
-      ? (() => {
-          const difficulty = courseDifficultyOf(holes);
-          return { ...week, difficulty, difficultyMet: difficulty >= rung.minDifficulty };
-        })()
+    // against the rung's minimum, measured once and carried.
+    //
+    // Keyed on the measurement being missing rather than on round 1, so a
+    // save taken mid-week before the measurement existed is measured on
+    // its next round instead of failing the floor on a null. The design is
+    // locked for the week (championshipWeek.weekUnderWay), so measuring
+    // late normally gives the same answer. Not always: a decision event
+    // can close holes mid-week, and `holes` is the open ones (see "A round
+    // played on a short course counts as a full one" in
+    // docs/known-issues.md).
+    const measured = week.difficulty == null
+      ? { ...week, difficulty: baseDifficulty, difficultyMet: baseDifficulty >= rung.minDifficulty }
       : week;
     // Drawn once, on the first round, and carried in the week thereafter,
     // so the same sixty play every round and their totals add up.
