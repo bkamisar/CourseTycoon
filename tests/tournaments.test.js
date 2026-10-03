@@ -158,16 +158,26 @@ test('the contract lists every bonus before it is signed', () => {
   }
 });
 
+/*
+ * The judge moved on 2026-10-03 from the setup band to the winning total
+ * (see scoreTournament). These build each week from the target rather than
+ * from a hard-coded score, so re-measuring a rung's target in calibration
+ * cannot leave a test passing for a reason it no longer states.
+ */
+const COUNTY = RUNGS.countyOpen.target;
+const NATIONAL = RUNGS.national.target;
+const inside = (t) => Math.round((t.low + t.high) / 2);
+
 test('a perfect week earns the ceiling and a shambles earns the base', () => {
   const perfect = scoreTournament('countyOpen', {
-    setup: 52, turfQuality: 88, paceOnTarget: true, crowdHandled: true,
+    winningTotal: inside(COUNTY), turfQuality: 88, paceOnTarget: true, crowdHandled: true,
   });
   assert.equal(perfect.paid, RUNGS.countyOpen.purseCeiling);
   assert.equal(perfect.met.length, 4);
   assert.ok(perfect.prestige > 0, 'and it should be worth something in reputation');
 
   const shambles = scoreTournament('countyOpen', {
-    setup: 15, turfQuality: 40, paceOnTarget: false, crowdHandled: false,
+    winningTotal: COUNTY.low - 9, turfQuality: 40, paceOnTarget: false, crowdHandled: false,
   });
   assert.equal(shambles.paid, RUNGS.countyOpen.baseFee);
   assert.equal(shambles.met.length, 0);
@@ -175,47 +185,57 @@ test('a perfect week earns the ceiling and a shambles earns the base', () => {
   assert.ok(shambles.barDays > 0, 'and the rung should go to somebody else for a while');
 });
 
-test('overcooking the course fails the band as surely as undercooking', () => {
-  const tricked = scoreTournament('countyOpen', {
-    setup: 95, turfQuality: 88, paceOnTarget: true, crowdHandled: true,
-  });
-  assert.ok(!tricked.met.includes('band'),
-    'a county open set like a national is not set correctly');
-  assert.ok(tricked.paid < RUNGS.countyOpen.purseCeiling);
+test('a winner over the target misses as surely as one under it', () => {
+  // Too soft and the field takes the course apart; overcooked and nobody
+  // can score. Both are a week that did not test the field properly.
+  for (const total of [COUNTY.low - 1, COUNTY.high + 1]) {
+    const result = scoreTournament('countyOpen', {
+      winningTotal: total, turfQuality: 88, paceOnTarget: true, crowdHandled: true,
+    });
+    assert.ok(!result.met.includes('target'), `${total} is outside ${COUNTY.low} to ${COUNTY.high}`);
+    assert.equal(result.paid, RUNGS.countyOpen.baseFee);
+  }
 });
 
-test('missing the band pays base only, even when turf, pace and crowd all hit — '
-  + 'and hitting the band pays them, in the same three conditions', () => {
-  // Changed with the free-ride fix: band used to be one bonus among four,
-  // so a course left unconditioned (or overcooked past the band) still
-  // banked turf, pace and crowd for free — three of the four contract
-  // conditions are satisfied by ordinary operation, so only band ever
-  // required the work. Now band gates the other three: missing it pays
-  // the base fee only, whatever else went right that week. Asserted both
-  // directions on the identical turf/pace/crowd inputs, so this cannot
-  // pass by only ever checking the failing side.
+test('missing the target pays base only, even when turf, pace and crowd all hit — '
+  + 'and hitting it pays them, in the same three conditions', () => {
+  // Changed with the free-ride fix: the gate used to be one bonus among
+  // four, so a course left unconditioned still banked turf, pace and crowd
+  // for free — three of the four contract conditions are satisfied by
+  // ordinary operation, so only the gate ever required the work. Now the
+  // target gates the other three: missing it pays the base fee only,
+  // whatever else went right that week. Asserted both directions on the
+  // identical turf/pace/crowd inputs, so this cannot pass by only ever
+  // checking the failing side.
   const common = { turfQuality: 88, paceOnTarget: true, crowdHandled: true };
-  const band = RUNGS.countyOpen.band;
-
-  const outOfBand = scoreTournament('countyOpen', { ...common, setup: band.high + 20 });
-  assert.ok(!outOfBand.met.includes('band'), 'sanity: this setup must miss the band');
-  assert.deepEqual(outOfBand.met.sort(), ['crowd', 'pace', 'turf'],
+  const missed = scoreTournament('countyOpen', { ...common, winningTotal: COUNTY.high + 5 });
+  assert.deepEqual([...missed.met].sort(), ['crowd', 'pace', 'turf'],
     'turf, pace and crowd are still individually met and reported as such');
-  assert.equal(outOfBand.paid, RUNGS.countyOpen.baseFee,
-    'none of the three pay out without the band — base fee only');
+  assert.equal(missed.paid, RUNGS.countyOpen.baseFee,
+    'none of the three pay out without the target — base fee only');
 
-  const inBand = scoreTournament('countyOpen', {
-    ...common, setup: (band.low + band.high) / 2,
-  });
-  assert.ok(inBand.met.includes('band'));
-  assert.equal(inBand.met.length, 4);
-  assert.equal(inBand.paid, RUNGS.countyOpen.purseCeiling,
-    'the identical turf/pace/crowd DO pay out once the band is also met');
+  const hit = scoreTournament('countyOpen', { ...common, winningTotal: inside(COUNTY) });
+  assert.equal(hit.met.length, 4);
+  assert.equal(hit.paid, RUNGS.countyOpen.purseCeiling,
+    'the identical turf/pace/crowd DO pay out once the target is also hit');
+});
+
+test('a course under the rung\'s minimum is a miss whatever the winner shot', () => {
+  const common = { winningTotal: inside(NATIONAL), turfQuality: 95, paceOnTarget: true, crowdHandled: true };
+  const under = scoreTournament('national', { ...common, difficultyMet: false });
+  assert.ok(!under.met.includes('target'));
+  assert.equal(under.paid, RUNGS.national.baseFee);
+  assert.ok(under.prestige < 0);
+  assert.ok(under.barDays > 0);
+  assert.equal(under.difficultyMet, false, 'and the verdict says why');
+
+  const met = scoreTournament('national', { ...common, difficultyMet: true });
+  assert.ok(met.met.includes('target'));
 });
 
 test('a good week is never barred', () => {
   const good = scoreTournament('regional', {
-    setup: 70, turfQuality: 85, paceOnTarget: true, crowdHandled: true,
+    winningTotal: inside(RUNGS.regional.target), turfQuality: 85, paceOnTarget: true, crowdHandled: true,
   });
   assert.equal(good.barDays, 0);
 });
@@ -267,47 +287,49 @@ test('and a thin crew still cannot get there inside the run-up', () => {
   assert.ok(setup > 0, 'sanity: they did do some work');
 });
 
-test('the band governs the money, the reputation AND the rung', () => {
-  // All three stakes answer to one question: was this a championship
-  // venue on the day. Prestige used to average the four conditions, so a
-  // National with the course set to 12 scored three of four and came away
-  // NINE points better off -- having failed the only thing the week was
-  // about.
+test('the target governs the money, the reputation AND the rung', () => {
+  // All three stakes answer to one question: did this week test the field.
+  // Prestige used to average the four conditions, so a National that
+  // failed the gate scored three of four and came away NINE points better
+  // off -- having failed the only thing the week was about.
   const common = { turfQuality: 95, paceOnTarget: true, crowdHandled: true };
+  const delivered = scoreTournament('national', { winningTotal: inside(NATIONAL), ...common });
+  const notDelivered = scoreTournament('national', { winningTotal: NATIONAL.low - 12, ...common });
 
-  const delivered = scoreTournament('national', { setup: 86, ...common });
-  const notDelivered = scoreTournament('national', { setup: 12, ...common });
-
-  // Identical turf, pace and crowd on both. The only difference is the band.
-  assert.deepEqual(notDelivered.met.sort(), ['crowd', 'pace', 'turf'],
+  // Identical turf, pace and crowd on both. The only difference is the winner.
+  assert.deepEqual([...notDelivered.met].sort(), ['crowd', 'pace', 'turf'],
     'the other three were genuinely earned, and the report still says so');
 
   assert.ok(delivered.paid > notDelivered.paid, 'money');
   assert.ok(delivered.prestige > 0, 'a delivered championship earns reputation');
   assert.ok(notDelivered.prestige < 0,
-    `turning up outside the band scored ${notDelivered.prestige} prestige; it must cost, not pay`);
-  assert.equal(notDelivered.barDays > 0, true, 'and the rung goes to somebody else');
+    `a winner outside the target scored ${notDelivered.prestige} prestige; it must cost, not pay`);
+  assert.ok(notDelivered.barDays > 0, 'and the rung goes to somebody else');
   assert.equal(delivered.barDays, 0, 'while a good week is never barred');
 });
 
-test('inside the band, the other three decide how much credit you get', () => {
-  // The band is a gate, not the whole score. A venue that delivered but
+test('inside the target, the other three decide how much credit you get', () => {
+  // The target is a gate, not the whole score. A venue that delivered but
   // fumbled its turf should earn less than one that did everything, and
-  // still more than one that never set the course at all.
-  const inBand = (extra) => scoreTournament('national', {
-    setup: 86, turfQuality: 95, paceOnTarget: true, crowdHandled: true, ...extra,
+  // still more than one whose week never tested the field at all.
+  const hit = (extra) => scoreTournament('national', {
+    winningTotal: inside(NATIONAL), turfQuality: 95, paceOnTarget: true, crowdHandled: true, ...extra,
   });
-  const perfect = inBand({});
-  const scruffy = inBand({ turfQuality: 40, paceOnTarget: false });
-  const missedBand = scoreTournament('national', {
-    setup: 12, turfQuality: 95, paceOnTarget: true, crowdHandled: true,
-  });
+  const perfect = hit({});
+  const scruffy = hit({ turfQuality: 40, paceOnTarget: false });
+  const missed = hit({ winningTotal: NATIONAL.low - 12 });
 
   assert.ok(perfect.prestige > scruffy.prestige, 'doing it well should be worth more');
   assert.ok(scruffy.prestige >= 0, 'but a delivered championship is never a reputational loss');
-  assert.ok(scruffy.prestige > missedBand.prestige,
+  assert.ok(scruffy.prestige > missed.prestige,
     'and a scruffy delivered week must still beat one that was never delivered');
-  assert.equal(scruffy.barDays, 0, 'a bad day inside the band is not a barring offence');
+  assert.equal(scruffy.barDays, 0, 'a bad day inside the target is not a barring offence');
+});
+
+test('the contract names the winning score as its first condition', () => {
+  const contract = contractFor('national');
+  assert.equal(contract.bonuses[0].id, 'target');
+  assert.match(contract.bonuses[0].label, /target/i);
 });
 
 test('each rung declares its week: rounds, a difficulty floor and a winning-score target', () => {

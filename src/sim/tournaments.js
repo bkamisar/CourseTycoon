@@ -295,7 +295,8 @@ export function championshipRoomsSold(capacity, roomRate, valuePerRound = 60) {
  * Used to be derived from the contract itself — (baseFee + purseCeiling) /
  * 2 / RUN_UP_DAYS — so the bill scaled in lockstep with the purse. That
  * derivation died with the free-ride fix: `scoreTournament` now pays base
- * only when the band is missed, which is what actually closes the exploit,
+ * only when the gate is missed (the band then, the winning-score target
+ * since 2026-10-03), which is what actually closes the exploit,
  * so the bill no longer has to do that job by being large. Deriving it from
  * the ceiling also stopped being affordable once the ceiling grew to make
  * the bonuses worth chasing — at the new national it would have billed
@@ -307,7 +308,7 @@ export function championshipRoomsSold(capacity, roomRate, valuePerRound = 60) {
  * rather than against its own purse: a bill a competent resort can carry
  * for three weeks without the run-up alone threatening bankruptcy, but
  * still large enough that skipping it (the free ride) has to beat paying it
- * only by losing the one bonus — band — that gates all the others.
+ * only by losing the one bonus — the target — that gates all the others.
  */
 export function conditioningCostPerDay(rungId) {
   const rung = rungFor(rungId);
@@ -355,7 +356,7 @@ export function bidFor(state, rungId, { holesOpen = 0 } = {}) {
  * not silently make the advertised ceiling a lie.
  */
 const BONUS_SHARES = Object.freeze([
-  { id: 'band', label: 'Course set as asked', share: 0.40 },
+  { id: 'target', label: 'Winner inside the target', share: 0.40 },
   { id: 'turf', label: 'Turf still standing', share: 0.27 },
   { id: 'pace', label: 'Rounds inside the pace target', share: 0.20 },
   { id: 'crowd', label: 'Crowd handled without complaint', share: 0.13 },
@@ -395,42 +396,51 @@ export const BAR_DAYS = 120;
  *
  * `met` names the conditions that were individually satisfied — turf,
  * pace and crowd are reported honestly even when they end up unpaid, so
- * the tournament report can tell a player "your turf held, but the course
- * was never set for a championship" rather than silently zeroing a
- * condition they actually met.
+ * the tournament report can tell a player "your turf held, but the week
+ * never tested the field" rather than silently zeroing a condition they
+ * actually met.
  *
- * `band` is the gate, not one bonus among four. Three of the four
+ * `target` is the gate, not one bonus among four. Three of the four
  * conditions are satisfied by ordinary operation — a normally-staffed
  * course clears turf, the default tee interval clears pace, and crowd is
- * hardcoded true — so paying them regardless of the band is what made
+ * hardcoded true — so paying them regardless of the gate is what made
  * bidding and never conditioning the best line in the game: base plus
- * three free bonuses, for a bill that was never paid. A course that was
- * never set the way the rung asked for was not delivered as a
- * championship, whatever else went right that week, so missing the band
- * pays the base fee only. The spec's own line is that a course set wrong
- * is "worse than never having bid" — true here because the run-up bill
+ * three free bonuses, for a bill that was never paid. A week whose
+ * winner landed outside the target was not delivered as a championship,
+ * whatever else went right, so missing the target pays the base fee only.
+ * The spec's own line is that a course set wrong is "worse than never
+ * having bid" — true here because the run-up bill
  * (`conditioningCostPerDay`) is charged on every day the crew was
- * preparing, whether or not the band was ever reached.
+ * preparing, whether or not the target was ever hit.
+ *
+ * The gate moved on 2026-10-03 from the setup band to the winning total.
+ * The band asked "is the dial in the right place", which the player
+ * answered three weeks early and then watched; the target asks "did the
+ * week test the field", which the player is steering right up to the last
+ * round. The band survives as guidance on the sheet. And a course under
+ * the rung's minimum difficulty fails the gate whatever the winner shot:
+ * the field cannot be properly tested on a course too easy to be the venue.
  */
 export function scoreTournament(rungId, {
-  setup = 0, turfQuality = 0, paceOnTarget = false, crowdHandled = false,
+  winningTotal = null, difficultyMet = true,
+  turfQuality = 0, paceOnTarget = false, crowdHandled = false,
 } = {}) {
   const rung = rungFor(rungId);
   if (!rung) return null;
   const contract = contractFor(rungId);
 
   const met = [];
-  if (withinBand(setup, rung.band)) met.push('band');
+  if (difficultyMet && withinTarget(winningTotal, rung.target)) met.push('target');
   if (turfQuality >= TURF_EXPECTED) met.push('turf');
   if (paceOnTarget) met.push('pace');
   if (crowdHandled) met.push('crowd');
 
-  // Everything past the base fee is withheld unless the course was set
-  // the way the rung asked for. Turf, pace and crowd stay in `met` when
-  // they were individually earned — the report can still say so — but
-  // none of them pay out without the band.
-  const bandMet = met.includes('band');
-  const paid = bandMet
+  // Everything past the base fee is withheld unless the winner landed
+  // inside the target. Turf, pace and crowd stay in `met` when they were
+  // individually earned — the report can still say so — but none of them
+  // pay out without the target.
+  const targetMet = met.includes('target');
+  const paid = targetMet
     ? contract.bonuses.reduce(
       (sum, b) => sum + (met.includes(b.id) ? b.amount : 0),
       contract.baseFee
@@ -441,7 +451,7 @@ export function scoreTournament(rungId, {
   // that ran a good week on a small rung is not punished for the rung
   // being small.
   /*
-   * The band governs reputation and the rung as well as the money.
+   * The target governs reputation and the rung as well as the money.
    *
    * Prestige used to average the four conditions, so a venue that turned
    * up to a National with the course set to 12 -- having failed the one
@@ -449,9 +459,11 @@ export function scoreTournament(rungId, {
    * NINE points of reputation better off. The result card noticed before
    * anybody else did: it was printing "a venue that turns up outside the
    * band has not staged a championship" and then, two sentences later,
-   * "word gets round, and it gets round in your favour".
+   * "word gets round, and it gets round in your favour". That was the band,
+   * when the band was the gate; the reasoning carried over to the target
+   * unchanged.
    *
-   * So a missed band costs the full swing, whatever else went right,
+   * So a missed target costs the full swing, whatever else went right,
    * because the design's line is that a course set wrong is "worse than
    * never having bid". Turf, pace and crowd decide how much CREDIT a
    * delivered championship earns; they cannot rescue one that was not
@@ -459,7 +471,7 @@ export function scoreTournament(rungId, {
    */
   const swing = PRESTIGE_SWING[rungId] ?? 6;
   const earned = ['turf', 'pace', 'crowd'].filter((id) => met.includes(id)).length;
-  const prestige = bandMet
+  const prestige = targetMet
     ? Math.round((earned / 3) * swing)
     : -swing;
 
@@ -469,12 +481,15 @@ export function scoreTournament(rungId, {
     missed: contract.bonuses.map((b) => b.id).filter((id) => !met.includes(id)),
     paid,
     prestige,
+    // Carried so the report can say WHY a winner inside the target still
+    // missed: the course was under the rung's minimum.
+    difficultyMet,
     // Nothing below half the conditions is a week anybody wants repeated.
     // And they give the rung to somebody else. Same rule as the money and
-    // the reputation: the band is whether a championship happened at all,
-    // so missing it is what "a poor tournament" means. A week that made
-    // the band but fumbled the rest is a venue having a bad day, which is
+    // the reputation: the target is whether a championship happened at
+    // all, so missing it is what "a poor tournament" means. A week that hit
+    // the target but fumbled the rest is a venue having a bad day, which is
     // not the same thing and is not barred for it.
-    barDays: bandMet ? 0 : BAR_DAYS,
+    barDays: targetMet ? 0 : BAR_DAYS,
   };
 }

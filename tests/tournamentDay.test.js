@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, serialize, deserialize } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
-import { makeHole } from '../src/sim/hole.js';
+import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import {
   RUNGS, RUN_UP_DAYS, TURF_EXPECTED, conditioningCostPerDay,
 } from '../src/sim/tournaments.js';
 import { newWeek, withPins } from '../src/sim/championshipWeek.js';
+import { narrowToDifficulty } from '../tools/championshipPolicy.js';
 
 /** A resort that has finished Act II, which is where Act III begins. */
 function actThreeResort(seed = 3) {
@@ -53,6 +54,12 @@ function playWeek(state, seed) {
     out = runDay(out.state, seed + i);
   }
   return out;
+}
+
+/** The course narrowed to a rung's minimum, the way a host would. */
+function atMinimum(state, rungId) {
+  narrowToDifficulty(state.resort.courses[0].holes, RUNGS[rungId].minDifficulty);
+  return state;
 }
 
 test('a new game carries tournament state that survives a save', () => {
@@ -382,7 +389,8 @@ test('a botched championship pays close to base, not 58% of the ceiling', () => 
     const result = report.tournament;
     const rung = RUNGS[rungId];
 
-    assert.ok(!result.met.includes('band'), `${rungId}: setup 5 must miss every band`);
+    assert.ok(!result.met.includes('target'),
+      `${rungId}: an unconditioned, untended week must miss the target`);
     assert.ok(!result.met.includes('turf'), `${rungId}: wrecked turf must miss the turf bonus`);
     assert.ok(!result.met.includes('pace'),
       `${rungId}: a tight interval on a neglected week must fail pace too`);
@@ -459,7 +467,7 @@ test('the crowd bonus is earned by having somewhere to put them', () => {
 
   const helped = hostWith([...four, 'shortCourse', 'brewPub', 'functionRoom']);
   assert.ok(helped.met.includes('crowd'), 'with the property helping, it can');
-  assert.ok(helped.paid > bare.paid, 'and the contract should pay more for it');
+  // No money compared: both are under the National's floor, so base fee only (crowd's pay: tournaments.test.js).
 });
 
 test('the report records what the week was judged on, not only the verdict', () => {
@@ -489,11 +497,13 @@ test('the report records what the week was judged on, not only the verdict', () 
     'the report must name the course the field actually played');
   assert.ok(t.setup > 53, `the report printed ${t.setup}, the target, not the course played`);
 
-  // The invariant that matters: the number the report prints and the
-  // verdict it prints beside it have to agree. A card saying "set to 50,
-  // they wanted 45-60" next to "band missed" is this project's oldest bug.
-  assert.equal(t.met.includes('band'), t.setup >= t.band.low && t.setup <= t.band.high,
-    `report says setup ${t.setup} against band ${t.band.low}-${t.band.high}, but band met is ${t.met.includes('band')}`);
+  // The invariant that matters: the numbers the report prints and the
+  // verdict it prints beside them have to agree. A card saying "set to 50,
+  // they wanted 45-60" next to "band missed" is this project's oldest bug,
+  // and the judge moving to the winning total does not retire it.
+  assert.equal(t.met.includes('target'),
+    t.difficultyMet && t.week.winningTotal >= t.week.target.low && t.week.winningTotal <= t.week.target.high,
+    'the verdict and the numbers printed beside it have to agree');
 
   assert.equal(t.turfQuality, Math.round(after.turfQuality), 'and what they left the turf at');
   assert.deepEqual(t.band, RUNGS.countyOpen.band, 'and what was being asked for');
@@ -537,53 +547,83 @@ function nationalReady(seed) {
   return state;
 }
 
-test('hosting a national properly passes Act III', () => {
-  const state = nationalReady(41);
-  state.resort.setup = 86;
-  state.resort.setupTarget = 86;
-  state.tournament = { rung: 'national', day: state.day, resolved: false };
-
-  const { state: after, report } = playWeek(state, 5400);
-  assert.ok(report.tournament.met.includes('band'), 'sanity: the week went well');
-  assert.equal(after.actThreePassed, true, 'a good national should finish the act');
-  assert.equal(report.actThreePassed, true, 'and the evening should say so');
+test('the act passes exactly when a national hits its target', () => {
+  // Asserted as an invariant over seeds rather than on one lucky seed: the
+  // winner of sixty is noisy, and a test that picked a seed where the
+  // national happened to land would break the first time anybody tuned
+  // the field.
+  let passed = 0;
+  for (const seed of [41, 42, 43, 44, 45, 46]) {
+    const state = atMinimum(nationalReady(seed), 'national');
+    state.resort.setup = 86;
+    state.resort.setupTarget = 86;
+    state.tournament = newWeek('national', state.day);
+    const { state: after, report } = playWeek(state, 5400 + seed * 10);
+    const hit = report.tournament.met.includes('target');
+    assert.equal(Boolean(after.actThreePassed), hit, `seed ${seed}`);
+    assert.equal(Boolean(report.actThreePassed), hit);
+    if (hit) {
+      passed += 1;
+      // Announced once, then it stays passed without being announced again.
+      const next = runDay(after, 5490 + seed);
+      assert.equal(next.state.actThreePassed, true, 'it does not come undone');
+      assert.equal(next.report.actThreePassed ?? false, false, 'and is not re-announced');
+    }
+  }
+  assert.ok(passed > 0, 'a well-run national has to be passable');
 });
 
-test('a botched national does not pass Act III', () => {
+test('a botched national never passes Act III', () => {
   // The other side. Hosting is not passing, or the gate is just an
   // attendance record.
-  const state = nationalReady(42);
-  state.resort.setup = 5;
-  state.resort.setupTarget = 0;
-  state.turfQuality = 30;
-  state.tournament = { rung: 'national', day: state.day, resolved: false };
-
-  const { state: after } = playWeek(state, 5410);
-  assert.ok(!(after.actThreePassed ?? false),
-    'turning up is not the same as delivering');
+  for (const seed of [42, 43, 44]) {
+    const state = atMinimum(nationalReady(seed), 'national');
+    state.resort.setup = 5;
+    state.resort.setupTarget = 0;
+    state.tournament = newWeek('national', state.day);
+    const { state: after } = playWeek(state, 5500 + seed * 10);
+    assert.ok(!after.actThreePassed, `seed ${seed}: turning up is not delivering`);
+  }
 });
 
 test('a county open never passes Act III, however perfect', () => {
-  const state = nationalReady(43);
-  state.resort.setup = 52;
-  state.resort.setupTarget = 52;
-  state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
-  const { state: after, report } = playWeek(state, 5420);
-  assert.ok(report.tournament.met.includes('band'), 'sanity: a good county week');
-  assert.ok(!(after.actThreePassed ?? false), 'the gate is the national, not the ladder');
+  // The gate is the national, not the ladder.
+  for (const seed of [43, 44, 45]) {
+    const state = atMinimum(nationalReady(seed), 'countyOpen');
+    state.resort.setup = 52;
+    state.resort.setupTarget = 52;
+    state.tournament = newWeek('countyOpen', state.day);
+    const { state: after } = playWeek(state, 5600 + seed * 10);
+    assert.ok(!after.actThreePassed);
+  }
 });
 
-test('passing Act III is announced once and then stays passed', () => {
-  const state = nationalReady(44);
-  state.resort.setup = 86;
-  state.resort.setupTarget = 86;
-  state.tournament = { rung: 'national', day: state.day, resolved: false };
-  const first = playWeek(state, 5430);
-  assert.equal(first.report.actThreePassed, true);
-  const second = runDay(first.state, 5440);
-  assert.equal(second.state.actThreePassed, true, 'it does not come undone');
-  assert.equal(second.report.actThreePassed ?? false, false,
-    'but it is not announced every evening afterwards');
+test('the course is measured against the minimum on the first morning', () => {
+  const under = openFullCourse(actThreeResort(80));
+  under.tournament = newWeek('countyOpen', under.day);
+  const raw = courseDifficultyOf(under.resort.courses[0].holes);
+  assert.ok(raw < RUNGS.countyOpen.minDifficulty, 'sanity: the template course is under the County floor');
+  const short = playWeek(under, 8000).report.tournament;
+  assert.equal(short.difficultyMet, false);
+  assert.ok(!short.met.includes('target'), 'under the minimum is a miss whatever the winner shot');
+  assert.equal(short.paid, RUNGS.countyOpen.baseFee);
+
+  const enough = atMinimum(openFullCourse(actThreeResort(80)), 'countyOpen');
+  enough.tournament = newWeek('countyOpen', enough.day);
+  assert.equal(playWeek(enough, 8000).report.tournament.difficultyMet, true);
+});
+
+test('a harder course plays harder', () => {
+  // Same seed, same setup, same pins: only the design differs.
+  const play = (rungId) => {
+    const state = rungId ? atMinimum(openFullCourse(actThreeResort(81)), rungId)
+      : openFullCourse(actThreeResort(81));
+    state.resort.setup = 60;
+    state.resort.setupTarget = 60;
+    state.tournament = newWeek('countyOpen', state.day);
+    return playWeek(state, 8100).report.tournament.week.winningTotal;
+  };
+  assert.ok(play('national') > play(null) + 2, 'a course narrowed to 65 must score higher than one at 41');
 });
 
 test('each rung is a week of rounds, closed every day, resolved on the last', () => {

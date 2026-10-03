@@ -725,6 +725,15 @@ export function runDay(state, seed) {
   if (championshipToday) {
     const week = normaliseWeek(next.tournament);
     const rung = RUNGS[week.rung];
+    // The course the field meets on the first morning is the course judged
+    // against the rung's minimum. Measured once: holes are locked for the
+    // week (championshipWeek.weekUnderWay), so later rounds cannot differ.
+    const measured = week.roundsPlayed === 0
+      ? (() => {
+          const difficulty = courseDifficultyOf(holes);
+          return { ...week, difficulty, difficultyMet: difficulty >= rung.minDifficulty };
+        })()
+      : week;
     // Drawn once, on the first round, and carried in the week thereafter,
     // so the same sixty play every round and their totals add up.
     const handicaps = week.field?.handicaps ?? drawFieldHandicaps(rng);
@@ -747,7 +756,7 @@ export function runDay(state, seed) {
     // what made this condition unfailable, and officials don't give it.
     const paceOnTarget = field.averageRoundMinutes <= holes.length * TARGET_MINUTES_PER_HOLE;
 
-    const played = recordRound(week, {
+    const played = recordRound(measured, {
       handicaps,
       playerToPar,
       entry: {
@@ -774,7 +783,10 @@ export function runDay(state, seed) {
       next.tournament = played;
     } else {
       const result = scoreTournament(played.rung, {
-        setup: next.resort.setup ?? 0,
+        // The winner's total is the judge; the setup band is guidance on
+        // the sheet. See scoreTournament.
+        winningTotal: winningTotal(played),
+        difficultyMet: played.difficultyMet,
         turfQuality: next.turfQuality,
         // Officials judge the week, and one slow round is a slow week.
         paceOnTarget: played.roundLog.every((r) => r.paceOnTarget),
@@ -806,6 +818,9 @@ export function runDay(state, seed) {
         setup: Math.round(next.resort.setup ?? 0),
         band: rung.band,
         turfQuality: Math.round(next.turfQuality),
+        difficulty: Math.round(played.difficulty * 10) / 10,
+        minDifficulty: rung.minDifficulty,
+        difficultyMet: played.difficultyMet,
         week: {
           rounds: played.rounds,
           roundLog: played.roundLog,
@@ -834,14 +849,15 @@ export function runDay(state, seed) {
       /*
        * Act III's gate: a national, hosted properly.
        *
-       * "Properly" is the band, because the band is the whole act. A course
-       * that was never set for a championship did not stage one -- which is
-       * why it gates the bonuses too -- and turning up is not delivering.
+       * "Properly" is the target, because the target is the whole act. A
+       * week that never tested the field did not stage a championship --
+       * which is why it gates the bonuses too -- and turning up is not
+       * delivering.
        *
        * Recorded once. The act stays passed afterwards, but the evening
        * only announces it the once.
        */
-      if (result.rung === 'national' && result.met.includes('band')
+      if (result.rung === 'national' && result.met.includes('target')
           && !next.actThreePassed) {
         next.actThreePassed = true;
         report.actThreePassed = true;
