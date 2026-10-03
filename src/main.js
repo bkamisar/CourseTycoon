@@ -14,6 +14,7 @@ import { computeTokens, computeEffects, drawTokens, drawEffects } from './render
 import { openHoles } from './sim/state.js';
 import { runDay, applyEventChoice } from './sim/day.js';
 import { holeStats } from './sim/hole.js';
+import { weekUnderWay } from './sim/championshipWeek.js';
 import { createClock, PLAYBACK_SPEEDS } from './play/clock.js';
 import { mountHud } from './ui/hud.js';
 import { mountAmenityBar } from './ui/amenityBar.js';
@@ -320,6 +321,21 @@ function openEditorFor(holeId) {
 }
 
 function onHoleTap(holeId) {
+  // The design the field meets on the first morning is the design it
+  // plays all week. Building a hole counts too: a new hole is a redesign.
+  if (weekUnderWay(state)) {
+    sheets.open({
+      id: 'course-locked',
+      title: 'The course is set',
+      render(body) {
+        const note = document.createElement('p');
+        note.textContent = 'The field is on the course. Nothing is redesigned until the championship '
+          + 'is over — what they met on the first morning is what they play all week.';
+        body.appendChild(note);
+      },
+    });
+    return;
+  }
   const hole = state.resort.courses[0].holes.find((h) => h.id === holeId);
   if (hole.open) {
     openEditorFor(holeId);
