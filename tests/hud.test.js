@@ -93,5 +93,7 @@ test('during the week the readout is the round and the leader', () => {
   assert.equal(t.round, 2);
   assert.equal(t.rounds, 3);
   assert.equal(t.leaderToPar, -2);
+  assert.equal(t.projectedTotal, -6, 'one round of three at -2 is on pace for -6');
+  assert.equal(t.short, 'Regional');
   assert.deepEqual(t.target, RUNGS.regional.target);
 });

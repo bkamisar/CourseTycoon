@@ -15,6 +15,8 @@
  * Pure. Nothing here computes with a DOM or a clock.
  */
 import { RUNGS } from './tournaments.js';
+import { courseDifficultyOf } from './hole.js';
+import { playableHoles } from './state.js';
 
 /**
  * Where the holes are cut, the one call the player makes each morning.
@@ -148,4 +150,62 @@ export function weekFinished(week) {
 export function weekUnderWay(state) {
   const t = state?.tournament;
   return Boolean(t && !t.resolved && state.day >= t.day);
+}
+
+/**
+ * Everything the HUD and the championship sheet say about a booked
+ * championship, worked out once.
+ *
+ * Both screens used to compute these separately, and the review found
+ * three ways the interface could disagree with the judge: they measured
+ * the difficulty over every open hole where the judge measures the
+ * playable ones (a decision event can have closed some, `playableHoles`);
+ * they kept re-measuring a live figure after the judge had settled it on
+ * the first morning; and a leader's partial total sat beside a target
+ * that is for the whole week. One selector, so there is one answer.
+ *
+ * `difficulty` is raw, not floored: callers floor it for display
+ * (64.6 against a floor of 65 must not print as "65" beside a warning
+ * colour) but compare it unfloored, as the judge does.
+ *
+ * Once the week has measured the course (`week.difficulty`, set on the
+ * first round's day in `runDay`) that measurement is returned, frozen,
+ * because it is the one the verdict will use; before that it is this
+ * morning's measure of the holes the day would play.
+ *
+ * `projectedTotal` is the leader's pace over the full week, rounded --
+ * null before a round is in, when there is no pace to project.
+ *
+ * Null when nothing is booked or the rung is unknown (a save from a future
+ * version should not take down a screen that draws every frame).
+ */
+export function championshipStatus(state) {
+  const booked = state?.tournament;
+  if (!booked || booked.resolved) return null;
+  const rung = RUNGS[booked.rung];
+  if (!rung) return null;
+  const week = normaliseWeek(booked);
+  const frozen = week.difficulty != null;
+  const difficulty = frozen
+    ? week.difficulty
+    : courseDifficultyOf(playableHoles(state));
+  const leaderToPar = winningTotal(week);
+  return {
+    rungId: booked.rung,
+    rung,
+    week,
+    inWeek: weekUnderWay(state),
+    round: week.roundsPlayed + 1,
+    roundsPlayed: week.roundsPlayed,
+    rounds: week.rounds,
+    leaderToPar,
+    projectedTotal: leaderToPar === null || week.roundsPlayed === 0
+      ? null
+      : Math.round(leaderToPar * week.rounds / week.roundsPlayed),
+    target: rung.target,
+    minDifficulty: rung.minDifficulty,
+    difficulty,
+    difficultyMet: frozen ? Boolean(week.difficultyMet) : difficulty >= rung.minDifficulty,
+    difficultyFrozen: frozen,
+  };
 }

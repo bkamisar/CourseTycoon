@@ -1,6 +1,7 @@
 import { makeHole } from './hole.js';
 import { emptyGoodwill } from './goodwill.js';
 import { normaliseWeek } from './championshipWeek.js';
+import { conditionEffects } from './conditions.js';
 import {
   MENU_SLOTS, itemsFor, ITEMS, MENU_AUDIENCE, exclusiveTo,
 } from './menu.js';
@@ -270,4 +271,26 @@ export function openHoles(state) {
   return state.resort.courses[0].holes.filter(
     (h) => h.open && h.corridor && h.corridor.length > 1 && h.teePos
   );
+}
+
+/**
+ * The holes a day would actually play: the open ones, less however many a
+ * decision event has closed.
+ *
+ * `runDay` reads `state.conditions` once at the top (`conditionEffects`)
+ * and only ticks them down at the very end of the day, so the closures in
+ * force when a day starts are exactly the ones in force all through it.
+ * That makes this morning's view and the in-day view the same list, which
+ * is why `runDay` calls this rather than keeping its own copy -- and why
+ * the HUD and the championship sheet can quote the course's difficulty
+ * from here and agree with the judge (`championshipStatus`).
+ *
+ * Closures take the last holes first, so the course shortens from the far
+ * end rather than leaving a gap in the middle that the flow-shop scheduler
+ * would have to reason about. At least one hole always plays.
+ */
+export function playableHoles(state) {
+  const all = openHoles(state);
+  const closed = conditionEffects(state.conditions ?? []).holesClosed;
+  return closed > 0 ? all.slice(0, Math.max(1, all.length - closed)) : all;
 }

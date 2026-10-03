@@ -11,7 +11,7 @@ import { HISTORY_LIMIT, SATISFACTION_HISTORY_LIMIT } from './state.js';
 import {
   addCondition, tickConditions, conditionEffects,
 } from './conditions.js';
-import { openHoles } from './state.js';
+import { playableHoles } from './state.js';
 import { menuBestEnergy } from './menu.js';
 import { kitchenCapacity, kitchenLoad, serviceFactor } from './kitchen.js';
 import { narrationContext, pickNarration, rememberNarration } from './narration.js';
@@ -221,13 +221,9 @@ export function runDay(state, seed) {
     hold: booked,
   });
 
-  const allOpen = openHoles(next);
-  // Closures take the last holes first, so the course shortens from the
-  // far end rather than leaving a gap in the middle that the flow-shop
-  // scheduler would have to reason about.
-  const holes = wrong.holesClosed > 0
-    ? allOpen.slice(0, Math.max(1, allOpen.length - wrong.holesClosed))
-    : allOpen;
+  // The open holes less today's closures (see `playableHoles`: the same
+  // list the HUD and the championship sheet quote the difficulty from).
+  const holes = playableHoles(next);
 
   // A day's fade back toward neutral, for whichever segments a past
   // decision event has coloured. Runs every day regardless of whether one

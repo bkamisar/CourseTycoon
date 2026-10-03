@@ -19,10 +19,9 @@
  * enjoying themselves.
  */
 import { PALETTE } from '../render/palette.js';
-import { RUNGS, withinBand } from '../sim/tournaments.js';
+import { withinBand } from '../sim/tournaments.js';
 import { openHoles } from '../sim/state.js';
-import { courseDifficultyOf } from '../sim/hole.js';
-import { normaliseWeek, weekUnderWay, winningTotal } from '../sim/championshipWeek.js';
+import { championshipStatus } from '../sim/championshipWeek.js';
 import { toParText } from './toPar.js';
 import { courseRating } from '../sim/ratings.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
@@ -38,37 +37,38 @@ import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
  * The judge is now the winning total on a course hard enough for the rung,
  * so the run-up readout carries the course's difficulty against the floor
  * beside the setup (which is guidance now), and once the week is under way
- * it switches to the round, the leader and the target -- the thing being
- * judged.
+ * it switches to the round, the leader's pace and the target -- the thing
+ * being judged. Every figure comes from `championshipStatus`, which
+ * measures the course the way the judge does, so this line cannot say
+ * "ready" about a course the verdict will fail.
  *
  * Null for an unknown rung rather than throwing. This is drawn every
  * frame, and a save from a future version should not be the thing that
  * takes the game down.
  */
 function tournamentReadout(state) {
-  const booked = state.tournament;
-  if (!booked || booked.resolved) return null;
-  const rung = RUNGS[booked.rung];
-  if (!rung) return null;
-  const week = normaliseWeek(booked);
+  const status = championshipStatus(state);
+  if (!status) return null;
+  const { rung, week } = status;
   const setup = Math.round(state.resort.setup ?? 0);
-  const rawDifficulty = courseDifficultyOf(openHoles(state));
   return {
     label: rung.label,
-    daysLeft: Math.max(0, booked.day - state.day),
+    short: rung.short ?? rung.label,
+    daysLeft: Math.max(0, week.day - state.day),
     setup,
     inBand: withinBand(setup, rung.band),
     band: rung.band,
     // Floored, not rounded: 64.6 against a floor of 65 must not print as
     // "65" beside a warning colour.
-    difficulty: Math.floor(rawDifficulty),
-    minDifficulty: rung.minDifficulty,
-    difficultyMet: rawDifficulty >= rung.minDifficulty,
-    inWeek: weekUnderWay(state),
-    round: week.roundsPlayed + 1,
-    rounds: week.rounds,
-    leaderToPar: winningTotal(week),
-    target: rung.target,
+    difficulty: Math.floor(status.difficulty),
+    minDifficulty: status.minDifficulty,
+    difficultyMet: status.difficultyMet,
+    inWeek: status.inWeek,
+    round: status.round,
+    rounds: status.rounds,
+    leaderToPar: status.leaderToPar,
+    projectedTotal: status.projectedTotal,
+    target: status.target,
   };
 }
 
@@ -133,7 +133,22 @@ function injectStyles() {
       flex-direction: column;
       pointer-events: none;
     }
-    .hud-tournament { color: ${PALETTE.FAIRWAY}; }
+    /* Its own full-width row, like the crowd bars below: on a phone the
+       readout shared the bar with money, day and four ratings and was
+       squeezed out of sight. One line, clipped with an ellipsis rather than
+       wrapped, so the bar never grows taller mid-week. */
+    .hud-tournament {
+      padding: 2px 10px;
+      background: ${PALETTE.UI_DARK};
+      color: ${PALETTE.FAIRWAY};
+      font-family: monospace;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .hud-tournament[hidden] { display: none; }
     .hud-tournament--off { color: ${PALETTE.SAND}; }
     .hud-crowd {
       display: flex;
@@ -227,7 +242,7 @@ export function mountHud(root) {
   tournament.className = 'hud-tournament';
   tournament.hidden = true;
 
-  bar.append(money, day, ratings, tournament);
+  bar.append(money, day, ratings);
 
   // The three crowds, as bars, always on screen. The whole game turns on the
   // fact that no course pleases everybody, and until now that only showed up
@@ -256,7 +271,7 @@ export function mountHud(root) {
 
   const wrap = document.createElement('div');
   wrap.className = 'hud-wrap';
-  wrap.append(bar, crowdRow);
+  wrap.append(bar, tournament, crowdRow);
   root.appendChild(wrap);
 
   function update(state) {
@@ -273,12 +288,20 @@ export function mountHud(root) {
     if (data.tournament) {
       const t = data.tournament;
       if (t.inWeek) {
-        tournament.textContent = `${t.label} · Round ${t.round} of ${t.rounds} · `
-          + `leads ${toParText(t.leaderToPar)} (target ${toParText(t.target.low)} to ${toParText(t.target.high)})`;
-        tournament.classList.remove('hud-tournament--off');
+        // The pace segment waits for a first round: before it there is no
+        // leader, and "leads —" is noise on a line with room for little.
+        const pace = t.leaderToPar === null ? ''
+          : ` · leads ${toParText(t.leaderToPar)} · on pace ${toParText(t.projectedTotal)}`;
+        tournament.textContent = `R${t.round}/${t.rounds}${pace}`
+          + ` (target ${toParText(t.target.low)}…${toParText(t.target.high)})`;
+        // `difficultyMet` here is the judge's own: live on the first
+        // morning, then the figure it settled. Once that says the course
+        // was too easy the week pays the base fee whatever the scores do,
+        // and the row says so rather than staying green.
+        tournament.classList.toggle('hud-tournament--off', !t.difficultyMet);
       } else {
         const when = t.daysLeft === 0 ? 'today' : `${t.daysLeft}d`;
-        tournament.textContent = `${t.label} ${when} · setup ${t.setup} (want ${t.band.low}-${t.band.high})`
+        tournament.textContent = `${t.short} ${when} · setup ${t.setup} (${t.band.low}–${t.band.high})`
           + ` · course ${t.difficulty}/${t.minDifficulty}`;
         tournament.classList.toggle('hud-tournament--off', !t.inBand || !t.difficultyMet);
       }

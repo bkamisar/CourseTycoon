@@ -45,6 +45,7 @@ const LIST = [
   {
     id: 'countyOpen',
     label: 'County Open',
+    short: 'County',
     blurb: 'Two hundred entries, a local paper, and a trophy somebody has to fetch from a cupboard. Nobody outside the county will hear about it, which is the point of starting here.',
     prestige: 55,
     requires: [],
@@ -59,6 +60,7 @@ const LIST = [
   {
     id: 'regional',
     label: 'Regional Championship',
+    short: 'Regional',
     blurb: 'A field worth watching and a crowd worth seating. The first rung where people arrive who did not drive themselves, and the first where the course is expected to be a test rather than a nice day out.',
     prestige: 70,
     requires: ['grandstands', 'overflowParking'],
@@ -73,6 +75,7 @@ const LIST = [
   {
     id: 'national',
     label: 'National Open',
+    short: 'National',
     blurb: 'Television, a press tent, and every hole photographed from the air. A week that makes a resort or files it permanently under "nearly".',
     prestige: 82,
     requires: ['mediaCentre', 'hospitalityPavilion'],

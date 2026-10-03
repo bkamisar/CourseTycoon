@@ -5,6 +5,8 @@ import { makeHole } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { RUNGS } from '../src/sim/tournaments.js';
 import { newWeek, recordRound, PIN_IDS } from '../src/sim/championshipWeek.js';
+import { runDay } from '../src/sim/day.js';
+import { effectsOf } from '../src/sim/weather.js';
 import { computeChampionshipData } from '../src/ui/championship.js';
 
 function championshipResort(seed = 1) {
@@ -164,7 +166,10 @@ test('a booked week shows the difficulty against the floor all through the run-u
 test("during the week the sheet has the pins, the leader and today's weather", () => {
   const state = championshipResort(3);
   let week = newWeek('national', state.day);
-  week = recordRound(week, { handicaps: [0], playerToPar: [4], entry: { pins: 'fair' } });
+  // A full field of sixty, because the same state is played below.
+  const toPar = Array(60).fill(6);
+  toPar[0] = 4;
+  week = recordRound(week, { handicaps: Array(60).fill(0), playerToPar: toPar, entry: { pins: 'fair' } });
   state.tournament = week;
   const b = computeChampionshipData(state).booked;
   assert.equal(b.inWeek, true);
@@ -174,4 +179,7 @@ test("during the week the sheet has the pins, the leader and today's weather", (
   assert.equal(b.pins, 'fair');
   assert.deepEqual(b.pinChoices.map((p) => p.id), [...PIN_IDS]);
   assert.ok(b.weather.label.length > 2, 'the pins are set against the day they will be played in');
+  // Not just present: the very sky the round is then played in.
+  assert.deepEqual(b.weather, effectsOf(runDay(state, 5).report.weather.key));
+  assert.equal(b.projectedTotal, 16, 'one round of four in at +4 is on pace for +16');
 });

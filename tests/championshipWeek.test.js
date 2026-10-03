@@ -1,10 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serialize, deserialize, newGame } from '../src/sim/state.js';
+import { serialize, deserialize, newGame, openHoles, playableHoles } from '../src/sim/state.js';
+import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
+import { TEMPLATE_NAMES } from '../src/sim/templates.js';
+import { runDay } from '../src/sim/day.js';
+import { addCondition } from '../src/sim/conditions.js';
 import { RUNGS, setupDifficultyBonus } from '../src/sim/tournaments.js';
 import {
   PINS, PIN_IDS, pinHandicap, newWeek, normaliseWeek, recordRound,
-  winningTotal, weekFinished, weekUnderWay, withPins,
+  winningTotal, weekFinished, weekUnderWay, withPins, championshipStatus,
 } from '../src/sim/championshipWeek.js';
 
 test('four pin settings, harder in order, fair changing nothing', () => {
@@ -146,4 +150,96 @@ test('a week survives a save', () => {
   state.tournament = withPins(week, 'easy');
   const revived = deserialize(serialize(state));
   assert.deepEqual(revived.tournament, state.tournament);
+});
+
+// --- championshipStatus: the one answer the HUD and the sheet both read ---
+
+function statusResort(seed = 11) {
+  const state = newGame(seed);
+  state.act = 3;
+  state.money = 500000;
+  state.prestige = 84;
+  state.resort.courses[0].holes = state.resort.courses[0].holes.map((h, i) => ({
+    ...makeHole(TEMPLATE_NAMES[i % TEMPLATE_NAMES.length], i + 1), open: true,
+  }));
+  return state;
+}
+
+function narrow(state, width) {
+  for (const hole of state.resort.courses[0].holes) hole.corridorWidth = width;
+}
+
+test('nothing booked, nothing to report', () => {
+  assert.equal(championshipStatus(statusResort()), null);
+  const state = statusResort();
+  state.tournament = { rung: 'nonsense', day: 5, resolved: false };
+  assert.equal(championshipStatus(state), null, 'an unknown rung is not a crash');
+});
+
+test('in the run-up the difficulty is live and follows the course', () => {
+  const state = statusResort();
+  state.day = 40;
+  state.tournament = newWeek('countyOpen', 61);
+  const before = championshipStatus(state);
+  assert.equal(before.difficultyFrozen, false);
+  assert.equal(before.inWeek, false);
+  assert.equal(before.difficulty, courseDifficultyOf(openHoles(state)));
+  assert.equal(before.difficultyMet, false, 'the template course is under the County floor');
+
+  narrow(state, 34);
+  const after = championshipStatus(state);
+  assert.ok(after.difficulty > before.difficulty, 'a redesign moves the run-up figure');
+  assert.equal(after.difficultyMet, true);
+});
+
+test('once the week has measured the course the figure is frozen', () => {
+  const state = statusResort();
+  state.tournament = newWeek('countyOpen', state.day);
+  const morning = championshipStatus(state);
+  const out = runDay(state, 7).state;
+  assert.ok(out.tournament && !out.tournament.resolved, 'a two-round week is still going');
+
+  const frozen = championshipStatus(out);
+  assert.equal(frozen.difficultyFrozen, true);
+  assert.equal(frozen.difficulty, morning.difficulty,
+    'what the judge settled is what the morning view said');
+  assert.equal(frozen.difficultyMet, false);
+
+  // A later redesign (the editor is locked in play, but a save or a tool is
+  // not) must not change what the judge already decided.
+  narrow(out, 34);
+  const later = championshipStatus(out);
+  assert.equal(later.difficulty, frozen.difficulty);
+  assert.equal(later.difficultyMet, false, 'the frozen verdict ignores the new corridors');
+});
+
+test('a closure from a decision event moves the figure the way the judge sees it', () => {
+  const state = statusResort();
+  state.tournament = newWeek('countyOpen', state.day);
+  const whole = championshipStatus(state).difficulty;
+
+  state.conditions = addCondition([], { id: 'stormDamage', days: 5, holesClosed: 4 });
+  assert.equal(playableHoles(state).length, 14);
+  const closed = championshipStatus(state);
+  assert.equal(closed.difficulty, courseDifficultyOf(openHoles(state).slice(0, 14)));
+  assert.notEqual(closed.difficulty, whole, 'the closure has to matter for this test to mean anything');
+
+  const judged = runDay(state, 3).state.tournament.difficulty;
+  assert.equal(closed.difficulty, judged, 'the morning view is the number the judge uses');
+});
+
+test("the leader's pace is projected over the whole week", () => {
+  const state = statusResort();
+  state.tournament = newWeek('regional', state.day);
+  const morning = championshipStatus(state);
+  assert.equal(morning.leaderToPar, null);
+  assert.equal(morning.projectedTotal, null, 'no round in, no pace');
+  assert.equal(morning.round, 1);
+
+  state.tournament = recordRound(state.tournament, { handicaps: [0, 0], playerToPar: [3, 1], entry: {} });
+  const after = championshipStatus(state);
+  assert.equal(after.leaderToPar, 1);
+  assert.equal(after.projectedTotal, 3, 'one under-the-line round in three, three times over');
+  assert.equal(after.round, 2);
+  assert.equal(after.rounds, 3);
 });

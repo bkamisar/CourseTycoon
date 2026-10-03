@@ -16,7 +16,7 @@
  * other is the interface telling the player something the simulation
  * disagrees with.
  */
-import { openHoles, amenity } from '../sim/state.js';
+import { openHoles, playableHoles, amenity } from '../sim/state.js';
 import {
   RUNG_IDS, RUNGS, contractFor, nextRungFor, eligibleFor, withinBand, bidFor,
   CHAMPIONSHIP_HOLES, RUN_UP_DAYS,
@@ -27,7 +27,7 @@ import {
 } from '../sim/championshipBuildings.js';
 import { courseDifficultyOf } from '../sim/hole.js';
 import {
-  normaliseWeek, weekUnderWay, winningTotal, withPins, PINS, PIN_IDS,
+  normaliseWeek, championshipStatus, withPins, PINS, PIN_IDS,
 } from '../sim/championshipWeek.js';
 import { weatherOn, effectsOf } from '../sim/weather.js';
 import { toParText } from './toPar.js';
@@ -74,10 +74,13 @@ export function computeChampionshipData(state) {
   const setup = Math.round(state.resort.setup ?? 0);
   const target = Math.round(state.resort.setupTarget ?? 0);
   const band = subject ? RUNGS[subject].band : null;
-  // The course's own design against the rung's floor. Computed once so the
-  // apply section, the run-up and the week all quote the same figure.
-  const rawDifficulty = courseDifficultyOf(openHoles(state));
-  const week = booked ? normaliseWeek(booked) : null;
+  // The course's difficulty against the rung's floor, from the same
+  // selector as the HUD so the two cannot disagree with each other or with
+  // the judge (it measures the playable holes, and keeps the figure the
+  // week settled on its first morning). With nothing booked there is no
+  // week to settle anything, so the live measure of the playable holes.
+  const status = championshipStatus(state);
+  const rawDifficulty = status ? status.difficulty : courseDifficultyOf(playableHoles(state));
 
   return {
     money: state.money,
@@ -93,6 +96,7 @@ export function computeChampionshipData(state) {
           rounds: RUNGS[nextId].rounds,
           target: RUNGS[nextId].target,
           minDifficulty: RUNGS[nextId].minDifficulty,
+          difficultyMet: rawDifficulty >= RUNGS[nextId].minDifficulty,
           prepPerDay: RUNGS[nextId].prepPerDay,
           eligible: eligibleFor(nextId, {
             prestige: state.prestige, resort: state.resort, holesOpen,
@@ -109,15 +113,17 @@ export function computeChampionshipData(state) {
           band: RUNGS[booked.rung].band,
           prepPerDay: RUNGS[booked.rung].prepPerDay,
           contract: contractFor(booked.rung),
-          rounds: week.rounds,
-          roundsPlayed: week.roundsPlayed,
-          target: RUNGS[booked.rung].target,
-          minDifficulty: RUNGS[booked.rung].minDifficulty,
-          difficultyMet: rawDifficulty >= RUNGS[booked.rung].minDifficulty,
-          inWeek: weekUnderWay(state),
-          leaderToPar: winningTotal(week),
-          roundLog: week.roundLog,
-          pins: week.roundSettings.pins,
+          rounds: status.rounds,
+          roundsPlayed: status.roundsPlayed,
+          target: status.target,
+          minDifficulty: status.minDifficulty,
+          difficultyMet: status.difficultyMet,
+          difficultyFrozen: status.difficultyFrozen,
+          inWeek: status.inWeek,
+          leaderToPar: status.leaderToPar,
+          projectedTotal: status.projectedTotal,
+          roundLog: status.week.roundLog,
+          pins: status.week.roundSettings.pins,
           pinChoices: PIN_IDS.map((id) => PINS[id]),
           // Today's, because the pins are set in the morning for the round
           // about to be played -- and the forecast is the weather, read
@@ -235,11 +241,24 @@ function weekSection(data, state, commit) {
   const b = data.booked;
   wrap.appendChild(heading(`${b.label} · Round ${b.roundsPlayed + 1} of ${b.rounds}`));
   wrap.appendChild(line('Leader', toParText(b.leaderToPar)));
+  // The leader's total is for the rounds played; the target is for the
+  // whole week. The pace line puts them on the same footing.
+  if (b.projectedTotal !== null) {
+    wrap.appendChild(line('On pace for', toParText(b.projectedTotal),
+      b.projectedTotal >= b.target.low && b.projectedTotal <= b.target.high ? 'champ-ok' : 'champ-off'));
+  }
   wrap.appendChild(line('Target', `${toParText(b.target.low)} to ${toParText(b.target.high)}`));
-  wrap.appendChild(line('Today', `${b.weather.label}`));
+  wrap.appendChild(line('Today', b.weather.label));
+
+  const pinsLabel = document.createElement('div');
+  pinsLabel.className = 'champ-detail';
+  pinsLabel.textContent = `Pins — ${b.weather.note}`;
+  wrap.appendChild(pinsLabel);
 
   const pins = document.createElement('div');
   pins.className = 'champ-dial';
+  pins.setAttribute('role', 'group');
+  pins.setAttribute('aria-label', 'Pins for this round');
   for (const choice of b.pinChoices) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -276,7 +295,11 @@ function dialSection(data, state, commit) {
   wrap.className = 'champ-row';
   const b = data.booked;
 
-  wrap.appendChild(heading(`${b.label} · ${b.daysLeft === 0 ? 'today' : `${b.daysLeft} days`}`));
+  // In the week the heading above is already the rung and the round, so
+  // this section is just the course's setup, not the rung and "today" again.
+  wrap.appendChild(heading(b.inWeek
+    ? 'Setup'
+    : `${b.label} · ${b.daysLeft === 0 ? 'today' : `${b.daysLeft} days`}`));
   wrap.appendChild(line('Course is set to', String(data.dial.setup),
     data.dial.inBand ? 'champ-ok' : 'champ-off'));
   // "Suggest" because the band is guidance now: the judge is the winning
@@ -345,7 +368,7 @@ function applySection(data, state, commit) {
   wrap.appendChild(line('Rounds', String(n.rounds)));
   wrap.appendChild(line('Winning score wanted', `${toParText(n.target.low)} to ${toParText(n.target.high)}`));
   wrap.appendChild(line('Course difficulty', `${data.difficulty} (at least ${n.minDifficulty})`,
-    data.difficulty >= n.minDifficulty ? 'champ-ok' : 'champ-off'));
+    n.difficultyMet ? 'champ-ok' : 'champ-off'));
   wrap.appendChild(line(`Preparing, ${data.runUpDays} days`,
     `$${(n.prepPerDay * data.runUpDays).toLocaleString()}`));
 
