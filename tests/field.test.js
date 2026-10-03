@@ -106,7 +106,8 @@ test('wind reaches the field', () => {
     windy += playField(makeRng(seed), course(), { setup: 60, handicaps, spread: 1.45 }).averageToPar;
   }
   // Measured over 200 sets of four seeds the gap is 16.98 with a spread of
-  // 1.08: about two strokes a round, so 8 is far from both noise and zero.
+  // 1.08 -- about four strokes a round. 8 asks for two, which is far from
+  // both the noise and zero.
   assert.ok(windy > calm + 8, `windy ${windy / 4} against calm ${calm / 4}`);
 });
 
