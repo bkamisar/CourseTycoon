@@ -4,6 +4,7 @@ import { newGame } from '../src/sim/state.js';
 import { makeHole } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { RUNGS } from '../src/sim/tournaments.js';
+import { newWeek, recordRound, PIN_IDS } from '../src/sim/championshipWeek.js';
 import { computeChampionshipData } from '../src/ui/championship.js';
 
 function championshipResort(seed = 1) {
@@ -132,4 +133,36 @@ test('the buildings say what they cost and whether they stand', () => {
   state.money = 100;
   const broke = computeChampionshipData(state);
   assert.equal(broke.buildings.find((b) => b.id === 'mediaCentre').affordable, false);
+});
+
+test('the apply section quotes the week: rounds, target and difficulty floor', () => {
+  const data = computeChampionshipData(championshipResort(1));
+  assert.equal(data.next.rounds, RUNGS.countyOpen.rounds);
+  assert.deepEqual(data.next.target, RUNGS.countyOpen.target);
+  assert.equal(data.next.minDifficulty, RUNGS.countyOpen.minDifficulty);
+  assert.ok(typeof data.difficulty === 'number');
+});
+
+test('a booked week shows the difficulty against the floor all through the run-up', () => {
+  const state = championshipResort(2);
+  state.tournament = newWeek('countyOpen', state.day + 10);
+  const b = computeChampionshipData(state).booked;
+  assert.equal(b.inWeek, false);
+  assert.equal(b.minDifficulty, RUNGS.countyOpen.minDifficulty);
+  assert.equal(typeof b.difficultyMet, 'boolean');
+});
+
+test("during the week the sheet has the pins, the leader and today's weather", () => {
+  const state = championshipResort(3);
+  let week = newWeek('national', state.day);
+  week = recordRound(week, { handicaps: [0], playerToPar: [4], entry: { pins: 'fair' } });
+  state.tournament = week;
+  const b = computeChampionshipData(state).booked;
+  assert.equal(b.inWeek, true);
+  assert.equal(b.roundsPlayed, 1);
+  assert.equal(b.rounds, 4);
+  assert.equal(b.leaderToPar, 4);
+  assert.equal(b.pins, 'fair');
+  assert.deepEqual(b.pinChoices.map((p) => p.id), [...PIN_IDS]);
+  assert.ok(b.weather.label.length > 2, 'the pins are set against the day they will be played in');
 });

@@ -25,6 +25,12 @@ import {
   CHAMPIONSHIP_BUILDINGS, CHAMPIONSHIP_BUILDING_IDS,
   galleryCapacity, galleryFor, crowdHandledFor,
 } from '../sim/championshipBuildings.js';
+import { courseDifficultyOf } from '../sim/hole.js';
+import {
+  normaliseWeek, weekUnderWay, winningTotal, withPins, PINS, PIN_IDS,
+} from '../sim/championshipWeek.js';
+import { weatherOn, effectsOf } from '../sim/weather.js';
+import { toParText } from './toPar.js';
 import { PALETTE } from '../render/palette.js';
 
 /**
@@ -68,9 +74,15 @@ export function computeChampionshipData(state) {
   const setup = Math.round(state.resort.setup ?? 0);
   const target = Math.round(state.resort.setupTarget ?? 0);
   const band = subject ? RUNGS[subject].band : null;
+  // The course's own design against the rung's floor. Computed once so the
+  // apply section, the run-up and the week all quote the same figure.
+  const rawDifficulty = courseDifficultyOf(openHoles(state));
+  const week = booked ? normaliseWeek(booked) : null;
 
   return {
     money: state.money,
+    // Floored, not rounded: 64.6 against a floor of 65 must not read as met.
+    difficulty: Math.floor(rawDifficulty),
     runUpDays: RUN_UP_DAYS,
     next: nextId
       ? {
@@ -78,6 +90,9 @@ export function computeChampionshipData(state) {
           label: RUNGS[nextId].label,
           blurb: RUNGS[nextId].blurb,
           band: RUNGS[nextId].band,
+          rounds: RUNGS[nextId].rounds,
+          target: RUNGS[nextId].target,
+          minDifficulty: RUNGS[nextId].minDifficulty,
           prepPerDay: RUNGS[nextId].prepPerDay,
           eligible: eligibleFor(nextId, {
             prestige: state.prestige, resort: state.resort, holesOpen,
@@ -94,6 +109,20 @@ export function computeChampionshipData(state) {
           band: RUNGS[booked.rung].band,
           prepPerDay: RUNGS[booked.rung].prepPerDay,
           contract: contractFor(booked.rung),
+          rounds: week.rounds,
+          roundsPlayed: week.roundsPlayed,
+          target: RUNGS[booked.rung].target,
+          minDifficulty: RUNGS[booked.rung].minDifficulty,
+          difficultyMet: rawDifficulty >= RUNGS[booked.rung].minDifficulty,
+          inWeek: weekUnderWay(state),
+          leaderToPar: winningTotal(week),
+          roundLog: week.roundLog,
+          pins: week.roundSettings.pins,
+          pinChoices: PIN_IDS.map((id) => PINS[id]),
+          // Today's, because the pins are set in the morning for the round
+          // about to be played -- and the forecast is the weather, read
+          // early (weather.js), so this cannot disagree with the day.
+          weather: effectsOf(weatherOn(state.weatherSeed ?? 1, state.day)),
         }
       : null,
     dial: {
@@ -197,6 +226,44 @@ function heading(text) {
 }
 
 /**
+ * The morning call. Only while the week is under way: the pins are the
+ * one decision a round asks for, set against the leader and the weather.
+ */
+function weekSection(data, state, commit) {
+  const wrap = document.createElement('div');
+  wrap.className = 'champ-row';
+  const b = data.booked;
+  wrap.appendChild(heading(`${b.label} · Round ${b.roundsPlayed + 1} of ${b.rounds}`));
+  wrap.appendChild(line('Leader', toParText(b.leaderToPar)));
+  wrap.appendChild(line('Target', `${toParText(b.target.low)} to ${toParText(b.target.high)}`));
+  wrap.appendChild(line('Today', `${b.weather.label}`));
+
+  const pins = document.createElement('div');
+  pins.className = 'champ-dial';
+  for (const choice of b.pinChoices) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'champ-step';
+    button.textContent = choice.label;
+    button.setAttribute('aria-pressed', String(choice.id === b.pins));
+    if (choice.id === b.pins) button.classList.add('champ-ok');
+    button.addEventListener('click', () => {
+      const next = structuredClone(state);
+      next.tournament = withPins(normaliseWeek(next.tournament), choice.id);
+      commit(next);
+    });
+    pins.appendChild(button);
+  }
+  wrap.appendChild(pins);
+
+  const note = document.createElement('div');
+  note.className = 'champ-detail';
+  note.textContent = PINS[b.pins].blurb;
+  wrap.appendChild(note);
+  return wrap;
+}
+
+/**
  * The dial. Only drawn while something is booked, because setting a target
  * with nothing to prepare for is a slider that does nothing.
  *
@@ -212,7 +279,11 @@ function dialSection(data, state, commit) {
   wrap.appendChild(heading(`${b.label} · ${b.daysLeft === 0 ? 'today' : `${b.daysLeft} days`}`));
   wrap.appendChild(line('Course is set to', String(data.dial.setup),
     data.dial.inBand ? 'champ-ok' : 'champ-off'));
-  wrap.appendChild(line('They want', `${b.band.low}–${b.band.high}`));
+  // "Suggest" because the band is guidance now: the judge is the winning
+  // total, and the setup is only the usual way of getting the greens there.
+  wrap.appendChild(line('Setup they suggest', `${b.band.low}–${b.band.high}`));
+  wrap.appendChild(line('Course difficulty', `${data.difficulty} (at least ${b.minDifficulty})`,
+    b.difficultyMet ? 'champ-ok' : 'champ-off'));
   wrap.appendChild(line('Preparing costs', `$${b.prepPerDay.toLocaleString()}/day`));
 
   const dial = document.createElement('div');
@@ -271,12 +342,18 @@ function applySection(data, state, commit) {
   }
   wrap.appendChild(line('At best', `$${data.contract.ceiling.toLocaleString()}`, 'champ-ok'));
   wrap.appendChild(line('Course wanted at', `${n.band.low}–${n.band.high}`));
+  wrap.appendChild(line('Rounds', String(n.rounds)));
+  wrap.appendChild(line('Winning score wanted', `${toParText(n.target.low)} to ${toParText(n.target.high)}`));
+  wrap.appendChild(line('Course difficulty', `${data.difficulty} (at least ${n.minDifficulty})`,
+    data.difficulty >= n.minDifficulty ? 'champ-ok' : 'champ-off'));
   wrap.appendChild(line(`Preparing, ${data.runUpDays} days`,
     `$${(n.prepPerDay * data.runUpDays).toLocaleString()}`));
 
   const gate = document.createElement('div');
   gate.className = 'champ-detail';
-  gate.textContent = 'Miss the band and the week pays the base fee alone — the other three are earned on top of a course that was actually set for a championship, not instead of one.';
+  gate.textContent = 'Judged on the winning score: it has to land in the range above. Miss it, or turn up '
+    + 'on the first morning with the course easier than they asked for, and the week pays the base fee '
+    + 'alone. You can redesign during the run-up; the course is locked once the first round starts.';
   wrap.appendChild(gate);
 
   const apply = document.createElement('button');
@@ -371,8 +448,12 @@ export function mountChampionshipSheet(sheetHost, { state, onChange }) {
         };
 
         // The dial first when there is one, because a booked championship
-        // is the live decision and the rest is planning.
-        if (data.booked) body.appendChild(dialSection(data, current, commit));
+        // is the live decision and the rest is planning. Under way, the
+        // morning's pin call comes above it.
+        if (data.booked?.inWeek) {
+          body.appendChild(weekSection(data, current, commit));
+          body.appendChild(dialSection(data, current, commit));
+        } else if (data.booked) body.appendChild(dialSection(data, current, commit));
         else if (data.next) body.appendChild(applySection(data, current, commit));
         else {
           const done = document.createElement('div');

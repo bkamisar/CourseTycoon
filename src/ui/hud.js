@@ -21,6 +21,9 @@
 import { PALETTE } from '../render/palette.js';
 import { RUNGS, withinBand } from '../sim/tournaments.js';
 import { openHoles } from '../sim/state.js';
+import { courseDifficultyOf } from '../sim/hole.js';
+import { normaliseWeek, weekUnderWay, winningTotal } from '../sim/championshipWeek.js';
+import { toParText } from './toPar.js';
 import { courseRating } from '../sim/ratings.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 
@@ -32,6 +35,12 @@ import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
  * three weeks long and the one thing a player needs to glance at is
  * whether the crew are heading for a number that will score.
  *
+ * The judge is now the winning total on a course hard enough for the rung,
+ * so the run-up readout carries the course's difficulty against the floor
+ * beside the setup (which is guidance now), and once the week is under way
+ * it switches to the round, the leader and the target -- the thing being
+ * judged.
+ *
  * Null for an unknown rung rather than throwing. This is drawn every
  * frame, and a save from a future version should not be the thing that
  * takes the game down.
@@ -41,13 +50,25 @@ function tournamentReadout(state) {
   if (!booked || booked.resolved) return null;
   const rung = RUNGS[booked.rung];
   if (!rung) return null;
+  const week = normaliseWeek(booked);
   const setup = Math.round(state.resort.setup ?? 0);
+  const rawDifficulty = courseDifficultyOf(openHoles(state));
   return {
     label: rung.label,
     daysLeft: Math.max(0, booked.day - state.day),
     setup,
     inBand: withinBand(setup, rung.band),
     band: rung.band,
+    // Floored, not rounded: 64.6 against a floor of 65 must not print as
+    // "65" beside a warning colour.
+    difficulty: Math.floor(rawDifficulty),
+    minDifficulty: rung.minDifficulty,
+    difficultyMet: rawDifficulty >= rung.minDifficulty,
+    inWeek: weekUnderWay(state),
+    round: week.roundsPlayed + 1,
+    rounds: week.rounds,
+    leaderToPar: winningTotal(week),
+    target: rung.target,
   };
 }
 
@@ -247,15 +268,21 @@ export function mountHud(root) {
     // ask what it meant, which is the whole test a HUD label has to pass.
     ratings.textContent = `Happy ${satText} · CR ${data.courseRating} · Prestige ${data.prestige} · Turf ${data.turfQuality}`;
 
-    // The championship, with the band beside it -- the number alone does
-    // not tell the player whether it is the right number.
+    // The championship, with what it is judged on beside it -- the number
+    // alone does not tell the player whether it is the right number.
     if (data.tournament) {
       const t = data.tournament;
-      const when = t.daysLeft === 0 ? 'today' : `${t.daysLeft}d`;
-      tournament.textContent =
-        `${t.label} ${when} · setup ${t.setup} (want ${t.band.low}-${t.band.high})`;
+      if (t.inWeek) {
+        tournament.textContent = `${t.label} · Round ${t.round} of ${t.rounds} · `
+          + `leads ${toParText(t.leaderToPar)} (target ${toParText(t.target.low)} to ${toParText(t.target.high)})`;
+        tournament.classList.remove('hud-tournament--off');
+      } else {
+        const when = t.daysLeft === 0 ? 'today' : `${t.daysLeft}d`;
+        tournament.textContent = `${t.label} ${when} · setup ${t.setup} (want ${t.band.low}-${t.band.high})`
+          + ` · course ${t.difficulty}/${t.minDifficulty}`;
+        tournament.classList.toggle('hud-tournament--off', !t.inBand || !t.difficultyMet);
+      }
       tournament.hidden = false;
-      tournament.classList.toggle('hud-tournament--off', !t.inBand);
     } else {
       tournament.hidden = true;
     }
