@@ -728,9 +728,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 The band is still the judge in this task; Task 5 swaps it. Doing the week first keeps every step green.
 
 **Files:**
-- Modify: `src/sim/tournaments.js` (`bidFor`)
 - Modify: `src/sim/day.js` (imports; the `if (championshipToday)` block at ~697-779; the `return` at ~1039)
-- Test: `tests/tournamentDay.test.js`, `tests/tournaments.test.js`
+- Test: `tests/tournamentDay.test.js`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -857,49 +856,16 @@ test('the week\'s pace is every round, not the last', () => {
 });
 ```
 
-In `tests/tournaments.test.js`, extend `'winning a bid books a date three weeks out'`:
-
-```js
-  assert.equal(booked.rounds, RUNGS.regional.rounds, 'the booking is the whole week');
-  assert.equal(booked.roundsPlayed, 0);
-  assert.equal(booked.roundSettings.pins, 'fair');
-```
+(The `bidFor` assertions on `rounds`, `roundsPlayed` and `pins` were added in Task 2.)
 
 - [ ] **Step 2: Run and see them fail**
 
 Run: `node --test tests/tournamentDay.test.js tests/tournaments.test.js`
-Expected: FAIL — `report.tournamentRound` undefined; the county week resolves after one round; `booked.rounds` undefined.
+Expected: FAIL — `report.tournamentRound` undefined; the county week resolves after one round.
 
 - [ ] **Step 3: Implement**
 
-In `src/sim/tournaments.js`: import `newWeek` would create a cycle (`championshipWeek.js` imports `RUNGS` from here). Build the shape inline instead and note why:
-
-```js
-  // The whole week, not only the date. Built here rather than through
-  // `newWeek` because championshipWeek.js imports this file; the two must
-  // agree, and tests/championshipWeek.test.js checks a booking against
-  // `newWeek` so they cannot drift.
-  return {
-    rung: rungId, day: state.day + RUN_UP_DAYS, resolved: false,
-    rounds: rung.rounds, roundsPlayed: 0, roundSettings: { pins: 'fair' },
-    field: null, roundLog: [], difficulty: null, difficultyMet: null,
-  };
-```
-
-and add that check to `tests/championshipWeek.test.js`:
-
-```js
-import { bidFor } from '../src/sim/tournaments.js';
-
-test('a booking from bidFor is a new week', () => {
-  const state = {
-    day: 10, prestige: 90, act: 3, tournament: null,
-    resort: { amenities: [] }, tournamentsHosted: [],
-  };
-  const booked = bidFor(state, 'countyOpen', { holesOpen: 18 });
-  assert.deepEqual(booked, newWeek('countyOpen', booked.day));
-});
-```
+`bidFor` already returns `newWeek(...)` (done during Task 2's review), so `tournaments.js` needs no change here.
 
 In `src/sim/day.js`:
 
@@ -1050,7 +1016,7 @@ Sabotage: in the `weekFinished` branch, swap the condition (`if (weekFinished(pl
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/sim/tournaments.js src/sim/day.js tests/tournamentDay.test.js tests/tournaments.test.js tests/championshipWeek.test.js
+git add src/sim/day.js tests/tournamentDay.test.js
 git commit -m "Play a championship as a week of rounds, with the field on the playback
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
