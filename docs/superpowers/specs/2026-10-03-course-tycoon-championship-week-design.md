@@ -99,8 +99,14 @@ ignoring it is a legitimate way to play.
 
 Implemented as a **handicap adjustment added to the setup's own** in
 `playField` — the same mechanism the setup dial already uses, so pins and setup
-are one scale. Starting values: easy −1.5, fair 0, tough +1.5, brutal +3
-handicap points, against the setup's 0–8.7. Calibrated in the plan.
+are one scale: easy −0.75, fair 0, tough +0.75, brutal +1.5 handicap points,
+against the setup's 0–8.7.
+
+**Measured, 2026-10-03.** The first values tried (−1.5 / 0 / +1.5 / +3) let
+brutal pins on an unconditioned County course land almost exactly where a
+properly set one did — the free ride, reopened. At the values above, an
+unconditioned course with brutal pins every round hit the County range in 13%
+of 24 seeds and the Regional and National in none.
 
 **The rule that keeps the free ride closed:** the whole span of the pins (easy
 to brutal) must be smaller than the difference between an unconditioned course
@@ -235,11 +241,39 @@ not guessed. Per rung:
 - **Centre:** the median winning total across at least sixteen seeds on a
   course at the rung's minimum difficulty, with the setup at the band's
   midpoint, fair pins every round, and the seeds' own weather.
-- **Width:** chosen so that the centre's own setup with fair pins lands in range
-  at least 75% of the time, and a setup fifteen points below the band's low edge
-  lands in range no more than 20% of the time even with the best pin choices.
+- **Width:** ±3 strokes either side of the centre.
 
-The plan records the measured ranges and the seeds they came from.
+The winner of a sixty-player field is noisy — the same setup and pins put the
+National winner anywhere from +7 to +18 across seeds — so no fixed pin choice
+can be judged fairly on its own. The skill is reacting: reading the leader each
+evening and setting tomorrow's pins against where the winning score is heading.
+The criteria are written for that:
+
+| Policy, on a course at the rung's minimum difficulty | Lands in range |
+|---|---|
+| Band midpoint, reacting to the leader each morning | ≥ 80% |
+| Band midpoint, fair pins all week | ≥ 60% |
+| Unconditioned (setup 0), brutal pins all week | ≤ 15% |
+| Setup 100, easy pins all week — County and Regional only | ≤ 25% |
+
+Measured on 24 seeds with a simplified field (no weather, no turf effect):
+
+| Rung | Course difficulty | Centre | Range | Midpoint, reacting | Midpoint, fair | Setup 0, brutal |
+|---|---|---|---|---|---|---|
+| County Open | 45.5 | −1 | −4 to +2 | 96% | 92% | 13% |
+| Regional | 54.0 | +5 | +2 to +8 | 88% | 75% | 0% |
+| National | 64.4 | +15 | +12 to +18 | 83% | 75% | 0% |
+
+These are the starting values. The plan re-measures them on the real field
+(weather and turf included) and adjusts the centre if it has moved.
+
+**Two limits, stated rather than hidden.** Overcooking cannot be made to fail
+at the National: its band tops out at 92 and the dial at 100, so there is no
+room to overcook into — setup 100 with easy pins landed in range 63% of the
+time, and that is accepted. And at the County Open a half-conditioned course
+(setup 22) rescued by brutal pins landed in range 71% of the time; the County
+band is low enough that pins cover half of it. Accepted at the bottom rung,
+where the stakes are smallest. Neither holds at the Regional or the National.
 
 Calibrating at the minimum means a course built well past it has to set up
 softer, or it overshoots the range. The band is advice for a course at the
@@ -295,14 +329,14 @@ The invitation card and the act-passed card are unchanged.
 
 Each a test or a recorded measurement, verified by sabotage where it is a test:
 
-1. **Free ride still dead.** Bid, never condition, brutal pins every round, on
-   a course at the rung's minimum → winner out of range at every rung, across
-   seeds.
-2. **Overcooking still fails.** Setup well past the band, easy pins every
-   round → out of range.
-3. **Reachable.** Band midpoint, fair pins → in range at the calibrated rate.
-4. **Pins matter but cannot rescue.** The pin span moves the winning total by a
-   stroke or two per round, and is smaller than the gap tested in 1.
+1. **Free ride still dead.** Unconditioned, brutal pins every round, on a
+   course at the rung's minimum → in range on at most 15% of seeds.
+2. **Overcooking still fails** at the County and Regional: setup 100, easy pins
+   every round → in range on at most 25% of seeds.
+3. **Reachable.** Band midpoint, reacting to the leader → at least 80%; fair
+   pins all week → at least 60%.
+4. **Pins matter.** Same seed and setup, brutal against easy, moves the field's
+   average by more than a stroke a round.
 5. **Weather reaches the field.** Same seed, same setup, blowy vs clear → the
    blowy round averages higher.
 6. **Mid-week save/load.** A state serialised after round 2 of 4 reloads and
