@@ -46,12 +46,16 @@ const ROUGH_SPREAD = 1.28;
  * off whatever the leader says, because wind does the pins' job for them
  * and brutal pins in a gale wreck the pace.
  *
- * Easing starts a stroke over schedule, not two. Measured on 120 seeds
- * (2026-10-03, weather at half strength on the field), against 72 variants
- * of these cut-offs: easing at +1 took the Regional from 80% to 83% and the
- * National from 76% to 78%, and cost the County nothing (88%). No variant
- * reached 80% at the National -- the best was 79% -- so that rung's limit
- * is the lever, not the policy, and the author accepted it.
+ * Easing starts a stroke over schedule, not two. Chosen on 120 tuning
+ * seeds (2026-10-03, weather at half strength on the field) from 72
+ * variants of these cut-offs: easing at +1 took the Regional from 80% to
+ * 83% and the National from 76% to 78% there, and cost the County nothing
+ * (88%). On 120 held-out seeds it makes no difference: County 92% either
+ * way, Regional 76% against 77%, National 75% either way. So the gain was
+ * the tuning seeds', not the policy's; it is kept because it is no worse
+ * and reads as what a host would do. No variant reached 80% at the
+ * National -- the best was 79%, on the tuning seeds -- so that rung's
+ * limit is the lever, not the policy, and the author accepted it.
  */
 export function reactivePins({ week, spread = 1 }) {
   const target = RUNGS[week.rung].target;

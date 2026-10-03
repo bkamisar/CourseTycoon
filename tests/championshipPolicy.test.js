@@ -77,9 +77,8 @@ test('a leader on schedule gets fair pins, and one running high gets easy ones',
   // 4 is 0.25 under and 5 is 0.75 over: on schedule, either way.
   assert.equal(reactivePins({ week: nationalAfterOne(4), spread: CALM }), 'fair');
   assert.equal(reactivePins({ week: nationalAfterOne(5), spread: CALM }), 'fair');
-  // 6 is 1.75 over. Easing starts a stroke over schedule, not two:
-  // measured, it lifted the Regional's reacting rate from 80% to 83% on
-  // 120 seeds.
+  // 6 is 1.75 over. Easing starts a stroke over schedule, not two (see
+  // reactivePins for what that was measured to do, and not do).
   assert.equal(reactivePins({ week: nationalAfterOne(6), spread: CALM }), 'easy');
 });
 

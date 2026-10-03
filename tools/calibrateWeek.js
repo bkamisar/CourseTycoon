@@ -9,17 +9,28 @@
  *   setup 0, brutal pins all week            <= 15%
  *   setup 100, easy pins -- County, Regional <= 25%
  *
- * The National's reacting rate is an accepted miss (about 78%); the
- * results and why are recorded above RUNGS in src/sim/tournaments.js.
+ * Prints two tables: the tuning seeds the centres and the host's pin
+ * cut-offs were chosen on, and held-out seeds nothing was chosen on. Quote
+ * the held-out one. On it (2026-10-03, 120 seeds):
+ *
+ *               reacting  fair  setup 0 brutal  setup 100 easy
+ *   County         92%     83%        8%             30%
+ *   Regional       76%     68%        0%             24%
+ *   National       75%     53%        0%             62% (not judged)
+ *
+ * Four of those fall short of the criteria -- County overcooked, Regional
+ * and National reacting, National fair -- and are stated limits in the
+ * spec; the full record is above RUNGS in src/sim/tournaments.js.
  *
  * Plays the week through `playField` and `recordRound` directly rather
  * than through `runDay`: the field is the whole question, and a resort
  * around it would only add noise and minutes. Weather is the real
  * weather for each day, handed over raw exactly as day.js does, and
- * `playField` damps it to the field's strength -- so wind and rain are in
- * the numbers the way they are in the game.
+ * `playField` damps its spread to the field's strength -- so wind and rain
+ * are in the numbers the way they are in the game. Turf is held at 90: it
+ * moves the field only about 0.2 strokes across its whole range.
  *
- * Short-running (about 20 seconds at 120 seeds), so no checkpointing.
+ * Short-running (about 40 seconds for both tables), so no checkpointing.
  *
  *   node tools/calibrateWeek.js
  */
@@ -34,12 +45,21 @@ import { pathToFileURL } from 'node:url';
 import { narrowToDifficulty, reactivePins } from './championshipPolicy.js';
 
 /**
- * A hundred and twenty seeds. Twenty-four were tried first and were a
- * lottery: on a second set of twenty-four the same configuration's rates
- * moved by twenty to forty points (the County free ride read 38% on one
- * set and 8% on the other). At 120 a rate is good to about four points.
+ * The tuning seeds: the centres and the host's pin cut-offs were chosen on
+ * these, so rates read on them flatter. A hundred and twenty, because
+ * twenty-four were a lottery: on a second set of twenty-four the same
+ * configuration's rates moved by twenty to forty points (the County free
+ * ride read 38% on one set and 8% on the other).
  */
 export const SEEDS = Array.from({ length: 120 }, (_, i) => (i + 1) * 101);
+
+/**
+ * A hundred and twenty seeds nothing was chosen on: the rates to quote.
+ * Even these are only good to about four points (one standard error of
+ * one fixed configuration on 120 seeds). Never re-tune a centre or a
+ * cut-off against them, or they stop being held out.
+ */
+export const HOLDOUT = Array.from({ length: 120 }, (_, i) => (i + 121) * 101);
 
 /** The template rotation an untouched resort is built from, narrowed to a
  * rung's minimum the way a host would. */
@@ -90,21 +110,27 @@ function median(values) {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
-function main() {
+function table(label, seeds) {
+  console.log(`\n=== ${label} (${seeds.length} seeds)`);
   for (const rungId of RUNG_IDS) {
     const rung = RUNGS[rungId];
     const holes = courseFor(rungId);
     const mid = Math.round((rung.band.low + rung.band.high) / 2);
-    const centre = median(SEEDS.map((seed) =>
+    const centre = median(seeds.map((seed) =>
       simulateWeek(holes, { rungId, setup: mid, policy: POLICIES.fair, seed })));
-    const rate = (setup, policy) => `${Math.round(100 * hitRate(rungId, { setup, policy, holes }))}%`;
+    const rate = (setup, policy) => `${Math.round(100 * hitRate(rungId, { setup, policy, seeds, holes }))}%`;
     console.log(`\n${rung.label}: target ${rung.target.low} to ${rung.target.high}, `
-      + `measured centre ${centre} (fair pins at setup ${mid})`);
+      + `median winner ${centre} (fair pins at setup ${mid})`);
     console.log(`  midpoint, reacting  ${rate(mid, POLICIES.reacting)}   (want >= 80%)`);
     console.log(`  midpoint, fair      ${rate(mid, POLICIES.fair)}   (want >= 60%)`);
     console.log(`  setup 0, brutal     ${rate(0, POLICIES.brutal)}   (want <= 15%)`);
     console.log(`  setup 100, easy     ${rate(100, POLICIES.easy)}   (want <= 25%, County and Regional)`);
   }
+}
+
+function main() {
+  table('Tuning seeds -- the centres were chosen here, so these flatter', SEEDS);
+  table('Held-out seeds -- the rates to quote', HOLDOUT);
 }
 
 // Run as a script, not when a test imports it.

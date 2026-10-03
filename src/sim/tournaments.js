@@ -30,35 +30,43 @@ export const CHAMPIONSHIP_HOLES = 18;
  *
  * `target` is the winning total to par after the last round, and each
  * range is a centre plus or minus three strokes. Measured on the real field
- * (`node tools/calibrateWeek.js`, 2026-10-03): 120 seeds, each with its own
- * weather at the field's half strength (FIELD_WEATHER_EFFECT in field.js),
- * turf 90, on the template course narrowed to the rung's minimum. "Median"
- * is the winner with fair pins at the band's midpoint; the four rates are
- * how often each way of playing the week lands in range.
+ * (`node tools/calibrateWeek.js`, 2026-10-03): each seed with its own
+ * weather (its spread at the field's half strength, FIELD_WEATHER_EFFECT in
+ * field.js), turf 90, on the template course narrowed to the rung's
+ * minimum. "Median" is the winner with fair pins at the band's midpoint;
+ * the four rates are how often each way of playing the week lands in range.
+ *
+ * The centres (and the host's pin cut-offs) were chosen on 120 tuning
+ * seeds: centres from two under the median to two over were tried at each
+ * rung, and County 0 and Regional +5 were the only ones that met every
+ * criterion there; National +17 was the best of its five. Rates read on
+ * the seeds they were chosen on flatter, so these are 120 HELD-OUT seeds
+ * nothing was chosen on, each rate good to about four points (one
+ * standard error of a fixed configuration on 120 seeds):
  *
  *                course  centre  median  reacting  fair  setup 0   setup 100
  *                                        (mid)     (mid) brutal    easy
- *   County        45.2      0      -1      88%     85%    13%       24%
- *   Regional      55.2     +5      +6      83%     72%     1%       24%
- *   National      65.0    +17     +16      78%     61%     0%       70%
+ *   County        45.2      0      -1      92%     83%     8%       30%
+ *   Regional      55.2     +5      +5      76%     68%     0%       24%
+ *   National      65.0    +17     +16      75%     53%     0%       62%
+ *
+ * (On the tuning seeds: County 88/85/13/24, Regional 83/72/1/24, National
+ * 78/61/0/70.)
  *
  * The spec asks for reacting >= 80%, fair >= 60%, setup 0 brutal <= 15%,
  * setup 100 easy <= 25% (County and Regional only: the National's band
- * tops out at 92, so there is no room to overcook into). Centres from two
- * under the median to two over were tried at each rung; County 0 and
- * Regional +5 are the only ones that meet every criterion. The National's
- * reacting rate is the one miss, accepted by the author: across 72
- * variants of the host's pin cut-offs it never reached 80% (best 79%), so
- * the limit is how far pins can move a four-round week, not the host.
- *
- * Moving a centre onto its median does not help. County -1 lets the free
- * ride in (28%), Regional +6 the overcooked week (28%), and National +16
- * drops reacting to 73%.
+ * tops out at 92, so there is no room to overcook into). Held out, four
+ * fall short, and all four are stated limits in the spec (§8): the
+ * County's overcooked week (30%), the Regional's and National's reacting
+ * rates (76%, 75%) and the National's fair-pins rate (53%). The
+ * National's reacting rate never reached 80% across 72 variants of the
+ * host's pin cut-offs (best 79%, tuning seeds): pins move a four-round
+ * week only so far.
  *
  * An earlier measurement on a simplified field (no weather, no turf
  * effect, 24 seeds) put the centres at -1, +5 and +15. With the day's
- * weather at full strength, the County's free ride rose to 20% and the
- * Regional's overcooked week to 49% -- see FIELD_WEATHER_EFFECT.
+ * weather at full strength the County's free ride rose to 26% held out
+ * (20% tuning) -- see FIELD_WEATHER_EFFECT.
  *
  * `minDifficulty` is the course's own design, `courseDifficultyOf`. The
  * template rotation an untouched resort is built from measures 40.8;

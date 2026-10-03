@@ -180,22 +180,29 @@ honestly (`weather.js`: the forecast *is* the weather, read early). Today
 It now passes the day's `sky.spread` and `sky.pace`. Wind and rain push the
 field's scores up and slow its rounds; clear days play easy and fast.
 
-**At half strength.** The field feels half of the day's weather
-(`FIELD_WEATHER_EFFECT = 0.5` in `field.js`: a multiplier `x` plays as
-`1 + (x − 1) × 0.5`, for spread and pace alike). The resort's own golfers feel
-all of it. The fiction is that tour players flight the ball under the wind; the
-reason is the judge. At full strength the weather doubled the spread of the
-winning total — a County week set properly landed anywhere from −6 to +6
-against −4 to +2 in calm — and the weeks the target has to tell apart smeared
-into each other. On 120 seeds, with every centre tried, the County's free ride
-(setup 0, brutal pins) hit the range 20% of the time and the Regional's
-overcooked week (setup 100, easy pins) 49%. At half strength both pass (13%,
-24%). A third was worse than a half: it tightened the bad weeks along with the
-good, and each rung failed one criterion. Raising the County band instead
-(55–70) did not help — the free-ride and overcooked weeks do not depend on the
-band, so it only slid the well-run week toward the overcooked one.
+**Scores at half strength, pace at full.** The field's scores feel half of the
+day's wind and rain (`FIELD_WEATHER_EFFECT = 0.5` in `field.js`: a spread `x`
+plays as `1 + (x − 1) × 0.5`). The resort's own golfers feel all of it. The
+fiction is that tour players flight the ball under the wind; the reason is the
+judge. At full strength the weather doubled the spread of the winning total — a
+County week set properly landed anywhere from −6 to +6 against −4 to +2 in calm
+— and the weeks the target has to tell apart smeared into each other. At the
+best centres found on 120 tuning seeds and checked on 120 held-out ones, full
+strength let the County's free ride (setup 0, brutal pins) into range 26% of the
+time held out (20% tuning) and the Regional's overcooked week (setup 100, easy
+pins) 33–43%; at half strength those are 8% and 24%. A third against a half was
+a wash held out — better at the County, worse at the Regional — so half was
+kept. Raising the County band instead (55–70) did not help: the free-ride and
+overcooked weeks do not depend on the band, so it only slid the well-run week
+toward the overcooked one.
 
-`playField` applies it to whatever it is handed, so `day.js` and the
+**Pace is not damped.** The judge needed the scoring spread tightened; nothing
+asked for faster rounds. Damping pace too (as the first version did) quietly
+made the pace condition far easier: at the Regional, against a 288-minute
+target, a blowy round averaged 302 minutes damped and 321 whole, a rainy one 313
+against 347. Rain slows a championship as much as a Tuesday.
+
+`playField` applies this to whatever it is handed, so `day.js` and the
 calibration both pass the raw sky and cannot disagree.
 
 This is what makes the morning call a decision rather than "fair, every day".
@@ -266,8 +273,8 @@ not guessed. Per rung:
 - **Width:** ±3 strokes either side of the centre.
 
 The winner of a sixty-player field is noisy — the same setup and pins put the
-National winner anywhere from +3 to +22 across seeds, +11 to +19 for the
-middle eighty per cent — so no fixed pin choice
+National winner anywhere from +5 to +26 across held-out seeds, +11 to +21 for
+the middle eighty per cent — so no fixed pin choice
 can be judged fairly on its own. The skill is reacting: reading the leader each
 evening and setting tomorrow's pins against where the winning score is heading.
 The criteria are written for that:
@@ -279,40 +286,61 @@ The criteria are written for that:
 | Unconditioned (setup 0), brutal pins all week | ≤ 15% |
 | Setup 100, easy pins all week — County and Regional only | ≤ 25% |
 
-Measured on the real field, 2026-10-03 (`node tools/calibrateWeek.js`): 120
-seeds, each with its own weather at the field's half strength (§6), turf 90,
-the reacting host from `tools/championshipPolicy.js`:
+Measured on the real field, 2026-10-03 (`node tools/calibrateWeek.js`): each
+seed with its own weather (scoring spread at the field's half strength, §6),
+turf 90, the reacting host from `tools/championshipPolicy.js`.
+
+The centres and the host's pin cut-offs were **chosen** on 120 tuning seeds:
+centres from two under the median to two over were tried at each rung, and
+County 0 and Regional +5 were the only ones meeting every criterion there,
+National +17 the best of its five. Rates read on the seeds they were chosen on
+flatter, so the table is 120 **held-out** seeds nothing was chosen on. Each
+rate there is good to about four points (one standard error of one fixed
+configuration on 120 seeds):
 
 | Rung | Course difficulty | Median winner | Centre | Range | Midpoint, reacting | Midpoint, fair | Setup 0, brutal | Setup 100, easy |
 |---|---|---|---|---|---|---|---|---|
-| County Open | 45.2 | −1 | 0 | −3 to +3 | 88% | 85% | 13% | 24% |
-| Regional | 55.2 | +6 | +5 | +2 to +8 | 83% | 72% | 1% | 24% |
-| National | 65.0 | +16 | +17 | +14 to +20 | 78% | 61% | 0% | 70% (not judged) |
+| County Open | 45.2 | −1 | 0 | −3 to +3 | 92% | 83% | 8% | 30% |
+| Regional | 55.2 | +5 | +5 | +2 to +8 | 76% | 68% | 0% | 24% |
+| National | 65.0 | +16 | +17 | +14 to +20 | 75% | 53% | 0% | 62% (not judged) |
 
-Centres from two under the median to two over were tried at each rung; County
-0 and Regional +5 are the only ones that meet every criterion, and National +17
-the best of its five. Moving a centre onto its median does not help: County −1
-lets the free ride in (28%), Regional +6 the overcooked week (28%), National +16
-drops reacting to 73%.
+On the tuning seeds the same centres read County 88/85/13/24, Regional
+83/72/1/24, National 78/61/0/70.
 
 Twenty-four seeds were tried first and were a lottery: on a second set of
 twenty-four the same configuration's rates moved by twenty to forty points.
 An earlier measurement on a simplified field (no weather, no turf effect, 24
 seeds) had put the centres at −1, +5 and +15.
 
-**Three limits, stated rather than hidden.** Overcooking cannot be made to fail
-at the National: its band tops out at 92 and the dial at 100, so there is no
-room to overcook into — setup 100 with easy pins lands in range 70% of the
-time, and that is accepted. The National's reacting rate is about 78%, short of
-the 80% asked: across 72 variants of the host's pin cut-offs it never reached
-80% (best 79%), so the limit is how far pins can move a four-round week, not
-the host, and the author accepted it. And at the County Open a half-conditioned
-course (setup 22) rescued by brutal pins lands in range 64% of the time; the
-County band is low enough that pins cover half of it. Accepted at the bottom
-rung, where the stakes are smallest. At the National the same trick (setup 43)
-lands 5% of the time. At the Regional (setup 35) it lands 45% of the time on
-the real field — this was believed not to hold there, and is raised with the
-author rather than settled here.
+**Limits, stated rather than hidden.** Held out, four rates fall short of the
+criteria above, and a fifth case is weaker than this spec first claimed. All
+accepted:
+
+- **Overcooking at the National cannot be made to fail.** Its band tops out at
+  92 and the dial at 100, so there is no room to overcook into — setup 100 with
+  easy pins lands in range 62% of the time held out.
+- **Reacting falls short at the Regional (76%) and the National (75%).** Across
+  72 variants of the host's pin cut-offs the National never reached 80% (best
+  79%, on the tuning seeds); pins move a three- or four-round week only so far,
+  and the limit is the lever, not the host.
+- **The National's fair-pins rate is 53%,** short of 60%. Its winner is the
+  noisiest of the three (+11 to +21 for the middle eighty per cent of seeds), so
+  a week left at fair pins is the one most at the weather's mercy — which is the
+  case for reacting.
+- **The County's overcooked week lands in range 30% of the time,** against 25%.
+  Over two rounds an overcooked course with easy pins finishes only about six
+  strokes above a well-set one (median +5 against −1), so its better weeks
+  reach the top of the range.
+- **A half-conditioned course rescued by brutal pins.** At the County Open
+  (setup 22) it lands in range 68% of the time held out; the County band is low
+  enough that pins cover half of it, accepted at the bottom rung where the
+  stakes are smallest. At the Regional (setup 35) it lands 56% held out — this
+  spec first said it did not hold there. It saves no money: the conditioning
+  bill and the care diversion are the same at any target above zero. What it
+  saves is crew — a crew too small to reach the band in time can still be
+  rescued by brutal pins about half the time — plus a little less trade lost
+  during the run-up and a little less turf wear on the round days. At the
+  National (setup 43) it lands 7% of the time.
 
 Calibrating at the minimum means a course built well past it has to set up
 softer, or it overshoots the range. The band is advice for a course at the
@@ -373,8 +401,9 @@ Each a test or a recorded measurement, verified by sabotage where it is a test:
 2. **Overcooking still fails** at the County and Regional: setup 100, easy pins
    every round → in range on at most 25% of seeds.
 3. **Reachable.** Band midpoint, reacting to the leader → at least 80%; fair
-   pins all week → at least 60%. The National's reacting rate (about 78%) is
-   an accepted limit (§8).
+   pins all week → at least 60%. Held out, the Regional's and National's
+   reacting rates and the National's fair-pins rate fall short; accepted limits
+   (§8).
 4. **Pins matter.** Same seed and setup, brutal against easy, moves the field's
    average by more than a stroke a round.
 5. **Weather reaches the field.** Same seed, same setup, blowy vs clear → the
