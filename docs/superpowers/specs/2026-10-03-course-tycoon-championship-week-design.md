@@ -180,6 +180,24 @@ honestly (`weather.js`: the forecast *is* the weather, read early). Today
 It now passes the day's `sky.spread` and `sky.pace`. Wind and rain push the
 field's scores up and slow its rounds; clear days play easy and fast.
 
+**At half strength.** The field feels half of the day's weather
+(`FIELD_WEATHER_EFFECT = 0.5` in `field.js`: a multiplier `x` plays as
+`1 + (x − 1) × 0.5`, for spread and pace alike). The resort's own golfers feel
+all of it. The fiction is that tour players flight the ball under the wind; the
+reason is the judge. At full strength the weather doubled the spread of the
+winning total — a County week set properly landed anywhere from −6 to +6
+against −4 to +2 in calm — and the weeks the target has to tell apart smeared
+into each other. On 120 seeds, with every centre tried, the County's free ride
+(setup 0, brutal pins) hit the range 20% of the time and the Regional's
+overcooked week (setup 100, easy pins) 49%. At half strength both pass (13%,
+24%). A third was worse than a half: it tightened the bad weeks along with the
+good, and each rung failed one criterion. Raising the County band instead
+(55–70) did not help — the free-ride and overcooked weeks do not depend on the
+band, so it only slid the well-run week toward the overcooked one.
+
+`playField` applies it to whatever it is handed, so `day.js` and the
+calibration both pass the raw sky and cannot disagree.
+
 This is what makes the morning call a decision rather than "fair, every day".
 With the forecast showing a blowy Saturday after a calm Friday that left the
 leader tracking low, the player has a real question: tough pins to drag the
@@ -241,13 +259,15 @@ the band's 40% share.
 Calibrated by measurement, the way the setup bands and the field's divisor were,
 not guessed. Per rung:
 
-- **Centre:** the median winning total across at least sixteen seeds on a
-  course at the rung's minimum difficulty, with the setup at the band's
-  midpoint, fair pins every round, and the seeds' own weather.
+- **Centre:** near the median winning total on a course at the rung's minimum
+  difficulty, with the setup at the band's midpoint, fair pins every round,
+  and the seeds' own weather — moved by a stroke where that is what meets the
+  criteria below.
 - **Width:** ±3 strokes either side of the centre.
 
 The winner of a sixty-player field is noisy — the same setup and pins put the
-National winner anywhere from +7 to +18 across seeds — so no fixed pin choice
+National winner anywhere from +3 to +22 across seeds, +11 to +19 for the
+middle eighty per cent — so no fixed pin choice
 can be judged fairly on its own. The skill is reacting: reading the leader each
 evening and setting tomorrow's pins against where the winning score is heading.
 The criteria are written for that:
@@ -259,24 +279,40 @@ The criteria are written for that:
 | Unconditioned (setup 0), brutal pins all week | ≤ 15% |
 | Setup 100, easy pins all week — County and Regional only | ≤ 25% |
 
-Measured on 24 seeds with a simplified field (no weather, no turf effect):
+Measured on the real field, 2026-10-03 (`node tools/calibrateWeek.js`): 120
+seeds, each with its own weather at the field's half strength (§6), turf 90,
+the reacting host from `tools/championshipPolicy.js`:
 
-| Rung | Course difficulty | Centre | Range | Midpoint, reacting | Midpoint, fair | Setup 0, brutal |
-|---|---|---|---|---|---|---|
-| County Open | 45.5 | −1 | −4 to +2 | 96% | 92% | 13% |
-| Regional | 54.0 | +5 | +2 to +8 | 88% | 75% | 0% |
-| National | 64.4 | +15 | +12 to +18 | 83% | 75% | 0% |
+| Rung | Course difficulty | Median winner | Centre | Range | Midpoint, reacting | Midpoint, fair | Setup 0, brutal | Setup 100, easy |
+|---|---|---|---|---|---|---|---|---|
+| County Open | 45.2 | −1 | 0 | −3 to +3 | 88% | 85% | 13% | 24% |
+| Regional | 55.2 | +6 | +5 | +2 to +8 | 83% | 72% | 1% | 24% |
+| National | 65.0 | +16 | +17 | +14 to +20 | 78% | 61% | 0% | 70% (not judged) |
 
-These are the starting values. The plan re-measures them on the real field
-(weather and turf included) and adjusts the centre if it has moved.
+Centres from two under the median to two over were tried at each rung; County
+0 and Regional +5 are the only ones that meet every criterion, and National +17
+the best of its five. Moving a centre onto its median does not help: County −1
+lets the free ride in (28%), Regional +6 the overcooked week (28%), National +16
+drops reacting to 73%.
 
-**Two limits, stated rather than hidden.** Overcooking cannot be made to fail
+Twenty-four seeds were tried first and were a lottery: on a second set of
+twenty-four the same configuration's rates moved by twenty to forty points.
+An earlier measurement on a simplified field (no weather, no turf effect, 24
+seeds) had put the centres at −1, +5 and +15.
+
+**Three limits, stated rather than hidden.** Overcooking cannot be made to fail
 at the National: its band tops out at 92 and the dial at 100, so there is no
-room to overcook into — setup 100 with easy pins landed in range 63% of the
-time, and that is accepted. And at the County Open a half-conditioned course
-(setup 22) rescued by brutal pins landed in range 71% of the time; the County
-band is low enough that pins cover half of it. Accepted at the bottom rung,
-where the stakes are smallest. Neither holds at the Regional or the National.
+room to overcook into — setup 100 with easy pins lands in range 70% of the
+time, and that is accepted. The National's reacting rate is about 78%, short of
+the 80% asked: across 72 variants of the host's pin cut-offs it never reached
+80% (best 79%), so the limit is how far pins can move a four-round week, not
+the host, and the author accepted it. And at the County Open a half-conditioned
+course (setup 22) rescued by brutal pins lands in range 64% of the time; the
+County band is low enough that pins cover half of it. Accepted at the bottom
+rung, where the stakes are smallest. At the National the same trick (setup 43)
+lands 5% of the time. At the Regional (setup 35) it lands 45% of the time on
+the real field — this was believed not to hold there, and is raised with the
+author rather than settled here.
 
 Calibrating at the minimum means a course built well past it has to set up
 softer, or it overshoots the range. The band is advice for a course at the
@@ -337,7 +373,8 @@ Each a test or a recorded measurement, verified by sabotage where it is a test:
 2. **Overcooking still fails** at the County and Regional: setup 100, easy pins
    every round → in range on at most 25% of seeds.
 3. **Reachable.** Band midpoint, reacting to the leader → at least 80%; fair
-   pins all week → at least 60%.
+   pins all week → at least 60%. The National's reacting rate (about 78%) is
+   an accepted limit (§8).
 4. **Pins matter.** Same seed and setup, brutal against easy, moves the field's
    average by more than a stroke a round.
 5. **Weather reaches the field.** Same seed, same setup, blowy vs clear → the
