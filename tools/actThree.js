@@ -57,8 +57,18 @@ for (let seed = 1; seed <= seedCount; seed++) {
     const one = play(openingResort(seed), { ...LEVERS, days: 200, seed });
     if (!one.gateDay) return { skipped: 'Act I gate never opened' };
     const two = playActTwo(one.state, { ...LEVERS, days: 300, seed });
-    if (two.state.act !== 3) return { skipped: `Act II ended ${two.ending ?? 'unsettled'}` };
-    return { state: serialize(two.state) };
+    let { state } = two;
+    // Settled but not yet in Act III: the act opens on a day the full
+    // eighteen are playing, and a decision event can close a hole on the
+    // day of the buyout (seed 8 did). Play on a day at a time until it
+    // opens. playActTwo plays one full ordinary day and stops once the
+    // investors are settled; each day gets its own seed so the days are
+    // not replays of one another.
+    for (let extra = 1; state.act === 2 && two.ending && extra <= 30; extra++) {
+      state = playActTwo(state, { ...LEVERS, days: 1, seed: seed * 1000 + extra }).state;
+    }
+    if (state.act !== 3) return { skipped: `Act II ended ${two.ending ?? 'unsettled'}` };
+    return { state: serialize(state) };
   });
   if (settled.skipped) {
     rows.push({ seed, skipped: settled.skipped });

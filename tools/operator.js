@@ -548,6 +548,44 @@ function crewUpFor(state) {
 }
 
 /**
+ * Narrows the course to a rung's floor, remembering each fairway's width
+ * the first time it is touched (keyed by hole id, in a map the caller
+ * owns) so `widenBack` can undo it.
+ */
+function narrowFor(state, rungId, widths) {
+  const holes = state.resort.courses[0].holes;
+  if (widths) {
+    // Only built holes: a stub has no width to go back to, and restoring
+    // `undefined` onto it after the operator builds it would break it.
+    for (const h of holes) {
+      if (!widths.has(h.id) && typeof h.corridorWidth === 'number') widths.set(h.id, h.corridorWidth);
+    }
+  }
+  narrowToDifficulty(holes, RUNGS[rungId].minDifficulty);
+}
+
+/**
+ * Puts every remembered fairway back, once nothing is booked.
+ *
+ * Measured 2026-10-03, seed 1 of tools/actThree.js: the same settled
+ * resort never bidding made $6.44M over 240 days with its own course and
+ * $4.74M with the fairways narrowed to the National's floor -- about
+ * $7,000 a day of ordinary profit (26,410 against 19,592). Before this
+ * existed the operator narrowed for the County Open and never widened
+ * again, so the ladder measurement charged hosting for a championship
+ * course on every ordinary day to the end of the run and reported it
+ * losing $1.8M-$2.3M against never bidding. A host widens back after the
+ * week, because the editor lets them and the locals want a course at 30.
+ */
+function widenBack(state, widths) {
+  if (!widths?.size) return;
+  for (const h of state.resort.courses[0].holes) {
+    if (widths.has(h.id)) h.corridorWidth = widths.get(h.id);
+  }
+  widths.clear();
+}
+
+/**
  * A competent host, on the same terms as the operator above.
  *
  * Bids for the next rung as soon as it is eligible, and asks for the
@@ -579,9 +617,15 @@ function crewUpFor(state) {
  *   - Each round's morning, sets the pins from the leader against the
  *     target and today's sky (`reactivePins`), the call a player makes.
  *
+ * And with nothing booked and no bid won that morning, it widens the
+ * fairways back to where they were before the first narrowing (see
+ * `widenBack`). That needs a memory across mornings, so the caller passes
+ * a `widths` map and keeps it (playActThree does); without one the
+ * course stays narrowed.
+ *
  * Returns true only on the morning a bid is won.
  */
-export function spendTheTournamentMorning(state, { holesOpen }) {
+export function spendTheTournamentMorning(state, { holesOpen, widths = null }) {
   const booked = state.tournament && !state.tournament.resolved ? state.tournament : null;
   if (booked) {
     crewUpFor(state);
@@ -593,12 +637,15 @@ export function spendTheTournamentMorning(state, { holesOpen }) {
     } else {
       // The run-up: bring the course up to the floor before the first
       // morning, by the cheapest redesign there is -- narrower fairways.
-      narrowToDifficulty(state.resort.courses[0].holes, RUNGS[booked.rung].minDifficulty);
+      narrowFor(state, booked.rung, widths);
     }
     return false;
   }
   const next = nextRungFor(state.tournamentsHosted ?? []);
-  if (!next) return false;
+  if (!next) {
+    widenBack(state, widths);
+    return false;
+  }
 
   // Put up whatever the rung insists on, if it can be afforded. Until
   // this existed the operator stopped at the County Open for ever --
@@ -608,12 +655,17 @@ export function spendTheTournamentMorning(state, { holesOpen }) {
   buildFor(state, next);
 
   const booking = bidFor(state, next, { holesOpen });
-  if (!booking) return false;
+  if (!booking) {
+    // Barred, or not yet eligible: the course goes back to being a course
+    // until there is a week to narrow it for.
+    widenBack(state, widths);
+    return false;
+  }
   state.tournament = booking;
   const band = RUNGS[next].band;
   state.resort.setupTarget = Math.round((band.low + band.high) / 2);
   crewUpFor(state);
-  narrowToDifficulty(state.resort.courses[0].holes, RUNGS[next].minDifficulty);
+  narrowFor(state, next, widths);
   return true;
 }
 
@@ -670,6 +722,44 @@ function buildFor(state, rungId) {
  * takings are in there too, because "the base fee alone loses money
  * against never bidding" is a claim about the twenty-one days as much as
  * about the day.
+ *
+ * Measured 2026-10-03, `node tools/actThree.js --seeds 8` (green fee 80,
+ * interval 14, room rate 300; Acts I and II played by this operator, then
+ * 240 days hosted against the same resort never bidding). Every seed
+ * climbed the whole ladder. Winning total against target, H = hit:
+ *
+ *   seed  County      Regional    National       paid     hosting worth
+ *     1   +2  H       +9  miss    +19 H         $466,750    -$894,665
+ *     2   +3  H       +3  H       +22 miss      $336,600    -$961,005
+ *     3   +2  H *     +1  miss    +21 miss ^*   $146,460  -$1,282,393
+ *     4   +3  H       +12 miss ^  +14 H         $466,750    -$890,585
+ *     5    0  H       +7  H       +21 miss ^    $336,600    -$936,719
+ *     6    0  H       +7  H       +18 H         $693,150    -$698,354
+ *     7   -2  H       +6  H       +23 miss ^    $336,600  -$1,035,376
+ *     8   +2  H       +6  H       +15 H         $651,150    -$624,962
+ *
+ *   ^ under the floor: a decision event closed two holes on the first
+ *     round's morning, and the operator narrows to the floor exactly, so
+ *     the playable sixteen measured 53.4 (Regional) or 62.6 (National).
+ *   * turf lost (77 and 74 against 78); every other week held it with
+ *     the eight-keeper crew (79-95).
+ *
+ * Profit per day, all eight seeds within a few hundred dollars: run-up
+ * $14.5-15.9k, round days -$0.6k to -$1.7k (the course is closed), and
+ * ordinary $25.4-26.1k against $26.0-26.6k never bidding. So hosting
+ * LOST on every seed, by $0.62M-$1.28M, against +$61k-$167k before the
+ * week existed. The run-up's 63 days cost about $0.64-0.75M against
+ * ordinary trade (a narrowed course takes ~$7k a day off it, measured on
+ * seed 1, plus the prep bill and the extra keepers), the nine round days
+ * about $0.25M, and the remaining $0.27-0.36M (by difference, not
+ * itemised) is the championship buildings and their upkeep, mostly. The
+ * ladder's whole ceiling is $840k. The purse is the author's call (spec
+ * §9), not this operator's.
+ *
+ * The first run of this measurement, before `widenBack`, left the course
+ * narrowed to the National's floor for the rest of the run and reported
+ * hosting $1.78M-$2.32M worse than never bidding -- the operator's
+ * omission, not the game's.
  */
 export function playActThree(startState, {
   greenFee, teeInterval, roomRate, suiteShare = 0.3, days = 200, seed = 1,
@@ -703,11 +793,14 @@ export function playActThree(startState, {
   let weekTakings = 0;
   let weekProfit = 0;
   let weekDays = 0;
+  // Fairway widths from before the first narrowing, so the course can be
+  // put back between weeks (see widenBack).
+  const widths = new Map();
 
   for (let day = 0; day < days; day++) {
     spendTheMorning(state, { greenFee, teeInterval });
     spendTheHotelMorning(state, { roomRate, suiteShare });
-    if (host && spendTheTournamentMorning(state, { holesOpen: openCount(state) })) bids += 1;
+    if (host && spendTheTournamentMorning(state, { holesOpen: openCount(state), widths })) bids += 1;
 
     // Whether the course is being hardened today, read BEFORE the day
     // runs, so a resolving championship's own day is not counted as a

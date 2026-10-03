@@ -103,3 +103,21 @@ test('a booked national makes the operator hire a crew that can hold the turf th
   const keepers = state.resort.staff.filter((m) => m.role === 'groundskeeper').length;
   assert.ok(keepers >= 8, `a booked national left the operator with ${keepers} groundskeepers`);
 });
+
+test('once nothing is booked the operator widens the fairways it narrowed back to where they were', () => {
+  // A host narrows for the week and has no reason to keep a course the
+  // locals find too hard once the ladder is done. Without this, a ladder
+  // measurement charged hosting for a championship-hard course on every
+  // ordinary day for the rest of the run.
+  const state = actThreeCourse(6);
+  const before = state.resort.courses[0].holes.map((h) => h.corridorWidth);
+  const widths = new Map();
+  state.tournament = newWeek('national', state.day + 10);
+  spendTheTournamentMorning(state, { holesOpen: 18, widths });
+  assert.notDeepEqual(state.resort.courses[0].holes.map((h) => h.corridorWidth), before);
+
+  state.tournament = null;
+  state.tournamentsHosted = ['countyOpen', 'regional', 'national'];
+  spendTheTournamentMorning(state, { holesOpen: 18, widths });
+  assert.deepEqual(state.resort.courses[0].holes.map((h) => h.corridorWidth), before);
+});
