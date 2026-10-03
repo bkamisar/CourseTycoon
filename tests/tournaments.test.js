@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUNGS, RUNG_IDS, rungFor, eligibleFor, SETUP_DECAY_PER_DAY, setupClimb, nextSetup, setupDifficultyBonus, withinBand, RUN_UP_DAYS, bidFor, nextRungFor, scoreTournament, contractFor } from '../src/sim/tournaments.js';
+import { RUNGS, RUNG_IDS, rungFor, eligibleFor, SETUP_DECAY_PER_DAY, setupClimb, nextSetup, setupDifficultyBonus, withinBand, withinTarget, RUN_UP_DAYS, bidFor, nextRungFor, scoreTournament, contractFor } from '../src/sim/tournaments.js';
 
 test('there are three rungs, each fully specified', () => {
   assert.equal(RUNG_IDS.length, 3);
@@ -305,4 +305,30 @@ test('inside the band, the other three decide how much credit you get', () => {
   assert.ok(scruffy.prestige > missedBand.prestige,
     'and a scruffy delivered week must still beat one that was never delivered');
   assert.equal(scruffy.barDays, 0, 'a bad day inside the band is not a barring offence');
+});
+
+test('each rung declares its week: rounds, a difficulty floor and a winning-score target', () => {
+  const rounds = { countyOpen: 2, regional: 3, national: 4 };
+  for (const id of RUNG_IDS) {
+    const rung = RUNGS[id];
+    assert.equal(rung.rounds, rounds[id], `${id} plays ${rounds[id]} rounds`);
+    assert.ok(rung.minDifficulty > 0 && rung.minDifficulty < 100);
+    assert.ok(rung.target.low < rung.target.high, `${id}: a target is a range`);
+  }
+  assert.ok(RUNGS.regional.minDifficulty > RUNGS.countyOpen.minDifficulty);
+  assert.ok(RUNGS.national.minDifficulty > RUNGS.regional.minDifficulty,
+    'each rung asks for a harder course than the last');
+  assert.ok(RUNGS.national.target.low > RUNGS.countyOpen.target.high,
+    'a harder course over more rounds wins with a higher total');
+  assert.throws(() => { RUNGS.national.target.low = -99; }, TypeError,
+    'the target is frozen like the band');
+});
+
+test('the target includes both edges and nothing outside them', () => {
+  const target = { low: -4, high: 2 };
+  assert.equal(withinTarget(-4, target), true);
+  assert.equal(withinTarget(2, target), true);
+  assert.equal(withinTarget(-5, target), false);
+  assert.equal(withinTarget(3, target), false);
+  assert.equal(withinTarget(null, target), false, 'no rounds played is not a winner');
 });

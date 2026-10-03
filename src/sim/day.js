@@ -1,5 +1,5 @@
 import { makeRng } from './rng.js';
-import { holeStats, clamp } from './hole.js';
+import { holeStats, clamp, courseDifficultyOf } from './hole.js';
 import { makeGroup, resetGuestIds } from './golfer.js';
 import { playHole } from './round.js';
 import { scheduleRounds, TARGET_MINUTES_PER_HOLE } from './schedule.js';
@@ -256,9 +256,7 @@ export function runDay(state, seed) {
   // guestSatisfaction). Computed once here and threaded through both, so
   // the crowd that arrives and the crowd that leaves happy can never
   // disagree about what this course's difficulty actually is.
-  const baseDifficulty = holes.length
-    ? holes.reduce((s, h) => s + holeStats(h).difficulty, 0) / holes.length
-    : 0;
+  const baseDifficulty = courseDifficultyOf(holes);
   // Firm greens and thick rough are what a championship wants and what a
   // Tuesday fourball hates. This is the whole cost of the run-up: the
   // course the regulars are paying for gets worse for weeks before

@@ -70,6 +70,19 @@ export function holeStats(hole) {
   };
 }
 
+/**
+ * How hard the course plays, 0-100: the mean of its holes.
+ *
+ * One definition, because three places need it -- the crowd's appeal in
+ * `day.js`, a championship's minimum in `tournaments.js`, and the HUD -- and
+ * three copies of an average are three chances to disagree about whether a
+ * course qualifies.
+ */
+export function courseDifficultyOf(holes) {
+  if (!holes.length) return 0;
+  return holes.reduce((sum, h) => sum + holeStats(h).difficulty, 0) / holes.length;
+}
+
 function parFor(length) {
   if (length < 260) return 3;
   if (length < 470) return 4;

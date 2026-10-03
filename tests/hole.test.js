@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeHole, holeStats } from '../src/sim/hole.js';
+import { makeHole, holeStats, courseDifficultyOf } from '../src/sim/hole.js';
 
 test('makeHole copies the template without sharing references', () => {
   const a = makeHole('straightPar4', 1);
@@ -98,4 +98,20 @@ test('a hazard far offline still counts for less than one in the corridor', () =
     holeStats(inCorridor).difficulty - base > holeStats(wayOffline).difficulty - base,
     'sideways proximity must still matter'
   );
+});
+
+test('course difficulty is the mean of the holes, and zero for no holes', () => {
+  const a = makeHole('shortPar3', 1);
+  const b = makeHole('doglegPar4', 2);
+  const mean = (holeStats(a).difficulty + holeStats(b).difficulty) / 2;
+  assert.equal(courseDifficultyOf([a, b]), mean);
+  assert.equal(courseDifficultyOf([]), 0, 'an empty course is not NaN');
+});
+
+test('narrowing a corridor makes the course harder', () => {
+  // The lever the run-up uses: the spec's minimum difficulty is meant to be
+  // reachable by redesign, and the cheapest redesign is a tighter fairway.
+  const wide = makeHole('straightPar4', 1);
+  const narrow = { ...wide, corridorWidth: 26 };
+  assert.ok(courseDifficultyOf([narrow]) > courseDifficultyOf([wide]) + 5);
 });

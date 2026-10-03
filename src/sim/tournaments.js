@@ -21,6 +21,23 @@ import { clamp } from './hole.js';
  * reasons and should not drift into each other. */
 export const CHAMPIONSHIP_HOLES = 18;
 
+/*
+ * `rounds`, `minDifficulty` and `target` are the championship week (see
+ * docs/superpowers/specs/2026-10-03-course-tycoon-championship-week-design.md).
+ *
+ * `target` is the winning total to par after the last round. Measured on
+ * 2026-10-03 across 24 seeds on a course at each rung's minimum difficulty,
+ * the band's midpoint, fair pins: the median winner was -1 at the County
+ * Open, +5 at the Regional and +15 at the National, and each range is that
+ * centre plus or minus three strokes. Re-measured on the real field in
+ * Task 11 of the plan -- if those numbers moved, so did these.
+ *
+ * `minDifficulty` is the course's own design, `courseDifficultyOf`. The
+ * template rotation an untouched resort is built from measures 40.8;
+ * narrowing every fairway to 40 yards reaches 45.5, to 34 reaches 54, to 26
+ * reaches 64.4. So each rung asks for some redesign and none asks for a
+ * rebuild.
+ */
 const LIST = [
   {
     id: 'countyOpen',
@@ -29,6 +46,9 @@ const LIST = [
     prestige: 55,
     requires: [],
     band: { low: 45, high: 60 },
+    rounds: 2,
+    minDifficulty: 45,
+    target: { low: -4, high: 2 },
     baseFee: 18000,
     purseCeiling: 100000,
     prepPerDay: 1600,
@@ -40,6 +60,9 @@ const LIST = [
     prestige: 70,
     requires: ['grandstands', 'overflowParking'],
     band: { low: 62, high: 78 },
+    rounds: 3,
+    minDifficulty: 55,
+    target: { low: 2, high: 8 },
     baseFee: 30000,
     purseCeiling: 240000,
     prepPerDay: 3200,
@@ -51,6 +74,9 @@ const LIST = [
     prestige: 82,
     requires: ['mediaCentre', 'hospitalityPavilion'],
     band: { low: 80, high: 92 },
+    rounds: 4,
+    minDifficulty: 65,
+    target: { low: 12, high: 18 },
     baseFee: 55000,
     purseCeiling: 500000,
     prepPerDay: 5400,
@@ -58,7 +84,9 @@ const LIST = [
 ];
 
 export const RUNGS = Object.freeze(Object.fromEntries(
-  LIST.map((r) => [r.id, Object.freeze({ ...r, band: Object.freeze(r.band) })])
+  LIST.map((r) => [r.id, Object.freeze({
+    ...r, band: Object.freeze(r.band), target: Object.freeze(r.target),
+  })])
 ));
 
 /** In climbing order. */
@@ -188,6 +216,13 @@ export function setupDifficultyBonus(setup = 0) {
 /** Whether the course is set the way this rung wants it. */
 export function withinBand(setup, band) {
   return setup >= band.low && setup <= band.high;
+}
+
+/** Whether a winning total is one the rung asked for. Null -- nobody has
+ * finished a round -- is never a winner. */
+export function withinTarget(total, target) {
+  if (total === null || total === undefined) return false;
+  return total >= target.low && total <= target.high;
 }
 
 /**
