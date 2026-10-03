@@ -149,7 +149,16 @@ test('a booked week shows the difficulty against the floor all through the run-u
   const b = computeChampionshipData(state).booked;
   assert.equal(b.inWeek, false);
   assert.equal(b.minDifficulty, RUNGS.countyOpen.minDifficulty);
-  assert.equal(typeof b.difficultyMet, 'boolean');
+  // Both sides: a flag that is always true (or always false) passes a
+  // typeof check. The template course measures 40.8 against the County's 45;
+  // narrowing every corridor to 34 takes it to about 54.
+  assert.equal(b.difficultyMet, false, 'the template course is under the County floor');
+
+  const narrowed = championshipResort(2);
+  for (const hole of narrowed.resort.courses[0].holes) hole.corridorWidth = 34;
+  narrowed.tournament = newWeek('countyOpen', narrowed.day + 10);
+  const harder = computeChampionshipData(narrowed).booked;
+  assert.equal(harder.difficultyMet, true, 'a narrowed course clears the County floor');
 });
 
 test("during the week the sheet has the pins, the leader and today's weather", () => {
