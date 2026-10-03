@@ -175,10 +175,9 @@ test('a crew conditioning the course holds less turf than an identical crew that
   function turfAfter(conditioning) {
     let state = openFullCourse(actThreeResort(30));
     if (conditioning) {
-      // A target no fifteen-day crew of seven could reach, so conditioning
-      // stays true (and care stays diverted) for the whole comparison
-      // rather than arriving partway through and holding there, which
-      // diverts no care at all.
+      // Any booked target diverts care, climbing or holding. 100 keeps the
+      // crew climbing for the whole comparison, so the setup is not also
+      // changing shape partway through.
       state.tournament = { rung: 'national', day: state.day + 21, resolved: false };
       state.resort.setupTarget = 100;
     }

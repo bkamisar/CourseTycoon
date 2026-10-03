@@ -532,7 +532,8 @@ export function runDay(state, seed) {
   // (see the hoisted `preparing` above): climbing to the target and
   // holding the course there, run-up and round days alike, until the
   // tournament resolves. A resort that bids and leaves `setupTarget` at 0
-  // pays nothing. Holding is billed because it is still the crew's job --
+  // pays nothing; any other target is billed, including one lowered below
+  // the course to ease it down. Holding is billed because it is still the crew's job --
   // firm greens do not stay firm on their own (`SETUP_DECAY_PER_DAY`) --
   // and because a bill that stopped on arrival made a big crew's run-up
   // cheap: ten keepers reach a national's 86 in eleven days and, before
