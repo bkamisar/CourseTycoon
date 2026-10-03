@@ -80,10 +80,17 @@ test('a slower bottleneck hole is reported, or none when nothing queues', () => 
 });
 
 test('pins move the field, by a stroke or two and not by a setup\'s worth', () => {
+  // One seed pair is luck: over 200 seed pairs brutal minus easy averaged
+  // 1.92 strokes a round with a spread of 0.56, and 5% of single pairs fell
+  // under 1. Averaging four seeds keeps the bounds honest.
   const handicaps = drawFieldHandicaps(makeRng(40));
-  const play = (pins) => playField(makeRng(41), course(), { setup: 70, turfQuality: 85, pins, handicaps });
-  const easy = play('easy').averageToPar;
-  const brutal = play('brutal').averageToPar;
+  let easy = 0;
+  let brutal = 0;
+  for (const seed of [1, 2, 3, 4]) {
+    const play = (pins) => playField(makeRng(seed), course(), { setup: 70, turfQuality: 85, pins, handicaps });
+    easy += play('easy').averageToPar / 4;
+    brutal += play('brutal').averageToPar / 4;
+  }
   assert.ok(brutal > easy + 1, `brutal ${brutal} against easy ${easy}`);
   assert.ok(brutal < easy + 4, 'pins fine-tune; they are not a second setup dial');
 });
@@ -98,14 +105,18 @@ test('wind reaches the field', () => {
     calm += playField(makeRng(seed), course(), { setup: 60, handicaps, spread: 0.95 }).averageToPar;
     windy += playField(makeRng(seed), course(), { setup: 60, handicaps, spread: 1.45 }).averageToPar;
   }
-  assert.ok(windy > calm + 2, `windy ${windy / 4} against calm ${calm / 4}`);
+  // Measured over 200 sets of four seeds the gap is 16.98 with a spread of
+  // 1.08: about two strokes a round, so 8 is far from both noise and zero.
+  assert.ok(windy > calm + 8, `windy ${windy / 4} against calm ${calm / 4}`);
 });
 
 test('wet weather slows the field', () => {
-  const a = playField(makeRng(43), course(), { setup: 60, pace: 1 });
-  const b = playField(makeRng(43), course(), { setup: 60, pace: 1.16 });
-  assert.ok(b.averageRoundMinutes > a.averageRoundMinutes,
-    'heavy rain (pace 1.16) must make rounds longer');
+  // With tee times far enough apart that nothing queues, a round is just
+  // the sum of its holes and pace scales it exactly.
+  const a = playField(makeRng(43), course(), { setup: 60, pace: 1, teeInterval: 30 });
+  const b = playField(makeRng(43), course(), { setup: 60, pace: 1.16, teeInterval: 30 });
+  assert.ok(Math.abs(b.averageRoundMinutes / a.averageRoundMinutes - 1.16) < 0.01,
+    `heavy rain (pace 1.16) made rounds ${b.averageRoundMinutes / a.averageRoundMinutes} times as long`);
 });
 
 test('a field passed in is the field that plays', () => {
@@ -131,6 +142,18 @@ test('the field\'s shots are kept for the playback', () => {
   assert.equal(round.playback.rawEvents.length, FIELD_GROUPS * holes.length);
   assert.equal(round.playback.holeMinutes.length, holes.length);
   assert.ok(round.playback.rawEvents.some((b) => b.events.some((e) => e.type === 'shot')));
+});
+
+test('handicaps are matched to players by position', () => {
+  const handicaps = [...new Array(30).fill(0), ...new Array(30).fill(6)];
+  const round = playField(makeRng(48), course(), { setup: 50, handicaps });
+  const mean = (xs) => xs.reduce((s, v) => s + v, 0) / xs.length;
+  assert.ok(mean(round.playerToPar.slice(0, 30)) < mean(round.playerToPar.slice(30)),
+    'the scratch half of the field must score better than the six-handicap half');
+});
+
+test('a field of the wrong size is refused', () => {
+  assert.throws(() => playField(makeRng(49), course(), { handicaps: [0, 1, 2] }), /60 handicaps/);
 });
 
 test('drawing a field gives sixty championship handicaps', () => {

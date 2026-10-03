@@ -54,13 +54,19 @@ export function drawFieldHandicaps(rng) {
 /**
  * Plays one round of a championship and reports how the course played.
  *
- * `setup` and `turfQuality` are the two things the player controls; the
- * rng carries everything else, so the same seed replays identically.
+ * `setup`, `turfQuality` and `pins` are what the player controls. `spread`
+ * and `pace` are the day's weather, and `handicaps` is the week's fixed
+ * field (sixty of them, from `drawFieldHandicaps`; omitted, a field is drawn
+ * from the rng). The rng carries everything else, so the same seed replays
+ * identically.
  */
 export function playField(rng, holes, {
   setup = 0, turfQuality = 100, teeInterval = DEFAULT_TEE_INTERVAL,
   pins = 'fair', spread = 1, pace = 1, handicaps = null,
 } = {}) {
+  if (handicaps && handicaps.length !== FIELD_SIZE) {
+    throw new Error(`a field is ${FIELD_SIZE} handicaps, got ${handicaps.length}`);
+  }
   const par = holes.reduce((sum, h) => sum + holeStats(h).par, 0);
   // A conditioned course plays longer and less forgiving. `playHole`
   // adds this to the golfer's handicap, and a HIGHER handicap is a worse
@@ -154,6 +160,8 @@ export function playField(rng, holes, {
   // `pace` is the weather's: rain and wind slow a round, and nothing on a
   // championship day used to read it.
   const averageHoleMinutes = holeMinutesTotal.map((total) => (total / FIELD_GROUPS) * pace);
+  // scheduleRounds' default day (07:00-18:00) matches day.js's DAY_START and
+  // DAY_END; the field relies on that so the playback clock shows it.
   const schedule = scheduleRounds({
     groupCount: FIELD_GROUPS,
     teeInterval,
