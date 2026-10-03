@@ -50,8 +50,11 @@ rung declares its round count:
 - Each round day runs through `runDay` like any other day. Normal play is
   closed (the existing `championshipToday` path), the hotel sells championship
   rooms (`championshipRoomsSold`), and the setup and its bill follow today's
-  rules: the crew holds the course at its target, and the conditioning bill is
-  charged only on a day the crew is still climbing toward it.
+  rules: the crew holds the course at its target (it no longer see-saws a
+  day's decay below it), and the conditioning bill and the care diversion are
+  charged on every day of the booking with a target set — climbing or
+  holding, run-up and rounds alike. Holding firm greens is still the crew's
+  job, and a bill that stopped on arrival made a big crew's run-up cheap.
 - The contract resolves on the evening of the **final** round. Earlier rounds
   pay nothing and change no prestige.
 - A save taken on any evening of the week reloads mid-tournament and carries on.
