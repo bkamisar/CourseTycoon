@@ -31,6 +31,8 @@ test('the result names every condition, met or missed', () => {
         averageToPar: 5.4, underPar: 2, best: -2,
         hardestHole: 14, averageRoundMinutes: 268,
       },
+      difficulty: 47, minDifficulty: 45, difficultyMet: true,
+      week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [{ round: 1, leaderToPar: -2, pins: 'fair', weather: 'fair' }, { round: 2, leaderToPar: -1, pins: 'tough', weather: 'breezy' }] },
     },
   };
   const cards = championshipCards(report, { act: 3 });
@@ -56,6 +58,8 @@ test('the card and the payout cannot disagree', () => {
       paid: 0, prestige: 6, barDays: 0,
       setup: 70, band: RUNGS.regional.band, turfQuality: 84,
       field: { averageToPar: 7.1, underPar: 1, best: -1, hardestHole: 9, averageRoundMinutes: 279 },
+      difficulty: 47, minDifficulty: 45, difficultyMet: true,
+      week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [{ round: 1, leaderToPar: -2, pins: 'fair', weather: 'fair' }, { round: 2, leaderToPar: -1, pins: 'tough', weather: 'breezy' }] },
     },
   };
   const contract = championshipCards(report, { act: 3 })[0];
@@ -76,13 +80,16 @@ test('a missed target says the other conditions were earned but not paid', () =>
       paid: RUNGS.countyOpen.baseFee, prestige: 2, barDays: 0,
       setup: 12, band: RUNGS.countyOpen.band, turfQuality: 94,
       field: { averageToPar: 1.1, underPar: 17, best: -8, hardestHole: 2, averageRoundMinutes: 241 },
+      difficulty: 47, minDifficulty: 45, difficultyMet: true,
+      week: { rounds: 2, winningTotal: -9, target: { low: -4, high: 2 }, roundLog: [{ round: 1, leaderToPar: -2, pins: 'fair', weather: 'fair' }, { round: 2, leaderToPar: -1, pins: 'tough', weather: 'breezy' }] },
     },
   };
   const [card] = championshipCards(report, { act: 3 });
   assert.equal(card.conditions.filter((c) => c.met).length, 3);
   assert.equal(card.conditions.filter((c) => c.paid).length, 0,
     'nothing pays without the target');
-  assert.match(card.prompt, /band|set/i, 'and the card has to say why');
+  assert.match(card.prompt, /-9/, 'the winning score is what missed');
+  assert.match(card.prompt, /-4 to \+2/, 'and the card has to say what was wanted');
 });
 
 test('a barred rung says so, because a setback the player cannot see is a dead end', () => {
@@ -93,6 +100,8 @@ test('a barred rung says so, because a setback the player cannot see is a dead e
       paid: RUNGS.countyOpen.baseFee, prestige: -6, barDays: 120,
       setup: 5, band: RUNGS.countyOpen.band, turfQuality: 40,
       field: { averageToPar: 1.2, underPar: 19, best: -7, hardestHole: 3, averageRoundMinutes: 240 },
+      difficulty: 47, minDifficulty: 45, difficultyMet: true,
+      week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [{ round: 1, leaderToPar: -2, pins: 'fair', weather: 'fair' }, { round: 2, leaderToPar: -1, pins: 'tough', weather: 'breezy' }] },
     },
   };
   const [card] = championshipCards(report, { act: 3 });
@@ -107,6 +116,8 @@ test('the field is described, since it is what the dial was for', () => {
       paid: 500000, prestige: 18, barDays: 0,
       setup: 86, band: RUNGS.national.band, turfQuality: 90,
       field: { averageToPar: 9.1, underPar: 0, best: 1, hardestHole: 17, averageRoundMinutes: 284 },
+      difficulty: 47, minDifficulty: 45, difficultyMet: true,
+      week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [{ round: 1, leaderToPar: -2, pins: 'fair', weather: 'fair' }, { round: 2, leaderToPar: -1, pins: 'tough', weather: 'breezy' }] },
     },
   };
   const [card] = championshipCards(report, { act: 3 });
@@ -124,10 +135,132 @@ test('passing the act gets its own card, after the write-up', () => {
       paid: 500000, prestige: 18, barDays: 0,
       setup: 86, band: RUNGS.national.band, turfQuality: 90,
       field: { averageToPar: 9.1, underPar: 0, best: 1, hardestHole: 17, averageRoundMinutes: 284 },
+      difficulty: 47, minDifficulty: 45, difficultyMet: true,
+      week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [{ round: 1, leaderToPar: -2, pins: 'fair', weather: 'fair' }, { round: 2, leaderToPar: -1, pins: 'tough', weather: 'breezy' }] },
     },
   };
   const cards = championshipCards(report, { act: 3 });
   assert.equal(cards.length, 2, 'the week, then what the week meant');
   assert.match(cards[0].id, /result/);
   assert.match(cards[1].id, /passed/);
+});
+
+test('the write-up is about the winning score, round by round', () => {
+  const report = {
+    day: 95,
+    tournament: {
+      rung: 'regional', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
+      paid: 240000, prestige: 11, barDays: 0, setup: 70,
+      band: RUNGS.regional.band, turfQuality: 86, difficulty: 57, minDifficulty: 55, difficultyMet: true,
+      field: { averageToPar: 6, underPar: 1, best: -1, hardestHole: 12, averageRoundMinutes: 270 },
+      week: {
+        rounds: 3, winningTotal: 5, target: { low: 2, high: 8 },
+        roundLog: [
+          { round: 1, leaderToPar: -1, pins: 'fair', weather: 'clear' },
+          { round: 2, leaderToPar: 1, pins: 'tough', weather: 'fair' },
+          { round: 3, leaderToPar: 5, pins: 'brutal', weather: 'blowy' },
+        ],
+      },
+    },
+  };
+  const card = championshipCards(report, { act: 3 })[0];
+  assert.match(card.prompt, /\+5/, 'the winning score is in the words');
+  assert.match(card.prompt, /\+2 to \+8/, 'and what was wanted');
+  assert.doesNotMatch(card.prompt, /competitor|player [0-9]/i, 'and nobody is named');
+});
+
+test('the winning score is the week, never the last round\'s best', () => {
+  // `field` is the final round only. Its best (-1) must not be passed off
+  // as the winner's week (+5).
+  const report = {
+    day: 95,
+    tournament: {
+      rung: 'regional', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
+      paid: 240000, prestige: 11, barDays: 0, setup: 70,
+      band: RUNGS.regional.band, turfQuality: 86, difficulty: 57, minDifficulty: 55, difficultyMet: true,
+      field: { averageToPar: 6, underPar: 1, best: -1, hardestHole: 12, averageRoundMinutes: 270 },
+      week: { rounds: 3, winningTotal: 5, target: { low: 2, high: 8 }, roundLog: [] },
+    },
+  };
+  const card = championshipCards(report, { act: 3 })[0];
+  assert.match(card.prompt, /winner finished \+5/);
+  assert.doesNotMatch(card.prompt, /-1\b/, 'the final round\'s best is not the winner');
+  assert.match(card.field, /^In the final round, the field averaged/,
+    'the field figures are one round, and say so');
+});
+
+test('the field is told under par in words, not as "-0.4 over"', () => {
+  const base = {
+    rung: 'countyOpen', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
+    paid: 61000, prestige: 4, barDays: 0, setup: 52, band: RUNGS.countyOpen.band, turfQuality: 88,
+    difficulty: 47, minDifficulty: 45, difficultyMet: true,
+    week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [] },
+  };
+  const under = championshipCards({
+    day: 1, tournament: { ...base, field: { averageToPar: -0.4, underPar: 40, best: -5, hardestHole: 3 } },
+  }, { act: 3 })[0];
+  assert.match(under.field, /0\.4 under par/);
+  assert.doesNotMatch(under.field, /-0\.4/);
+  const even = championshipCards({
+    day: 2, tournament: { ...base, field: { averageToPar: 0.02, underPar: 40, best: -5, hardestHole: 3 } },
+  }, { act: 3 })[0];
+  assert.match(even.field, /even par/);
+  assert.doesNotMatch(even.field, /0\.0/);
+  const over = championshipCards({
+    day: 3, tournament: { ...base, field: { averageToPar: 6.2, underPar: 0, best: 1, hardestHole: 3 } },
+  }, { act: 3 })[0];
+  assert.match(over.field, /6\.2 over par/);
+});
+
+test('a course under the floor is told as that, not as a scoring miss', () => {
+  const report = {
+    day: 96,
+    tournament: {
+      rung: 'national', met: ['turf'], missed: ['target', 'pace', 'crowd'],
+      paid: 55000, prestige: -18, barDays: 120, setup: 86,
+      band: RUNGS.national.band, turfQuality: 90, difficulty: 61.4, minDifficulty: 65, difficultyMet: false,
+      field: { averageToPar: 8, underPar: 0, best: 2, hardestHole: 4, averageRoundMinutes: 290 },
+      week: { rounds: 4, winningTotal: 14, target: { low: 12, high: 18 }, roundLog: [] },
+    },
+  };
+  const card = championshipCards(report, { act: 3 })[0];
+  assert.match(card.prompt, /61\.4/);
+  assert.match(card.prompt, /65/);
+});
+
+test('a course a tenth short of the floor does not read as meeting it', () => {
+  // The report stores difficulty floored to a tenth, so 44.9 against a
+  // floor of 45 must not be printed "45 against 45".
+  const report = {
+    day: 97,
+    tournament: {
+      rung: 'countyOpen', met: ['turf'], missed: ['target', 'pace', 'crowd'],
+      paid: RUNGS.countyOpen.baseFee, prestige: -2, barDays: 60, setup: 40,
+      band: RUNGS.countyOpen.band, turfQuality: 90, difficulty: 44.9, minDifficulty: 45, difficultyMet: false,
+      field: { averageToPar: 3, underPar: 4, best: -3, hardestHole: 4, averageRoundMinutes: 250 },
+      week: { rounds: 2, winningTotal: -3, target: { low: -2, high: 3 }, roundLog: [] },
+    },
+  };
+  const card = championshipCards(report, { act: 3 })[0];
+  assert.match(card.prompt, /44\.9/);
+  assert.doesNotMatch(card.prompt, /measured 45\b/);
+});
+
+test('a week with a hard run-up is told in a sentence from the round log', () => {
+  const log = (a, b, pins) => [
+    { round: 1, leaderToPar: a, pins: 'fair', weather: 'fair' },
+    { round: 2, leaderToPar: b, pins },
+  ];
+  const mk = (roundLog) => championshipCards({
+    day: 98,
+    tournament: {
+      rung: 'regional', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
+      paid: 240000, prestige: 11, barDays: 0, setup: 70,
+      band: RUNGS.regional.band, turfQuality: 86, difficulty: 57, minDifficulty: 55, difficultyMet: true,
+      field: { averageToPar: 6, underPar: 1, best: -1, hardestHole: 12 },
+      week: { rounds: 2, winningTotal: 2, target: { low: 0, high: 4 }, roundLog },
+    },
+  }, { act: 3 })[0].prompt;
+  assert.match(mk(log(-1, 2, 'tough')), /leader was -1 after the first round and gave back 3 by the end\. The pins went in harder/);
+  assert.match(mk(log(2, -1, 'easy')), /leader was \+2 after the first round and found 3 by the end\. The pins came out easier/);
 });
