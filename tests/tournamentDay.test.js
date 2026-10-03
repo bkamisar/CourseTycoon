@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { newGame, serialize, deserialize } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeHole } from '../src/sim/hole.js';
-import { RUNGS, RUN_UP_DAYS, TURF_EXPECTED } from '../src/sim/tournaments.js';
+import {
+  RUNGS, RUN_UP_DAYS, TURF_EXPECTED, conditioningCostPerDay,
+} from '../src/sim/tournaments.js';
 import { newWeek, withPins } from '../src/sim/championshipWeek.js';
 
 /** A resort that has finished Act II, which is where Act III begins. */
@@ -467,7 +469,9 @@ test('the report records what the week was judged on, not only the verdict', () 
   // field played. Recorded where the day settled it.
   const state = openFullCourse(actThreeResort(51));
   state.prestige = 90;
-  state.resort.setup = 53;
+  // Above the target, so the course is easing down all week and the
+  // course played is not the number on the dial.
+  state.resort.setup = 64;
   state.resort.setupTarget = 53;
   state.turfQuality = 91;
   state.tournament = { rung: 'countyOpen', day: state.day, resolved: false };
@@ -476,16 +480,15 @@ test('the report records what the week was judged on, not only the verdict', () 
   const t = report.tournament;
 
   // The course the field played, read from the day rather than the dial.
-  // This used to assert "a little under 53": a crew that reached its
-  // target stopped, the next morning's decay ran before the field teed
-  // off, and the course played at 49.5. Across a week that became a
-  // see-saw -- 49.5, then back up to 53 -- because the dip took the course
-  // below the target and the crew climbed again. A booked course now holds
-  // at its target (`hold` in `nextSetup`), and measured 2026-10-03 both
-  // rounds here played at exactly 53.
+  // Started at the target, this test could not tell the two apart once a
+  // booked course held its target exactly (`hold` in `nextSetup`): both
+  // read 53. Started at 64 against a target of 53, the course eases down
+  // 3.5 a day toward it -- measured 2026-10-03, round 1 at 60.5 and round 2
+  // (the one judged) at 57 -- so a report that printed the target would
+  // say 53 and be wrong.
   assert.equal(t.setup, Math.round(after.resort.setup),
     'the report must name the course the field actually played');
-  assert.equal(t.setup, 53, 'a course held at its target plays at its target, every round');
+  assert.ok(t.setup > 53, `the report printed ${t.setup}, the target, not the course played`);
 
   // The invariant that matters: the number the report prints and the
   // verdict it prints beside it have to agree. A card saying "set to 50,
@@ -686,7 +689,7 @@ test('the week\'s pace is every round, not the last', () => {
   assert.ok(!report.tournament.met.includes('pace'), 'one slow round is a slow week');
 });
 
-test('a booked course already at its target stays there, and holding it is not billed', () => {
+test('a booked course already at its target stays there, and holding it is billed', () => {
   // Arrival used to switch conditioning off, so the next morning decayed
   // the course 3.5 below its target and the morning after climbed it back
   // and billed the prep for it. Measured 2026-10-03 on this national held
@@ -694,6 +697,10 @@ test('a booked course already at its target stays there, and holding it is not b
   // 86, 83, 86, and $5,400 of prep on every other day. Checked across the
   // run-up's last days and every round, because the bug showed only on
   // alternate days and a one-day test would have passed half the time.
+  //
+  // The bill is the other half. Holding the course was briefly free once
+  // it stopped dipping; it is billed every day of the booking, because
+  // keeping greens firm is the crew's job as much as making them firm.
   let state = openFullCourse(actThreeResort(80));
   state.resort.setup = 86;
   state.resort.setupTarget = 86;
@@ -701,7 +708,8 @@ test('a booked course already at its target stays there, and holding it is not b
   for (let d = 0; d < 7; d++) {
     const { state: after, report } = runDay(state, 8000 + d);
     assert.equal(after.resort.setup, 86, `day ${d}: the course slipped to ${after.resort.setup}`);
-    assert.equal(report.costs.championshipPrep, 0, `day ${d}: holding the course was billed as conditioning`);
+    assert.equal(report.costs.championshipPrep, conditioningCostPerDay('national'),
+      `day ${d}: holding the course at its target went unbilled`);
     if (report.tournamentRound) assert.equal(report.tournamentRound.setup, 86, `round ${report.tournamentRound.round}`);
     state = after;
   }

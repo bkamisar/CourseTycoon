@@ -134,7 +134,9 @@ export const SETUP_DECAY_PER_DAY = 3.5;
 
 /**
  * How much of the grounds crew's turf care is diverted to conditioning
- * while a championship is being prepared for.
+ * while a championship is being prepared for -- every day of the booking
+ * with a target set, holding the course at the target included (see
+ * `preparing` in day.js).
  *
  * This is the run-up's cost. The spec promises firm greens and thick
  * rough are "paid in full before anything is paid back," but one crew
@@ -286,6 +288,10 @@ export function championshipRoomsSold(capacity, roomRate, valuePerRound = 60) {
 /**
  * The daily bill for conditioning toward a rung.
  *
+ * Charged every day of the booking that the crew has a target, climbing to
+ * it or holding the course there (`preparing` in day.js). Keeping greens
+ * firm is the same work as making them firm.
+ *
  * Used to be derived from the contract itself — (baseFee + purseCeiling) /
  * 2 / RUN_UP_DAYS — so the bill scaled in lockstep with the purse. That
  * derivation died with the free-ride fix: `scoreTournament` now pays base
@@ -403,8 +409,8 @@ export const BAR_DAYS = 120;
  * championship, whatever else went right that week, so missing the band
  * pays the base fee only. The spec's own line is that a course set wrong
  * is "worse than never having bid" — true here because the run-up bill
- * (`conditioningCostPerDay`) is charged whenever `conditioning` was true,
- * whether or not the band was ever reached.
+ * (`conditioningCostPerDay`) is charged on every day the crew was
+ * preparing, whether or not the band was ever reached.
  */
 export function scoreTournament(rungId, {
   setup = 0, turfQuality = 0, paceOnTarget = false, crowdHandled = false,

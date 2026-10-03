@@ -193,12 +193,21 @@ export function runDay(state, seed) {
   // is the dial the design asked for: without it, conditioning ran for as
   // long as a bid stayed open and nothing told the crew when to stop, so a
   // full crew overshot every band including the county's.
-  // Hoisted rather than computed inline, because the turf calculation
-  // further down needs to know the same thing: while the crew is
-  // conditioning the course, less of their effort is holding the turf.
+  //
+  // Two different questions, hoisted rather than computed inline because
+  // the bill and the turf calculation further down need one of them.
+  // `conditioning` is whether the course still has to climb today, and
+  // only `nextSetup` cares. `preparing` is whether the crew has a
+  // championship job at all -- climbing to a target OR holding the course
+  // at one -- and that is what is billed and what diverts their care
+  // from the turf. They were one flag until a booked course started
+  // holding its target (`hold` below); then holding cost nothing, and the
+  // run-up is meant to cost money and turf for every day of it.
   const booked = Boolean(next.tournament && !next.tournament.resolved);
   const conditioning = booked
     && (next.resort.setup ?? 0) < (next.resort.setupTarget ?? 0);
+  // A target of 0 is the player declining to prepare, and costs nothing.
+  const preparing = booked && (next.resort.setupTarget ?? 0) > 0;
   next.resort.setup = nextSetup(next.resort.setup ?? 0, {
     keepers,
     conditioning,
@@ -519,15 +528,17 @@ export function runDay(state, seed) {
   costs.championshipUpkeep = championshipUpkeep(next.resort.amenities);
   costs.total += costs.championshipUpkeep;
 
-  // Act III's run-up bill. Charged only on a day the crew is actually
-  // conditioning (see the hoisted `conditioning` above), so a resort that
-  // bids and then leaves `setupTarget` at 0 pays nothing — and stops the
-  // moment the target is reached or the tournament resolves, exactly
-  // tracking the days `conditioning` also diverts turf care for. Holding
-  // the course at its target is upkeep, not conditioning, so it is not
-  // billed; before `hold`, the daily dip below the target billed every
-  // other day of it.
-  const championshipPrep = conditioning ? conditioningCostPerDay(next.tournament.rung) : 0;
+  // Act III's run-up bill. Charged on every day the crew is preparing
+  // (see the hoisted `preparing` above): climbing to the target and
+  // holding the course there, run-up and round days alike, until the
+  // tournament resolves. A resort that bids and leaves `setupTarget` at 0
+  // pays nothing. Holding is billed because it is still the crew's job --
+  // firm greens do not stay firm on their own (`SETUP_DECAY_PER_DAY`) --
+  // and because a bill that stopped on arrival made a big crew's run-up
+  // cheap: ten keepers reach a national's 86 in eleven days and, before
+  // this, were billed for none of the ten days after. Exactly the days
+  // `preparing` also diverts turf care for.
+  const championshipPrep = preparing ? conditioningCostPerDay(next.tournament.rung) : 0;
   costs.championshipPrep = championshipPrep;
   costs.total += championshipPrep;
 
@@ -625,17 +636,19 @@ export function runDay(state, seed) {
    * player can read the answer off the number rather than discovering a
    * cliff edge by falling off it.
    *
-   * Act III spends the same crew twice. While `conditioning` is true, the
+   * Act III spends the same crew twice. While `preparing` is true, the
    * hours that would hold the turf are instead hardening the course for a
-   * championship, so `care` is cut by `CARE_DIVERTED_WHILE_CONDITIONING`
-   * (see tournaments.js) for exactly the days the crew spends doing that
-   * second job. Without this the run-up cost nothing — one crew raised
-   * setup AND held the turf at once, so trade while conditioning never
-   * measured below trade on an ordinary day.
+   * championship, or keeping it hard once it is there, so `care` is cut by
+   * `CARE_DIVERTED_WHILE_CONDITIONING` (see tournaments.js) for exactly
+   * the days the crew spends doing that second job. Without this the
+   * run-up cost nothing — one crew raised setup AND held the turf at once,
+   * so trade while conditioning never measured below trade on an ordinary
+   * day. Holding counts: keeping greens firm is the same hours as making
+   * them firm, and it is what the crew does every day of the week itself.
    */
   const wearRate = holes.length * 1.4 + groupCount * 0.45;
   const wear = wearRate * (next.turfQuality / 100);
-  const care = keepers * 6.8 * (conditioning ? 1 - CARE_DIVERTED_WHILE_CONDITIONING : 1);
+  const care = keepers * 6.8 * (preparing ? 1 - CARE_DIVERTED_WHILE_CONDITIONING : 1);
   // Rain waters the course for free; a run of clear days bakes it. A wet
   // week costs money and leaves the turf better than it found it, which
   // is a trade rather than a punishment.
