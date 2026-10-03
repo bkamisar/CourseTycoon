@@ -321,8 +321,9 @@ accepted:
   easy pins lands in range 62% of the time held out.
 - **Reacting falls short at the Regional (76%) and the National (75%).** Across
   72 variants of the host's pin cut-offs the National never reached 80% (best
-  79%, on the tuning seeds); pins move a three- or four-round week only so far,
-  and the limit is the lever, not the host.
+  79%, on the tuning seeds); pins move a three- or four-round week only so far.
+  That search was run at the National; that the Regional's shortfall has the
+  same cause is an inference, not a measurement.
 - **The National's fair-pins rate is 53%,** short of 60%. Its winner is the
   noisiest of the three (+11 to +21 for the middle eighty per cent of seeds), so
   a week left at fair pins is the one most at the weather's mercy — which is the
@@ -399,7 +400,8 @@ Each a test or a recorded measurement, verified by sabotage where it is a test:
 1. **Free ride still dead.** Unconditioned, brutal pins every round, on a
    course at the rung's minimum → in range on at most 15% of seeds.
 2. **Overcooking still fails** at the County and Regional: setup 100, easy pins
-   every round → in range on at most 25% of seeds.
+   every round → in range on at most 25% of seeds. Held out, the County lands
+   at 30% — accepted as a limit, see §8.
 3. **Reachable.** Band midpoint, reacting to the leader → at least 80%; fair
    pins all week → at least 60%. Held out, the Regional's and National's
    reacting rates and the National's fair-pins rate fall short; accepted limits

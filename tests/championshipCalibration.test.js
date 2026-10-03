@@ -13,7 +13,7 @@
  * (241 + i) * 101 for i < 960), each played at every rung. Each floor is
  * about two and a half standard deviations of those twenty rates from
  * their mean, rounded outward to a multiple of five, so a harmless
- * reshuffle of the rng cannot flip one:
+ * reshuffle of the rng is unlikely to flip one (about 5% across the file):
  *
  *               reacting       fair           free ride      overcooked
  *               mean  sd  >=   mean  sd  >=   mean  sd  <=   mean  sd  <=
