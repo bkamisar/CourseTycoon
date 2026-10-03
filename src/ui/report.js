@@ -15,7 +15,7 @@
  * `src/ui/hud.js` already uses.
  */
 import { PALETTE } from '../render/palette.js';
-import { CONDITIONS } from '../sim/weather.js';
+import { CONDITIONS, effectsOf } from '../sim/weather.js';
 import { MEASURE_LABEL, measureNow } from '../sim/investors.js';
 
 /** A target, in the units the measure is actually in: money reads as
@@ -34,6 +34,8 @@ import { ordinal } from '../sim/satisfaction.js';
 import { openHoles } from '../sim/state.js';
 import { TARGET_MINUTES_PER_HOLE } from '../sim/schedule.js';
 import { RUNGS, contractFor } from '../sim/tournaments.js';
+import { PINS, projectTotal } from '../sim/championshipWeek.js';
+import { toParText } from './toPar.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 
 const RATING_SPECS = [
@@ -317,6 +319,11 @@ function tournamentSection(report) {
     setup: t.setup,
     band: t.band,
     targetMet,
+    winningTotal: t.week?.winningTotal ?? null,
+    target: t.week?.target ?? null,
+    difficulty: t.difficulty,
+    minDifficulty: t.minDifficulty,
+    difficultyMet: t.difficultyMet !== false,
     turfQuality: t.turfQuality,
     field: t.field,
     conditions: (contract?.bonuses ?? []).map((b) => ({
@@ -326,6 +333,43 @@ function tournamentSection(report) {
       met: (t.met ?? []).includes(b.id),
       paid: targetMet && (t.met ?? []).includes(b.id),
     })),
+  };
+}
+
+/**
+ * Where the winner is heading: the leader's total projected over the
+ * week's length against the target. "on", "under" or "over" -- the read
+ * the next morning's pins are set from. The projection is the one the HUD
+ * and the championship sheet use (`projectTotal`), so the three agree.
+ */
+function trackingFor(leader, round, rounds, target) {
+  const projected = projectTotal(leader, round, rounds);
+  if (projected === null) return 'on';
+  if (projected < target.low) return 'under';
+  if (projected > target.high) return 'over';
+  return 'on';
+}
+
+/** One round of a championship week, read off the day's report. Null on
+ * every other day. */
+function roundSection(report) {
+  const r = report?.tournamentRound;
+  if (!r) return null;
+  return {
+    label: RUNGS[r.rung]?.label ?? r.rung,
+    round: r.round,
+    rounds: r.rounds,
+    target: r.target,
+    leaderText: toParText(r.leaderToPar),
+    averageToPar: r.averageToPar,
+    hardestHole: r.hardestHole,
+    averageRoundMinutes: r.averageRoundMinutes,
+    paceOnTarget: r.paceOnTarget,
+    turfAfter: r.turfAfter,
+    weatherLabel: effectsOf(r.weather).label,
+    pinsLabel: PINS[r.pins]?.label ?? 'Fair',
+    tracking: trackingFor(r.leaderToPar, r.round, r.rounds, r.target),
+    final: r.round >= r.rounds,
   };
 }
 
@@ -357,6 +401,8 @@ export function computeReportData(state, report) {
     // Act III. Null on every ordinary day, so the report simply does not
     // draw the section.
     tournament: tournamentSection(report),
+    // Every round day of a championship week, the last one included.
+    tournamentRound: roundSection(report),
     revenue: report.revenue,
     costs: report.costs,
     ratings,
@@ -956,6 +1002,31 @@ export function mountReport(root, { state, report, onContinue } = {}) {
     screen.appendChild(wrong);
   }
 
+  // --- Today's round, on every round day ---------------------------------
+  if (data.tournamentRound) {
+    const r = data.tournamentRound;
+    const round = document.createElement('div');
+    round.className = 'report-champ';
+    const head = document.createElement('div');
+    head.className = 'report-champ-head';
+    head.textContent = `${r.label} · Round ${r.round} of ${r.rounds}`;
+    round.appendChild(head);
+
+    const story = document.createElement('div');
+    story.className = 'report-champ-field';
+    const heading = r.final ? ''
+      : r.tracking === 'under' ? ' The field is taking it apart: the winner is heading under the target.'
+        : r.tracking === 'over' ? ' Nobody can score: the winner is heading over the target.'
+          : ' On course for the target.';
+    story.textContent = `${r.weatherLabel}, ${r.pinsLabel.toLowerCase()} pins. `
+      + `The leader is ${r.leaderText}; the target is ${toParText(r.target.low)} to ${toParText(r.target.high)}.`
+      + `${heading} The field averaged ${r.averageToPar.toFixed(1)} over and the ${ordinal(r.hardestHole)} `
+      + `played hardest. Rounds took ${Math.round(r.averageRoundMinutes)} minutes`
+      + `${r.paceOnTarget ? '' : ', which is over the pace target'}; the turf is at ${r.turfAfter}.`;
+    round.appendChild(story);
+    screen.appendChild(round);
+  }
+
   // --- The championship, if there was one --------------------------------
   //
   // Above the takings, because on the day of a championship the
@@ -973,13 +1044,16 @@ export function mountReport(root, { state, report, onContinue } = {}) {
 
     // What the course was and what was asked of it, side by side, so the
     // verdict underneath has something to be about.
-    // Rewritten around the winning score in the report/card tasks: keyed on
-    // the target now, this line still talks about the setup band.
+    // Judged on the winning total now; the setup dial is guidance, not the
+    // verdict, so the verdict line no longer quotes it.
     const setup = document.createElement('div');
     setup.className = `report-champ-setup ${t.targetMet ? 'report-champ-ok' : 'report-champ-off'}`;
-    setup.textContent = t.targetMet
-      ? `Set to ${t.setup}, inside the ${t.band.low}-${t.band.high} they wanted.`
-      : `Set to ${t.setup}. They wanted ${t.band.low}-${t.band.high}.`;
+    setup.textContent = !t.target ? ''
+      : !t.difficultyMet
+      ? `The course measured ${Math.floor(t.difficulty)} on the first morning. They asked for at least ${t.minDifficulty}.`
+      : t.targetMet
+        ? `Won at ${toParText(t.winningTotal)}, inside the ${toParText(t.target.low)} to ${toParText(t.target.high)} they wanted.`
+        : `Won at ${toParText(t.winningTotal)}. They wanted ${toParText(t.target.low)} to ${toParText(t.target.high)}.`;
     champ.appendChild(setup);
 
     // What the field shot: the read-out the whole setup dial exists for.

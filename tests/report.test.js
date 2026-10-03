@@ -222,6 +222,8 @@ test('a championship day puts the tournament on the report', () => {
     missed: ['pace', 'crowd'],
     paid: 61000, prestige: 4, barDays: 0,
     setup: 52, band: { low: 45, high: 60 }, turfQuality: 88,
+    week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [] },
+    difficulty: 47, minDifficulty: 45, difficultyMet: true,
     field: {
       averageToPar: 5.4, underPar: 2, best: -2, worst: 14,
       hardestHole: 14, hardestHoleOverPar: 1.4,
@@ -233,6 +235,12 @@ test('a championship day puts the tournament on the report', () => {
   assert.equal(data.tournament.paid, 61000, 'read from the report, not recomputed');
   assert.equal(data.tournament.conditions.length, 4, 'all four named, met or not');
   assert.equal(data.tournament.field.averageToPar, 5.4);
+  assert.equal(data.tournament.targetMet, true);
+  assert.equal(data.tournament.winningTotal, -1);
+  assert.deepEqual(data.tournament.target, { low: -4, high: 2 });
+  assert.equal(data.tournament.difficulty, 47);
+  assert.equal(data.tournament.minDifficulty, 45);
+  assert.equal(data.tournament.difficultyMet, true);
 });
 
 test('an ordinary day has no tournament section', () => {
@@ -252,6 +260,8 @@ test('the report distinguishes a condition earned from one that paid', () => {
     missed: ['target'],
     paid: 18000, prestige: 2, barDays: 0,
     setup: 12, band: { low: 45, high: 60 }, turfQuality: 94,
+    week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [] },
+    difficulty: 47, minDifficulty: 45, difficultyMet: true,
     field: {
       averageToPar: 1.1, underPar: 17, best: -8, worst: 9,
       hardestHole: 2, hardestHoleOverPar: 0.6,
@@ -263,4 +273,39 @@ test('the report distinguishes a condition earned from one that paid', () => {
   assert.equal(turf.met, true, 'the turf was held');
   assert.equal(turf.paid, false, 'and it paid nothing, because the target was missed');
   assert.equal(data.tournament.conditions.filter((c) => c.paid).length, 0);
+});
+
+test('a round day carries a round section, read off the round log', () => {
+  const { state, report } = runDay(newGame(74), 74);
+  report.tournamentRound = {
+    rung: 'national', rounds: 4, round: 2, target: { low: 12, high: 18 },
+    weather: 'blowy', pins: 'tough', leaderToPar: 7, averageToPar: 6.2,
+    hardestHole: 7, averageRoundMinutes: 281, paceOnTarget: true, turfAfter: 83,
+  };
+  const r = computeReportData(state, report).tournamentRound;
+  assert.equal(r.label, 'National Open');
+  assert.equal(r.round, 2);
+  assert.equal(r.rounds, 4);
+  assert.equal(r.leaderText, '+7');
+  assert.equal(r.weatherLabel, 'Blowing hard');
+  assert.equal(r.pinsLabel, 'Tough');
+  assert.equal(r.tracking, 'on', 'leading +7 after two of four projects to +14, inside 12 to 18');
+});
+
+test('tracking says which way the winner is heading', () => {
+  const { state, report } = runDay(newGame(75), 75);
+  const base = {
+    rung: 'national', rounds: 4, round: 2, target: { low: 12, high: 18 },
+    weather: 'fair', pins: 'fair', averageToPar: 5, hardestHole: 3,
+    averageRoundMinutes: 270, paceOnTarget: true, turfAfter: 85,
+  };
+  report.tournamentRound = { ...base, leaderToPar: -2 };
+  assert.equal(computeReportData(state, report).tournamentRound.tracking, 'under');
+  report.tournamentRound = { ...base, leaderToPar: 14 };
+  assert.equal(computeReportData(state, report).tournamentRound.tracking, 'over');
+});
+
+test('an ordinary day has no round section', () => {
+  const { state, report } = runDay(newGame(76), 76);
+  assert.equal(computeReportData(state, report).tournamentRound, null);
 });

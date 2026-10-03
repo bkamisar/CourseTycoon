@@ -153,6 +153,20 @@ export function weekUnderWay(state) {
 }
 
 /**
+ * The leader's pace carried over the whole week, rounded: -2 after one of
+ * two rounds is -4. Null before there is a pace to carry (no leader yet, or
+ * no round played).
+ *
+ * One definition because three screens project the winner -- the HUD, the
+ * championship sheet and the evening report -- and a rounding that differed
+ * between them would put "on target" and "heading over" on the same morning.
+ */
+export function projectTotal(leaderToPar, roundsPlayed, rounds) {
+  if (leaderToPar === null || leaderToPar === undefined || !roundsPlayed) return null;
+  return Math.round(leaderToPar * rounds / roundsPlayed);
+}
+
+/**
  * Everything the HUD and the championship sheet say about a booked
  * championship, worked out once.
  *
@@ -199,9 +213,7 @@ export function championshipStatus(state) {
     roundsPlayed: week.roundsPlayed,
     rounds: week.rounds,
     leaderToPar,
-    projectedTotal: leaderToPar === null || week.roundsPlayed === 0
-      ? null
-      : Math.round(leaderToPar * week.rounds / week.roundsPlayed),
+    projectedTotal: projectTotal(leaderToPar, week.roundsPlayed, week.rounds),
     target: rung.target,
     minDifficulty: rung.minDifficulty,
     difficulty,

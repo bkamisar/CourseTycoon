@@ -8,7 +8,7 @@ import { addCondition } from '../src/sim/conditions.js';
 import { RUNGS, setupDifficultyBonus } from '../src/sim/tournaments.js';
 import {
   PINS, PIN_IDS, pinHandicap, newWeek, normaliseWeek, recordRound,
-  winningTotal, weekFinished, weekUnderWay, withPins, championshipStatus,
+  winningTotal, weekFinished, weekUnderWay, withPins, championshipStatus, projectTotal,
 } from '../src/sim/championshipWeek.js';
 
 test('four pin settings, harder in order, fair changing nothing', () => {
@@ -242,4 +242,18 @@ test("the leader's pace is projected over the whole week", () => {
   assert.equal(after.projectedTotal, 3, 'one under-the-line round in three, three times over');
   assert.equal(after.round, 2);
   assert.equal(after.rounds, 3);
+});
+
+test("projectTotal carries the leader's pace over the week, rounded", () => {
+  assert.equal(projectTotal(-2, 1, 2), -4);
+  assert.equal(projectTotal(7, 2, 4), 14);
+  assert.equal(projectTotal(5, 2, 3), 8, '7.5 rounds up');
+  assert.equal(projectTotal(0, 1, 4), 0);
+  assert.equal(projectTotal(-3, 3, 3), -3, 'the last round projects to itself');
+});
+
+test('projectTotal has no pace to project before a leader or a round', () => {
+  assert.equal(projectTotal(null, 1, 4), null);
+  assert.equal(projectTotal(undefined, 1, 4), null);
+  assert.equal(projectTotal(3, 0, 4), null);
 });
