@@ -28,12 +28,37 @@ export const CHAMPIONSHIP_HOLES = 18;
  * `rounds`, `minDifficulty` and `target` are the championship week (see
  * docs/superpowers/specs/2026-10-03-course-tycoon-championship-week-design.md).
  *
- * `target` is the winning total to par after the last round. Measured on
- * 2026-10-03 across 24 seeds on a course at each rung's minimum difficulty,
- * the band's midpoint, fair pins: the median winner was -1 at the County
- * Open, +5 at the Regional and +15 at the National, and each range is that
- * centre plus or minus three strokes. Re-measured on the real field in
- * Task 11 of the plan -- if those numbers moved, so did these.
+ * `target` is the winning total to par after the last round, and each
+ * range is a centre plus or minus three strokes. Measured on the real field
+ * (`node tools/calibrateWeek.js`, 2026-10-03): 120 seeds, each with its own
+ * weather at the field's half strength (FIELD_WEATHER_EFFECT in field.js),
+ * turf 90, on the template course narrowed to the rung's minimum. "Median"
+ * is the winner with fair pins at the band's midpoint; the four rates are
+ * how often each way of playing the week lands in range.
+ *
+ *                course  centre  median  reacting  fair  setup 0   setup 100
+ *                                        (mid)     (mid) brutal    easy
+ *   County        45.2      0      -1      88%     85%    13%       24%
+ *   Regional      55.2     +5      +6      83%     72%     1%       24%
+ *   National      65.0    +17     +16      78%     61%     0%       70%
+ *
+ * The spec asks for reacting >= 80%, fair >= 60%, setup 0 brutal <= 15%,
+ * setup 100 easy <= 25% (County and Regional only: the National's band
+ * tops out at 92, so there is no room to overcook into). Centres from two
+ * under the median to two over were tried at each rung; County 0 and
+ * Regional +5 are the only ones that meet every criterion. The National's
+ * reacting rate is the one miss, accepted by the author: across 72
+ * variants of the host's pin cut-offs it never reached 80% (best 79%), so
+ * the limit is how far pins can move a four-round week, not the host.
+ *
+ * Moving a centre onto its median does not help. County -1 lets the free
+ * ride in (28%), Regional +6 the overcooked week (28%), and National +16
+ * drops reacting to 73%.
+ *
+ * An earlier measurement on a simplified field (no weather, no turf
+ * effect, 24 seeds) put the centres at -1, +5 and +15. With the day's
+ * weather at full strength, the County's free ride rose to 20% and the
+ * Regional's overcooked week to 49% -- see FIELD_WEATHER_EFFECT.
  *
  * `minDifficulty` is the course's own design, `courseDifficultyOf`. The
  * template rotation an untouched resort is built from measures 40.8;
@@ -52,7 +77,7 @@ const LIST = [
     band: { low: 45, high: 60 },
     rounds: 2,
     minDifficulty: 45,
-    target: { low: -4, high: 2 },
+    target: { low: -3, high: 3 },
     baseFee: 18000,
     purseCeiling: 100000,
     prepPerDay: 1600,
@@ -82,7 +107,7 @@ const LIST = [
     band: { low: 80, high: 92 },
     rounds: 4,
     minDifficulty: 65,
-    target: { low: 12, high: 18 },
+    target: { low: 14, high: 20 },
     baseFee: 55000,
     purseCeiling: 500000,
     prepPerDay: 5400,

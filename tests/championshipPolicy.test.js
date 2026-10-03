@@ -48,8 +48,8 @@ test('an unreachable minimum stops at the narrowest fairway instead of looping',
 // --- reactivePins -------------------------------------------------------
 
 /*
- * A national after one round of four. The target's centre is 15, so the
- * leader is "due" 15 / 4 = 3.75 after round 1; the pins read how far the
+ * A national after one round of four. The target's centre is 17, so the
+ * leader is "due" 17 / 4 = 4.25 after round 1; the pins read how far the
  * leader is from that.
  */
 function nationalAfterOne(leader) {
@@ -68,14 +68,18 @@ test('the first morning is fair in calm weather and easy in rough', () => {
 });
 
 test('a field taking the course apart gets tougher pins', () => {
-  // 0 is 3.75 under where the leader should be; 2 is 1.75 under.
+  // 0 is 4.25 under where the leader should be; 2 is 2.25 under.
   assert.equal(reactivePins({ week: nationalAfterOne(0), spread: CALM }), 'brutal');
   assert.equal(reactivePins({ week: nationalAfterOne(2), spread: CALM }), 'tough');
 });
 
 test('a leader on schedule gets fair pins, and one running high gets easy ones', () => {
+  // 4 is 0.25 under and 5 is 0.75 over: on schedule, either way.
   assert.equal(reactivePins({ week: nationalAfterOne(4), spread: CALM }), 'fair');
-  // 6 is 2.25 over.
+  assert.equal(reactivePins({ week: nationalAfterOne(5), spread: CALM }), 'fair');
+  // 6 is 1.75 over. Easing starts a stroke over schedule, not two:
+  // measured, it lifted the Regional's reacting rate from 80% to 83% on
+  // 120 seeds.
   assert.equal(reactivePins({ week: nationalAfterOne(6), spread: CALM }), 'easy');
 });
 

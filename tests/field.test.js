@@ -97,7 +97,8 @@ test('pins move the field, by a stroke or two and not by a setup\'s worth', () =
 
 test('wind reaches the field', () => {
   // Weather was always computed on a championship day and the field
-  // ignored it. Blowing hard is spread 1.45, clear is 0.95 (weather.js).
+  // ignored it. Blowing hard is spread 1.45, clear is 0.95 (weather.js);
+  // the field feels half of each (FIELD_WEATHER_EFFECT), so 1.225 and 0.975.
   const handicaps = drawFieldHandicaps(makeRng(42));
   let calm = 0;
   let windy = 0;
@@ -105,18 +106,20 @@ test('wind reaches the field', () => {
     calm += playField(makeRng(seed), course(), { setup: 60, handicaps, spread: 0.95 }).averageToPar;
     windy += playField(makeRng(seed), course(), { setup: 60, handicaps, spread: 1.45 }).averageToPar;
   }
-  // Measured over 200 sets of four seeds the gap is 16.98 with a spread of
-  // 1.08 -- about four strokes a round. 8 asks for two, which is far from
-  // both the noise and zero.
-  assert.ok(windy > calm + 8, `windy ${windy / 4} against calm ${calm / 4}`);
+  // Measured over 200 sets of four seeds (2026-10-03, damped) the gap is
+  // 8.62 with a spread of 0.96 and a lowest of 5.58 -- about two strokes a
+  // round. At full strength it was 16.98. 4 asks for one stroke a round,
+  // which is far from both the noise and zero.
+  assert.ok(windy > calm + 4, `windy ${windy / 4} against calm ${calm / 4}`);
 });
 
 test('wet weather slows the field', () => {
   // With tee times far enough apart that nothing queues, a round is just
-  // the sum of its holes and pace scales it exactly.
+  // the sum of its holes and pace scales it exactly. Heavy rain is pace
+  // 1.16 on the sky; the field feels half of that slowdown, 1.08.
   const a = playField(makeRng(43), course(), { setup: 60, pace: 1, teeInterval: 30 });
   const b = playField(makeRng(43), course(), { setup: 60, pace: 1.16, teeInterval: 30 });
-  assert.ok(Math.abs(b.averageRoundMinutes / a.averageRoundMinutes - 1.16) < 0.01,
+  assert.ok(Math.abs(b.averageRoundMinutes / a.averageRoundMinutes - 1.08) < 0.01,
     `heavy rain (pace 1.16) made rounds ${b.averageRoundMinutes / a.averageRoundMinutes} times as long`);
 });
 

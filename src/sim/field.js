@@ -35,6 +35,46 @@ export const FIELD_GROUPS = FIELD_SIZE / GROUP_SIZE;
  * `src/sim/schedule.js` for what it costs to get this wrong. */
 const DEFAULT_TEE_INTERVAL = 11;
 
+/**
+ * How much of the day's weather reaches a championship field: half.
+ *
+ * The resort's own golfers play the full sky (day.js); this is only the
+ * field. A tour pro flights the ball under the wind and has a caddie on
+ * the yardage, so a gale that turns a Tuesday fourball into a lottery costs
+ * the field less. That is the fiction. The reason is the judge.
+ *
+ * At full strength the weather doubled the spread of the winning total:
+ * a County week with fair pins at the band's midpoint landed anywhere from
+ * -6 to +6 across seeds, against -4 to +2 in calm, and the three ways of
+ * playing a week the target has to tell apart -- a course set properly, an
+ * unconditioned one with brutal pins, an overcooked one with easy pins --
+ * smeared into each other. On 120 seeds (2026-10-03), the best centre each
+ * rung could find (criteria: free ride <= 15%, overcooked <= 25%,
+ * reacting >= 80%; the host then eased its pins at two strokes over, not
+ * one -- see reactivePins in tools/championshipPolicy.js):
+ *
+ *   weather at   County                        Regional
+ *   full (1)     free ride 20% (centre 0)      reacting 75% (+7), or
+ *                                              overcooked 49% (+8)
+ *   half (0.5)   all met (0): 13%, 24%, 88%    all met (+5): 1%, 24%, 80%
+ *   a third      free ride 20% (-1), or        reacting 73% (+4), or
+ *                overcooked 29% (0)            overcooked 34% (+5)
+ *
+ * A third tightened the bad weeks along with the good ones and did worse
+ * than a half. Raising the County band to 55-70 instead was also tried and
+ * did not help: the free-ride and overcooked weeks do not depend on the
+ * band, so it only slid the well-run week toward the overcooked one.
+ *
+ * Applied here to whatever `spread` and `pace` are passed, so every caller
+ * hands in the raw sky and none can forget to damp it.
+ */
+export const FIELD_WEATHER_EFFECT = 0.5;
+
+/** The day's multiplier as the field feels it. */
+function damped(multiplier) {
+  return 1 + (multiplier - 1) * FIELD_WEATHER_EFFECT;
+}
+
 /** A championship field is not the resort's usual Tuesday crowd. */
 const FIELD_HANDICAP_LOW = 0;
 const FIELD_HANDICAP_HIGH = 6;
@@ -55,15 +95,19 @@ export function drawFieldHandicaps(rng) {
  * Plays one round of a championship and reports how the course played.
  *
  * `setup`, `turfQuality` and `pins` are what the player controls. `spread`
- * and `pace` are the day's weather, and `handicaps` is the week's fixed
+ * and `pace` are the day's weather, the raw sky (damped here, see
+ * FIELD_WEATHER_EFFECT), and `handicaps` is the week's fixed
  * field (sixty of them, from `drawFieldHandicaps`; omitted, a field is drawn
  * from the rng). The rng carries everything else, so the same seed replays
  * identically.
  */
 export function playField(rng, holes, {
   setup = 0, turfQuality = 100, teeInterval = DEFAULT_TEE_INTERVAL,
-  pins = 'fair', spread = 1, pace = 1, handicaps = null,
+  pins = 'fair', spread: skySpread = 1, pace: skyPace = 1, handicaps = null,
 } = {}) {
+  // The sky as the field feels it. See FIELD_WEATHER_EFFECT.
+  const spread = damped(skySpread);
+  const pace = damped(skyPace);
   if (handicaps && handicaps.length !== FIELD_SIZE) {
     throw new Error(`a field is ${FIELD_SIZE} handicaps, got ${handicaps.length}`);
   }
@@ -123,9 +167,9 @@ export function playField(rng, holes, {
     const group = { id: g, guests };
 
     holes.forEach((hole, i) => {
-      // `spread` is the day's weather, the same multiplier the resort's
-      // own golfers play in. It was always computed on a championship day
-      // and the field ignored it.
+      // `spread` is the day's weather, at half the strength the resort's
+      // own golfers feel it (FIELD_WEATHER_EFFECT). It was always computed
+      // on a championship day and the field once ignored it.
       const played = playHole(rng, hole, group, {
         carts: false, handicapAdjust, puttAdjust, spread,
       });

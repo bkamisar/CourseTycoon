@@ -1,8 +1,8 @@
 /**
  * How a competent host plays the championship week. Written to be shared
  * by the operator (tools/operator.js) and the calibration
- * (tools/calibrateWeek.js), so the two cannot measure different players;
- * neither uses it yet. For now the tests narrow their courses with it.
+ * (tools/calibrateWeek.js), so the two cannot measure different players.
+ * The calibration uses it; the operator does not yet.
  */
 import { courseDifficultyOf } from '../src/sim/hole.js';
 import { RUNGS } from '../src/sim/tournaments.js';
@@ -45,6 +45,13 @@ const ROUGH_SPREAD = 1.28;
  * course apart, so toughen up; running high, ease off. A rough day eases
  * off whatever the leader says, because wind does the pins' job for them
  * and brutal pins in a gale wreck the pace.
+ *
+ * Easing starts a stroke over schedule, not two. Measured on 120 seeds
+ * (2026-10-03, weather at half strength on the field), against 72 variants
+ * of these cut-offs: easing at +1 took the Regional from 80% to 83% and the
+ * National from 76% to 78%, and cost the County nothing (88%). No variant
+ * reached 80% at the National -- the best was 79% -- so that rung's limit
+ * is the lever, not the policy, and the author accepted it.
  */
 export function reactivePins({ week, spread = 1 }) {
   const target = RUNGS[week.rung].target;
@@ -55,6 +62,6 @@ export function reactivePins({ week, spread = 1 }) {
   const gap = winningTotal(week) - due;
   if (gap <= -3) return rough ? 'tough' : 'brutal';
   if (gap <= -1) return rough ? 'fair' : 'tough';
-  if (gap >= 2 || rough) return 'easy';
+  if (gap >= 1 || rough) return 'easy';
   return 'fair';
 }
