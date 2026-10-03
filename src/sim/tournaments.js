@@ -179,8 +179,10 @@ export function setupClimb(keepers = 0) {
 /**
  * Tomorrow's setup.
  *
- * `conditioning` is whether the resort is working toward a championship
- * at all. When it is not, the course drifts back to being a course.
+ * `conditioning` is whether the crew is climbing toward the target today:
+ * a championship is booked and the course is still below it. `hold` is
+ * whether a championship is booked at all. With neither, the course
+ * drifts back to being a course.
  *
  * A crew never conditions PAST what it was asked for. Without `target`
  * the climb was all-or-nothing -- full rate up, or full decay down -- so
@@ -190,17 +192,33 @@ export function setupClimb(keepers = 0) {
  * the band on six days in twenty: a thirty per cent chance of losing the
  * largest bonus in the game on nothing but which day the event fell.
  *
+ * Capping the climb at the target was only half of it. Arrival switched
+ * `conditioning` off, so the next morning decayed the course a full day
+ * below the target and the morning after climbed it back: measured
+ * 2026-10-03 on a booked national held at 86, the course read 82.5, 86,
+ * 82.5, 86 for ten days, a four-round week played at 83, 86, 83, 86, and
+ * the prep bill ($5,400) landed on every other day. Harmless while a
+ * championship was one day; a week of rounds made the round the verdict
+ * fell on a coin toss again. `hold` is the fix: booked and already there,
+ * the course eases down to the target and stops.
+ *
  * Easing off on arrival is also what the job actually looks like. The
  * greens are brought to a condition and held there, not overshot every
  * Tuesday and allowed to relax back.
  */
-export function nextSetup(setup = 0, { keepers = 0, conditioning = false, target = 100 } = {}) {
-  if (!conditioning) return clamp(setup - SETUP_DECAY_PER_DAY, 0, 100);
+export function nextSetup(setup = 0, {
+  keepers = 0, conditioning = false, target = 100, hold = false,
+} = {}) {
   // Never past the asking. A crew with more hands than the target needs
   // arrives sooner and then holds, rather than overshooting by the
   // difference.
-  const climbed = Math.min(setup + setupClimb(keepers), target);
-  return clamp(climbed, 0, 100);
+  if (conditioning) return clamp(Math.min(setup + setupClimb(keepers), target), 0, 100);
+  // Booked and already there (or above, because the target was lowered):
+  // ease down to the target and stop, rather than falling one day's decay
+  // below it and climbing back the next morning. Not booked, it falls all
+  // the way.
+  const floor = hold ? Math.min(setup, target) : 0;
+  return clamp(Math.max(setup - SETUP_DECAY_PER_DAY, floor), 0, 100);
 }
 
 /**

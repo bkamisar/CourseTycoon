@@ -175,8 +175,8 @@ test('a crew conditioning the course holds less turf than an identical crew that
     if (conditioning) {
       // A target no fifteen-day crew of seven could reach, so conditioning
       // stays true (and care stays diverted) for the whole comparison
-      // rather than settling into the target-holding oscillation partway
-      // through.
+      // rather than arriving partway through and holding there, which
+      // diverts no care at all.
       state.tournament = { rung: 'national', day: state.day + 21, resolved: false };
       state.resort.setupTarget = 100;
     }
@@ -475,18 +475,17 @@ test('the report records what the week was judged on, not only the verdict', () 
   const { state: after, report } = playWeek(state, 5500);
   const t = report.tournament;
 
-  // Not the target. A crew that has reached its target stops, and the
-  // day's decay runs before the field tees off, so a course sitting on its
-  // target plays a little under it -- the first round here played 50
-  // against a target of 53. The next morning it is below the target, so
-  // the crew climbs back, capped at 53, and the last round played at 53.
-  // Measured 2026-10-03: 49.5 then 53. When this was a single day the
-  // assertion was "always under 53"; across a week the course see-saws
-  // between the target and one day's decay below it. The report must
-  // describe the course played on the day it judged, whichever that was.
+  // The course the field played, read from the day rather than the dial.
+  // This used to assert "a little under 53": a crew that reached its
+  // target stopped, the next morning's decay ran before the field teed
+  // off, and the course played at 49.5. Across a week that became a
+  // see-saw -- 49.5, then back up to 53 -- because the dip took the course
+  // below the target and the crew climbed again. A booked course now holds
+  // at its target (`hold` in `nextSetup`), and measured 2026-10-03 both
+  // rounds here played at exactly 53.
   assert.equal(t.setup, Math.round(after.resort.setup),
     'the report must name the course the field actually played');
-  assert.ok(t.setup <= 53 && t.setup > 45, `setup drifted to ${t.setup}, outside the plausible range`);
+  assert.equal(t.setup, 53, 'a course held at its target plays at its target, every round');
 
   // The invariant that matters: the number the report prints and the
   // verdict it prints beside it have to agree. A card saying "set to 50,
@@ -671,9 +670,40 @@ test('a save taken between rounds finishes the week identically', () => {
 });
 
 test('the week\'s pace is every round, not the last', () => {
-  const state = openFullCourse(actThreeResort(77));
+  // A week whose slow round is not the last one, or judging only the last
+  // round would pass too. The first version of this test had every round
+  // on pace and could not fail. Found by search, 2026-10-03: a 10-minute
+  // interval on this resort plays the clear first and fair last rounds at
+  // 265 and 274 minutes against a target of 288, and the drizzly middle
+  // round at 305.
+  const state = openFullCourse(actThreeResort(78));
+  state.resort.pricing.teeInterval = 10;
   state.tournament = newWeek('regional', state.day);
   const { report } = playWeek(state, 7800);
-  const everyRound = report.tournament.week.roundLog.every((r) => r.paceOnTarget);
-  assert.equal(report.tournament.met.includes('pace'), everyRound);
+  const log = report.tournament.week.roundLog;
+  assert.ok(log.slice(0, -1).some((r) => !r.paceOnTarget) && log.at(-1).paceOnTarget,
+    `precondition: a slow early round and an on-pace last one, got ${log.map((r) => r.paceOnTarget)}`);
+  assert.ok(!report.tournament.met.includes('pace'), 'one slow round is a slow week');
+});
+
+test('a booked course already at its target stays there, and holding it is not billed', () => {
+  // Arrival used to switch conditioning off, so the next morning decayed
+  // the course 3.5 below its target and the morning after climbed it back
+  // and billed the prep for it. Measured 2026-10-03 on this national held
+  // at 86: 82.5, 86, 82.5, 86 for ten days, a week of rounds played at 83,
+  // 86, 83, 86, and $5,400 of prep on every other day. Checked across the
+  // run-up's last days and every round, because the bug showed only on
+  // alternate days and a one-day test would have passed half the time.
+  let state = openFullCourse(actThreeResort(80));
+  state.resort.setup = 86;
+  state.resort.setupTarget = 86;
+  state.tournament = { rung: 'national', day: state.day + 3, resolved: false };
+  for (let d = 0; d < 7; d++) {
+    const { state: after, report } = runDay(state, 8000 + d);
+    assert.equal(after.resort.setup, 86, `day ${d}: the course slipped to ${after.resort.setup}`);
+    assert.equal(report.costs.championshipPrep, 0, `day ${d}: holding the course was billed as conditioning`);
+    if (report.tournamentRound) assert.equal(report.tournamentRound.setup, 86, `round ${report.tournamentRound.round}`);
+    state = after;
+  }
+  assert.equal(state.tournament, null, 'sanity: the week was played through');
 });

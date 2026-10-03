@@ -62,3 +62,14 @@ Wear scales with traffic, so a resort that loses its golfers also stops
 damaging its greens, recovers, and draws them back. It is realistic and
 it works against "hard to dig out of". Left deliberately; revisit if a
 collapse ever feels too easy to recover from.
+
+### A round played on a short course counts as a full one
+
+**Found:** 2026-10-03, in review of the championship week. Not seen in play yet.
+
+If a decision event closes holes for a few days (digging out a failed
+drain, a tree down across a fairway) during a championship week, that round is
+played over the holes still open. The field's score for it is to par over
+fewer holes, so it is lower, and it goes into the same running totals as the
+full eighteen-hole rounds. The leaderboard and the winning total then read
+better than the course played, and the evening report does not say why.

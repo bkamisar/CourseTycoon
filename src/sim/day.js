@@ -196,7 +196,8 @@ export function runDay(state, seed) {
   // Hoisted rather than computed inline, because the turf calculation
   // further down needs to know the same thing: while the crew is
   // conditioning the course, less of their effort is holding the turf.
-  const conditioning = Boolean(next.tournament && !next.tournament.resolved)
+  const booked = Boolean(next.tournament && !next.tournament.resolved);
+  const conditioning = booked
     && (next.resort.setup ?? 0) < (next.resort.setupTarget ?? 0);
   next.resort.setup = nextSetup(next.resort.setup ?? 0, {
     keepers,
@@ -204,6 +205,11 @@ export function runDay(state, seed) {
     // Passed so a big crew stops on arrival rather than overshooting the
     // band and decaying back down through it.
     target: next.resort.setupTarget ?? 0,
+    // And so, once it has arrived, it stays there. Without this the day
+    // after arrival decayed a full 3.5 below the target and the day after
+    // that climbed back, so a week of rounds alternated 86 and 83 and the
+    // prep bill landed every other day. See `nextSetup`.
+    hold: booked,
   });
 
   const allOpen = openHoles(next);
@@ -517,7 +523,10 @@ export function runDay(state, seed) {
   // conditioning (see the hoisted `conditioning` above), so a resort that
   // bids and then leaves `setupTarget` at 0 pays nothing — and stops the
   // moment the target is reached or the tournament resolves, exactly
-  // tracking the days `conditioning` also diverts turf care for.
+  // tracking the days `conditioning` also diverts turf care for. Holding
+  // the course at its target is upkeep, not conditioning, so it is not
+  // billed; before `hold`, the daily dip below the target billed every
+  // other day of it.
   const championshipPrep = conditioning ? conditioningCostPerDay(next.tournament.rung) : 0;
   costs.championshipPrep = championshipPrep;
   costs.total += championshipPrep;
