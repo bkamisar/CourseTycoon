@@ -34,6 +34,7 @@ Settled one at a time with the author before writing:
 | 2 | What is judged? | **The winning total landing in the rung's target range.** Replaces the one-off band check as the gate. Pins must not be able to rescue an unconditioned course. |
 | 3 | How long is the week? | **County Open 2 rounds, Regional 3, National 4.** The course is closed to normal play on every round day. |
 | 4 | How is it built? | **Each round is a game day** in the existing loop — not one combined day, not a separate flow. |
+| 5 | Does the course's own design count? | **Yes.** Each rung has a minimum course difficulty, **checked on the first round** so the run-up can be spent redesigning. |
 
 ## 3. The week
 
@@ -111,7 +112,57 @@ the three-week setup decides.
 Stored as `roundSettings.pins` inside the tournament so a later lever (green
 speed, tee placement) is a new key rather than a new code path. Only pins ship.
 
-## 5. Weather on the field
+## 5. Course difficulty
+
+The field already plays the player's own holes, so a harder design already
+scores higher. This makes that a requirement and a lever.
+
+**Three levers on three timescales** now decide where the winning score lands:
+the course's design (permanent), the setup (three weeks), and the pins (each
+morning).
+
+### The minimum
+
+Each rung declares a minimum **course difficulty** — the existing measure, the
+mean of `holeStats(h).difficulty` across the eighteen, 0–100. Starting points:
+
+| Rung | Minimum difficulty |
+|------|--------------------|
+| County Open | 45 |
+| Regional Championship | 55 |
+| National Open | 65 |
+
+Checked against what a resort leaving Act II actually measures, so each rung
+asks for some redesign without demanding a rebuilt course. The plan records the
+measured Act II spread and the final figures.
+
+**Checked on the first round, not at the bid.** A player can bid and then spend
+the run-up redesigning, which gives those three weeks a second job beside
+waiting for the setup to climb. A course still under the minimum on the first
+morning has not staged a championship: the week is played, but it is judged as
+a miss — base fee only, minus the full prestige swing, and the bar — exactly
+as a winner out of range is.
+
+So nobody walks into that blind, the course's difficulty against the rung's
+minimum is shown on the HUD's tournament readout and on the championship sheet
+for the whole run-up, next to the setup and its band.
+
+### The cost
+
+This is where the act's money gets harder without a new mechanic. Each crowd
+has a favourite difficulty — locals about 30, serious golfers about 72
+(`segments.js`) — so toughening the course for a National drives away the locals
+who pay for ordinary days, and the course rating's fairness term dips until the
+clientele catches up. Climbing the ladder now costs trade between championships,
+not only during them.
+
+### Locked during the week
+
+Holes cannot be edited on a round day or between rounds. The design the field
+meets on the first morning is the design it plays all week; reworking a hole
+overnight to drag Sunday's scores up is not a lever.
+
+## 6. Weather on the field
 
 Each round day already has weather, and the forecast already shows tomorrow's
 honestly (`weather.js`: the forecast *is* the weather, read early). Today
@@ -126,7 +177,7 @@ leader tracking low, the player has a real question: tough pins to drag the
 score back, or ease off because the wind will do it and brutal pins in a gale
 will wreck the pace?
 
-## 6. Watching it
+## 7. Watching it
 
 `playField` already calls `playHole` for every threeball and runs
 `scheduleRounds`, then **throws the shot events away**. It now keeps them, and a
@@ -151,7 +202,7 @@ The championship sheet, during the week, shows the pin picker, the target range,
 the leader's total so far and tomorrow's forecast together — everything the call
 needs in one place.
 
-## 7. Judging
+## 8. Judging
 
 ### The gate
 
@@ -166,6 +217,9 @@ band did:
   `BAR_DAYS`),
 - and a National in range is Act III's pass (`actThreePassed`).
 
+A course under the rung's minimum difficulty on the first round fails the gate
+whatever the winning total (§5).
+
 Too soft and the field takes the course apart — the winner is under the range.
 Overcooked and nobody can score — the winner is over it. Both are misses, as a
 setup outside the band is today.
@@ -178,14 +232,18 @@ the band's 40% share.
 Calibrated by measurement, the way the setup bands and the field's divisor were,
 not guessed. Per rung:
 
-- **Centre:** the median winning total across at least sixteen seeds with the
-  setup at the band's midpoint, fair pins every round, and the seeds' own
-  weather.
+- **Centre:** the median winning total across at least sixteen seeds on a
+  course at the rung's minimum difficulty, with the setup at the band's
+  midpoint, fair pins every round, and the seeds' own weather.
 - **Width:** chosen so that the centre's own setup with fair pins lands in range
   at least 75% of the time, and a setup fifteen points below the band's low edge
   lands in range no more than 20% of the time even with the best pin choices.
 
 The plan records the measured ranges and the seeds they came from.
+
+Calibrating at the minimum means a course built well past it has to set up
+softer, or it overshoots the range. The band is advice for a course at the
+minimum, and the sheet says so.
 
 ### The band becomes guidance
 
@@ -211,7 +269,7 @@ and the pins pushed out of range has not.
 `scoreTournament` takes the winning total and the target in place of the setup
 and band; everything else about its shape stays.
 
-## 8. Money
+## 9. Money
 
 The closure is the cost: two, three or four days without green fees, food or
 the shop, against a hotel selling championship rooms. The plan measures one
@@ -224,7 +282,7 @@ it does today. If a passed National earns less than not bidding, the purse is
 retuned, not the closure. Wider Act III money pressure belongs to the run-up
 spec.
 
-## 9. Cards
+## 10. Cards
 
 The **result card** moves to the final evening and is rewritten around the new
 judge: the winning total against the target, how the week got there round by
@@ -233,12 +291,13 @@ as now. The impersonal tone stays — "the field", "the winner", never a name.
 
 The invitation card and the act-passed card are unchanged.
 
-## 10. What must be proven before shipping
+## 11. What must be proven before shipping
 
 Each a test or a recorded measurement, verified by sabotage where it is a test:
 
-1. **Free ride still dead.** Bid, never condition, brutal pins every round →
-   winner out of range at every rung, across seeds.
+1. **Free ride still dead.** Bid, never condition, brutal pins every round, on
+   a course at the rung's minimum → winner out of range at every rung, across
+   seeds.
 2. **Overcooking still fails.** Setup well past the band, easy pins every
    round → out of range.
 3. **Reachable.** Band midpoint, fair pins → in range at the calibrated rate.
@@ -256,10 +315,15 @@ Each a test or a recorded measurement, verified by sabotage where it is a test:
     multi-round with a simple pin policy (fair; ease to easy when tomorrow is
     windy or wet; tough when the leader is tracking under range) and
     `playActThree` completes the ladder. The plan records before/after money.
-11. **The existing suite stays green**, with tests that asserted the band as a
+11. **Difficulty is a requirement.** A course one point under the rung's
+    minimum on the first round is judged a miss even with the winner in range;
+    one at the minimum is not. Editing a hole is refused on a round day.
+12. **Difficulty is a lever.** Same seed, same setup, a harder eighteen → a
+    higher winning total.
+13. **The existing suite stays green**, with tests that asserted the band as a
     contract condition rewritten against the new judge rather than deleted.
 
-## 11. Not in this spec
+## 12. Not in this spec
 
 - The run-up: the inspector visit and weather affecting the setup climb (next
   spec).
