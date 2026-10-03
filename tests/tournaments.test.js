@@ -98,6 +98,9 @@ test('winning a bid books a date three weeks out', () => {
   assert.equal(booked.rung, 'regional');
   assert.equal(booked.day, 100 + RUN_UP_DAYS);
   assert.equal(booked.resolved, false);
+  assert.equal(booked.rounds, RUNGS.regional.rounds, 'the booking is the whole week');
+  assert.equal(booked.roundsPlayed, 0);
+  assert.equal(booked.roundSettings.pins, 'fair');
 });
 
 test('a bid is refused when the requirements are not met', () => {

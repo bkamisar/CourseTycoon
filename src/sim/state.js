@@ -1,5 +1,6 @@
 import { makeHole } from './hole.js';
 import { emptyGoodwill } from './goodwill.js';
+import { normaliseWeek } from './championshipWeek.js';
 import {
   MENU_SLOTS, itemsFor, ITEMS, MENU_AUDIENCE, exclusiveTo,
 } from './menu.js';
@@ -196,6 +197,7 @@ export function deserialize(text) {
   if (typeof parsed.resort?.setup !== 'number') parsed.resort.setup = 0;
   if (typeof parsed.resort?.setupTarget !== 'number') parsed.resort.setupTarget = 0;
   if (parsed.tournament === undefined) parsed.tournament = null;
+  parsed.tournament = normaliseWeek(parsed.tournament);
   if (!Array.isArray(parsed.tournamentsHosted)) parsed.tournamentsHosted = [];
   if (typeof parsed.actThreeArrived !== 'boolean') parsed.actThreeArrived = false;
   if (typeof parsed.actThreePassed !== 'boolean') parsed.actThreePassed = false;

@@ -74,9 +74,10 @@ export function newWeek(rungId, day) {
 /**
  * Fills in a booking from before the week existed.
  *
- * Saves and a great many tests carry `{ rung, day, resolved }` and nothing
- * else. Filling them in here, once, beats every reader guarding against a
- * missing field.
+ * Saves carry `{ rung, day, resolved }` from before the week and are
+ * normalised on load (`deserialize`). Readers still normalise too, because
+ * tests and older code build those short bookings directly on state.
+ * Filling them in here beats every reader guarding against a missing field.
  */
 export function normaliseWeek(t) {
   if (!t) return t;
@@ -105,6 +106,11 @@ export function withPins(week, id) {
  * leader's total is added here so it cannot disagree with the totals.
  */
 export function recordRound(week, { handicaps, playerToPar, entry = {} }) {
+  if (!playerToPar?.length) throw new Error('recordRound: no players in the round');
+  if (week.field && playerToPar.length !== week.field.totals.length) {
+    throw new Error(`recordRound: ${playerToPar.length} scores for a field of ${week.field.totals.length}`);
+  }
+  if (weekFinished(week)) throw new Error('recordRound: the week has already finished');
   const totals = week.field?.totals ?? new Array(playerToPar.length).fill(0);
   const nextTotals = totals.map((total, i) => total + (playerToPar[i] ?? 0));
   const roundsPlayed = week.roundsPlayed + 1;
@@ -112,7 +118,7 @@ export function recordRound(week, { handicaps, playerToPar, entry = {} }) {
     ...week,
     roundsPlayed,
     field: {
-      handicaps: week.field?.handicaps ?? handicaps,
+      handicaps: week.field?.handicaps ?? [...handicaps],
       totals: nextTotals,
     },
     roundLog: [
@@ -129,7 +135,7 @@ export function winningTotal(week) {
 }
 
 export function weekFinished(week) {
-  return week.roundsPlayed >= week.rounds;
+  return Boolean(week) && week.roundsPlayed >= week.rounds;
 }
 
 /**

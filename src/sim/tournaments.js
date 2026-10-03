@@ -15,6 +15,9 @@
  */
 
 import { clamp } from './hole.js';
+// A cycle with championshipWeek.js, harmless: each side only uses the
+// other's exports inside functions, at call time.
+import { newWeek } from './championshipWeek.js';
 
 /** The eighteen a championship needs. Named rather than inlined because
  * the Act I gate's nine and this are different numbers for different
@@ -316,7 +319,7 @@ export function bidFor(state, rungId, { holesOpen = 0 } = {}) {
     holesOpen,
   })) return null;
 
-  return { rung: rungId, day: state.day + RUN_UP_DAYS, resolved: false };
+  return newWeek(rungId, state.day + RUN_UP_DAYS);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { serialize, deserialize, newGame } from '../src/sim/state.js';
-import { RUNGS } from '../src/sim/tournaments.js';
+import { RUNGS, setupDifficultyBonus } from '../src/sim/tournaments.js';
 import {
   PINS, PIN_IDS, pinHandicap, newWeek, normaliseWeek, recordRound,
   winningTotal, weekFinished, weekUnderWay, withPins,
@@ -18,11 +18,15 @@ test('four pin settings, harder in order, fair changing nothing', () => {
 
 test('the pins span less than the setup dial does', () => {
   // The free-ride rule from the spec: brutal pins on an unconditioned
-  // course must not reach a conditioned one. The whole setup dial is worth
-  // 26/3 = 8.7 handicap points; the County band starts 45 points up it,
-  // which is 3.9. The pins' whole span has to be well under that.
+  // course must not reach a conditioned one. The County band's floor, in
+  // handicap points on the pins' scale, is what a properly set course
+  // demands; brutal on its own has to be well under half of it, and the
+  // pins' whole span well under three quarters.
+  const countyFloor = setupDifficultyBonus(RUNGS.countyOpen.band.low) / 3;
+  assert.ok(pinHandicap('brutal') < countyFloor / 2,
+    `brutal pins are worth ${pinHandicap('brutal')}, the County floor ${countyFloor}`);
   const span = pinHandicap('brutal') - pinHandicap('easy');
-  assert.ok(span < 3.9 * 0.75, `the pins span ${span} handicap points`);
+  assert.ok(span < countyFloor * 0.75, `the pins span ${span} handicap points`);
 });
 
 test('a new week carries everything the rung decides', () => {
@@ -45,6 +49,21 @@ test('an old-shaped booking is filled in rather than refused', () => {
   assert.equal(week.roundSettings.pins, 'fair');
   assert.deepEqual(week.roundLog, []);
   assert.equal(normaliseWeek(null), null);
+});
+
+test('normalising a week in progress changes nothing', () => {
+  let week = newWeek('national', 5);
+  week = recordRound(week, { handicaps: [1, 2], playerToPar: [3, -2], entry: { pins: 'tough' } });
+  week = withPins(week, 'brutal');
+  assert.deepEqual(normaliseWeek(week), week);
+});
+
+test('an old-shaped booking in a save comes back filled in', () => {
+  const state = newGame(3);
+  state.tournament = { rung: 'countyOpen', day: 40, resolved: false };
+  const revived = deserialize(serialize(state));
+  assert.equal(revived.tournament.rounds, 2);
+  assert.deepEqual(revived.tournament.roundLog, []);
 });
 
 test('recording rounds adds each player\'s score to their own total', () => {
@@ -70,6 +89,28 @@ test('the first round\'s handicaps are kept, whatever later rounds pass in', () 
   week = recordRound(week, { handicaps: [1, 2], playerToPar: [0, 0], entry: {} });
   week = recordRound(week, { handicaps: [9, 9], playerToPar: [0, 0], entry: {} });
   assert.deepEqual(week.field.handicaps, [1, 2]);
+});
+
+test('recording a round refuses what would corrupt the week', () => {
+  const week = newWeek('countyOpen', 10);
+  assert.throws(() => recordRound(week, { handicaps: [], playerToPar: [] }), /no players/);
+  const one = recordRound(week, { handicaps: [1, 2], playerToPar: [0, 0] });
+  assert.throws(() => recordRound(one, { handicaps: [1, 2, 3], playerToPar: [0, 0, 0] }),
+    /field of 2/);
+  const done = recordRound(one, { handicaps: [1, 2], playerToPar: [0, 0] });
+  assert.throws(() => recordRound(done, { handicaps: [1, 2], playerToPar: [0, 0] }),
+    /already finished/);
+});
+
+test('the field keeps its own copy of the handicaps', () => {
+  const handicaps = [1, 2];
+  const week = recordRound(newWeek('countyOpen', 10), { handicaps, playerToPar: [0, 0] });
+  handicaps[0] = 99;
+  assert.deepEqual(week.field.handicaps, [1, 2]);
+});
+
+test('a missing week is not finished', () => {
+  assert.equal(weekFinished(null), false);
 });
 
 test('no winner before anybody has finished a round', () => {
