@@ -843,5 +843,6 @@ test('a crew with real margin holds the turf through the week', () => {
     const t = playWeek(nationalWeekWith(10, TURF_EXPECTED + 2, seed), 9000 + seed).report.tournament;
     assert.ok(t.turfQuality >= TURF_EXPECTED,
       `seed ${seed}: ten keepers let the turf fall to ${t.turfQuality}`);
+    assert.ok(t.met.includes('turf'));
   }
 });

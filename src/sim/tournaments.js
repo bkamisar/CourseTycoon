@@ -197,8 +197,9 @@ export const CARE_DIVERTED_DURING_ROUNDS = 0.3;
  *
  * Set by measurement against tests/tournamentDay.test.js: six keepers who
  * arrive at a national with the turf just above TURF_EXPECTED must lose it
- * by the last round, and ten must hold it. Both pass at the first values
- * tried (this 1.5, CARE_DIVERTED_DURING_ROUNDS 0.3); nothing was tuned.
+ * by the last round, and ten must hold it. 1.5 is the first value tried
+ * for field wear; a 0.5 round-day diversion was tried and rejected, see
+ * CARE_DIVERTED_DURING_ROUNDS above.
  * Measured 2026-10-03, a national held at setup 86 on its minimum course,
  * turf arriving at 80, final turf after the fourth round on seeds 90 / 91
  * / 92:
@@ -212,6 +213,15 @@ export const CARE_DIVERTED_DURING_ROUNDS = 0.3;
  * Roughly ten points of final turf per keeper, so the line falls between
  * seven and eight: the dial stays a dial on round days rather than a
  * cliff, and both tests clear it by a wide margin rather than a lucky one.
+ *
+ * The lower rungs, same seeds, turf arriving at 80: the County Open at
+ * setup 52-60 loses it with six keepers (70-74) and holds with seven
+ * (78-82); the Regional at setup 70-78 loses it with seven (74-77) and
+ * holds with eight (83-86). So the crew a championship asks for is
+ * nearly flat across the ladder, seven or eight. The extra rounds up the
+ * ladder add little because the turf runs most of the way to the crew's
+ * level within the first two (six keepers at the National: 71, 66, 64,
+ * 62), so what separates the rungs is mostly the setup.
  */
 export const FIELD_WEAR_PER_SETUP = 1.5;
 
