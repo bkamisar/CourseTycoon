@@ -23,7 +23,7 @@ test('the result names every condition, met or missed', () => {
     day: 90,
     tournament: {
       rung: 'countyOpen',
-      met: ['band', 'turf'],
+      met: ['target', 'turf'],
       missed: ['pace', 'crowd'],
       paid: 61000, prestige: 4, barDays: 0,
       setup: 52, band: RUNGS.countyOpen.band, turfQuality: 88,
@@ -36,7 +36,7 @@ test('the result names every condition, met or missed', () => {
   const cards = championshipCards(report, { act: 3 });
   assert.equal(cards.length, 1);
   const card = cards[0];
-  for (const condition of ['band', 'turf', 'pace', 'crowd']) {
+  for (const condition of ['target', 'turf', 'pace', 'crowd']) {
     assert.ok(card.conditions.some((c) => c.id === condition),
       `${condition} must appear on the result card`);
   }
@@ -52,7 +52,7 @@ test('the card and the payout cannot disagree', () => {
   const report = {
     day: 91,
     tournament: {
-      rung: 'regional', met: ['band', 'turf', 'pace'], missed: ['crowd'],
+      rung: 'regional', met: ['target', 'turf', 'pace'], missed: ['crowd'],
       paid: 0, prestige: 6, barDays: 0,
       setup: 70, band: RUNGS.regional.band, turfQuality: 84,
       field: { averageToPar: 7.1, underPar: 1, best: -1, hardestHole: 9, averageRoundMinutes: 279 },
@@ -66,13 +66,13 @@ test('the card and the payout cannot disagree', () => {
     'the line items the card shows as met must sum to what it says was earned');
 });
 
-test('a missed band says the other conditions were earned but not paid', () => {
-  // Band gates the rest. The card must not silently drop three conditions
+test('a missed target says the other conditions were earned but not paid', () => {
+  // The target gates the rest. The card must not silently drop three conditions
   // the player genuinely met -- that reads as the game losing them.
   const report = {
     day: 92,
     tournament: {
-      rung: 'countyOpen', met: ['turf', 'pace', 'crowd'], missed: ['band'],
+      rung: 'countyOpen', met: ['turf', 'pace', 'crowd'], missed: ['target'],
       paid: RUNGS.countyOpen.baseFee, prestige: 2, barDays: 0,
       setup: 12, band: RUNGS.countyOpen.band, turfQuality: 94,
       field: { averageToPar: 1.1, underPar: 17, best: -8, hardestHole: 2, averageRoundMinutes: 241 },
@@ -81,7 +81,7 @@ test('a missed band says the other conditions were earned but not paid', () => {
   const [card] = championshipCards(report, { act: 3 });
   assert.equal(card.conditions.filter((c) => c.met).length, 3);
   assert.equal(card.conditions.filter((c) => c.paid).length, 0,
-    'nothing pays without the band');
+    'nothing pays without the target');
   assert.match(card.prompt, /band|set/i, 'and the card has to say why');
 });
 
@@ -89,7 +89,7 @@ test('a barred rung says so, because a setback the player cannot see is a dead e
   const report = {
     day: 93,
     tournament: {
-      rung: 'countyOpen', met: [], missed: ['band', 'turf', 'pace', 'crowd'],
+      rung: 'countyOpen', met: [], missed: ['target', 'turf', 'pace', 'crowd'],
       paid: RUNGS.countyOpen.baseFee, prestige: -6, barDays: 120,
       setup: 5, band: RUNGS.countyOpen.band, turfQuality: 40,
       field: { averageToPar: 1.2, underPar: 19, best: -7, hardestHole: 3, averageRoundMinutes: 240 },
@@ -103,7 +103,7 @@ test('the field is described, since it is what the dial was for', () => {
   const report = {
     day: 94,
     tournament: {
-      rung: 'national', met: ['band', 'turf', 'pace', 'crowd'], missed: [],
+      rung: 'national', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
       paid: 500000, prestige: 18, barDays: 0,
       setup: 86, band: RUNGS.national.band, turfQuality: 90,
       field: { averageToPar: 9.1, underPar: 0, best: 1, hardestHole: 17, averageRoundMinutes: 284 },
@@ -120,7 +120,7 @@ test('passing the act gets its own card, after the write-up', () => {
     day: 300,
     actThreePassed: true,
     tournament: {
-      rung: 'national', met: ['band', 'turf', 'pace', 'crowd'], missed: [],
+      rung: 'national', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
       paid: 500000, prestige: 18, barDays: 0,
       setup: 86, band: RUNGS.national.band, turfQuality: 90,
       field: { averageToPar: 9.1, underPar: 0, best: 1, hardestHole: 17, averageRoundMinutes: 284 },

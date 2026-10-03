@@ -87,18 +87,18 @@ export function championshipCards(report, state) {
   if (t) {
     const rung = RUNGS[t.rung];
     const contract = contractFor(t.rung);
-    const bandMet = (t.met ?? []).includes('band');
+    const targetMet = (t.met ?? []).includes('target');
 
     // Built from the contract's own line items, so what the card shows as
     // earned and what the day actually banked come from one source.
     // `met` is whether the condition was achieved; `paid` is whether it
-    // was worth anything, which the band gates.
+    // was worth anything, which the target gates.
     const conditions = (contract?.bonuses ?? []).map((bonus) => ({
       id: bonus.id,
       label: bonus.label,
       amount: bonus.amount,
       met: (t.met ?? []).includes(bonus.id),
-      paid: bandMet && (t.met ?? []).includes(bonus.id),
+      paid: targetMet && (t.met ?? []).includes(bonus.id),
     }));
 
     const wouldPay = conditions
@@ -107,7 +107,9 @@ export function championshipCards(report, state) {
 
     const earnedNotPaid = conditions.filter((c) => c.met && !c.paid);
 
-    const opening = bandMet
+    // Rewritten around the winning score in the report/card tasks: keyed on
+    // the target now, this copy still talks about the setup band.
+    const opening = targetMet
       ? `The course was set to ${t.setup}, which is where they wanted it.`
       : `The course was set to ${t.setup}. They asked for ${t.band?.low}–${t.band?.high}, `
         + 'and a venue that turns up outside the band has not staged a championship — '
@@ -136,7 +138,7 @@ export function championshipCards(report, state) {
 
     cards.push({
       id: `championship-result-${report.day ?? ''}`,
-      kicker: bandMet && t.paid >= (contract?.ceiling ?? 0) ? 'A GOOD WEEK' : 'THE WRITE-UP',
+      kicker: targetMet && t.paid >= (contract?.ceiling ?? 0) ? 'A GOOD WEEK' : 'THE WRITE-UP',
       speaker: rung?.label ?? 'The championship',
       prompt: `${opening} ${fieldStory(t.field)} ${money}${withheld}${standing}`,
       // Read by the UI, and by tests, so the four conditions can be shown
@@ -145,7 +147,7 @@ export function championshipCards(report, state) {
       conditions,
       wouldPay,
       field: fieldStory(t.field),
-      choices: acknowledge(bandMet ? 'Good' : 'Understood'),
+      choices: acknowledge(targetMet ? 'Good' : 'Understood'),
     });
   }
 

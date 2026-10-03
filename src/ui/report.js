@@ -296,7 +296,7 @@ export function paceVerdict({ avgMinutes, targetMinutes, hadWaits }) {
  * interface starts describing a different course from the one the field
  * played.
  *
- * `met` and `paid` are kept apart deliberately. The band gates the other
+ * `met` and `paid` are kept apart deliberately. The target gates the other
  * three, so a week can hold its turf at 94 and be paid nothing for it.
  * Showing that as "missed" would disagree with the player's own eyes;
  * showing it as paid would disagree with the bank.
@@ -305,7 +305,7 @@ function tournamentSection(report) {
   const t = report?.tournament;
   if (!t) return null;
   const contract = contractFor(t.rung);
-  const bandMet = (t.met ?? []).includes('band');
+  const targetMet = (t.met ?? []).includes('target');
   return {
     rung: t.rung,
     label: RUNGS[t.rung]?.label ?? t.rung,
@@ -316,7 +316,7 @@ function tournamentSection(report) {
     barDays: t.barDays,
     setup: t.setup,
     band: t.band,
-    bandMet,
+    targetMet,
     turfQuality: t.turfQuality,
     field: t.field,
     conditions: (contract?.bonuses ?? []).map((b) => ({
@@ -324,7 +324,7 @@ function tournamentSection(report) {
       label: b.label,
       amount: b.amount,
       met: (t.met ?? []).includes(b.id),
-      paid: bandMet && (t.met ?? []).includes(b.id),
+      paid: targetMet && (t.met ?? []).includes(b.id),
     })),
   };
 }
@@ -973,9 +973,11 @@ export function mountReport(root, { state, report, onContinue } = {}) {
 
     // What the course was and what was asked of it, side by side, so the
     // verdict underneath has something to be about.
+    // Rewritten around the winning score in the report/card tasks: keyed on
+    // the target now, this line still talks about the setup band.
     const setup = document.createElement('div');
-    setup.className = `report-champ-setup ${t.bandMet ? 'report-champ-ok' : 'report-champ-off'}`;
-    setup.textContent = t.bandMet
+    setup.className = `report-champ-setup ${t.targetMet ? 'report-champ-ok' : 'report-champ-off'}`;
+    setup.textContent = t.targetMet
       ? `Set to ${t.setup}, inside the ${t.band.low}-${t.band.high} they wanted.`
       : `Set to ${t.setup}. They wanted ${t.band.low}-${t.band.high}.`;
     champ.appendChild(setup);
@@ -999,7 +1001,7 @@ export function mountReport(root, { state, report, onContinue } = {}) {
       const row = document.createElement('div');
       row.className = 'report-champ-row';
       const name = document.createElement('span');
-      // Earned and paid are different things -- the band gates the rest --
+      // Earned and paid are different things -- the target gates the rest --
       // and a week can hold its turf and be paid nothing for it.
       name.textContent = `${c.paid ? '✓' : c.met ? '—' : '✗'} ${c.label}`;
       name.className = c.paid ? 'report-champ-ok'
@@ -1016,7 +1018,7 @@ export function mountReport(root, { state, report, onContinue } = {}) {
     const total = document.createElement('div');
     total.className = 'report-champ-row report-champ-total';
     const totalName = document.createElement('span');
-    totalName.textContent = t.bandMet ? 'The contract paid' : 'Base fee only';
+    totalName.textContent = t.targetMet ? 'The contract paid' : 'Base fee only';
     const totalValue = document.createElement('span');
     totalValue.textContent = `$${t.paid.toLocaleString()} of $${t.ceiling.toLocaleString()}`;
     total.append(totalName, totalValue);

@@ -687,7 +687,7 @@ export function playActThree(startState, {
         // whole point is that the operator does not aim.
         setup: Math.round((state.resort.setup ?? 0) * 10) / 10,
         band: RUNGS[hosted.rung].band,
-        inBand: hosted.met.includes('band'),
+        inTarget: hosted.met.includes('target'),
         met: hosted.met,
         missed: hosted.missed,
         paid: hosted.paid,

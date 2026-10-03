@@ -218,7 +218,7 @@ test('a championship day puts the tournament on the report', () => {
   const { state, report } = runDay(newGame(71), 71);
   report.tournament = {
     rung: 'countyOpen',
-    met: ['band', 'turf'],
+    met: ['target', 'turf'],
     missed: ['pace', 'crowd'],
     paid: 61000, prestige: 4, barDays: 0,
     setup: 52, band: { low: 45, high: 60 }, turfQuality: 88,
@@ -242,14 +242,14 @@ test('an ordinary day has no tournament section', () => {
 });
 
 test('the report distinguishes a condition earned from one that paid', () => {
-  // Band gates the rest. A section showing turf as simply "missed" when
+  // The target gates the rest. A section showing turf as simply "missed" when
   // the player held it at 94 would be the interface disagreeing with the
   // simulation; showing it as paid would disagree with the bank.
   const { state, report } = runDay(newGame(73), 73);
   report.tournament = {
     rung: 'countyOpen',
     met: ['turf', 'pace', 'crowd'],
-    missed: ['band'],
+    missed: ['target'],
     paid: 18000, prestige: 2, barDays: 0,
     setup: 12, band: { low: 45, high: 60 }, turfQuality: 94,
     field: {
@@ -261,6 +261,6 @@ test('the report distinguishes a condition earned from one that paid', () => {
   const data = computeReportData(state, report);
   const turf = data.tournament.conditions.find((c) => c.id === 'turf');
   assert.equal(turf.met, true, 'the turf was held');
-  assert.equal(turf.paid, false, 'and it paid nothing, because the band was missed');
+  assert.equal(turf.paid, false, 'and it paid nothing, because the target was missed');
   assert.equal(data.tournament.conditions.filter((c) => c.paid).length, 0);
 });
