@@ -291,7 +291,7 @@ test('a round day carries a round section, read off the round log', () => {
   assert.equal(r.leaderText, '+7');
   assert.equal(r.projected, 14, 'the whole-week pace, shown beside a target that is for the week');
   assert.equal(r.weatherLabel, 'Blowing hard');
-  assert.equal(r.averageText, '+6.2');
+  assert.equal(r.averageText, '6.2 over par');
   assert.equal(r.pinsLabel, 'Tough');
   assert.equal(r.tracking, 'on', 'leading +7 after two of four projects to +14, inside 12 to 18');
 });

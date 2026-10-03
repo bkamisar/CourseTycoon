@@ -246,21 +246,63 @@ test('a course a tenth short of the floor does not read as meeting it', () => {
   assert.doesNotMatch(card.prompt, /measured 45\b/);
 });
 
-test('a week with a hard run-up is told in a sentence from the round log', () => {
-  const log = (a, b, pins) => [
-    { round: 1, leaderToPar: a, pins: 'fair', weather: 'fair' },
-    { round: 2, leaderToPar: b, pins },
-  ];
-  const mk = (roundLog) => championshipCards({
+function weekPrompt(roundLog, extra = {}) {
+  return championshipCards({
     day: 98,
     tournament: {
       rung: 'regional', met: ['target', 'turf', 'pace', 'crowd'], missed: [],
       paid: 240000, prestige: 11, barDays: 0, setup: 70,
       band: RUNGS.regional.band, turfQuality: 86, difficulty: 57, minDifficulty: 55, difficultyMet: true,
       field: { averageToPar: 6, underPar: 1, best: -1, hardestHole: 12 },
-      week: { rounds: 2, winningTotal: 2, target: { low: 0, high: 4 }, roundLog },
+      week: { rounds: roundLog.length, winningTotal: 2, target: { low: 0, high: 4 }, roundLog },
+      ...extra,
     },
   }, { act: 3 })[0].prompt;
-  assert.match(mk(log(-1, 2, 'tough')), /leader was -1 after the first round and gave back 3 by the end\. The pins went in harder/);
-  assert.match(mk(log(2, -1, 'easy')), /leader was \+2 after the first round and found 3 by the end\. The pins came out easier/);
+}
+
+const round = (n, leaderToPar, pins) => ({ round: n, leaderToPar, pins, weather: 'fair' });
+
+test('the lead is a score, not a person who gave something back', () => {
+  const moved = weekPrompt([round(1, -1, 'fair'), round(2, 2, 'fair')]);
+  assert.match(moved, /The lead was -1 after the first round and \+2 by the end\./);
+  assert.doesNotMatch(moved, /gave back|found|leader was/i);
+  const still = weekPrompt([round(1, 2, 'fair'), round(2, 2, 'fair')]);
+  assert.match(still, /The lead was \+2 after the first round and never moved\./);
+});
+
+test('the pins are called harder or easier against the first round, only when that is true', () => {
+  const said = (log) => weekPrompt(log);
+  assert.match(said([round(1, 0, 'fair'), round(2, 1, 'tough')]), /pins went in harder/);
+  assert.match(said([round(1, 0, 'brutal'), round(2, 1, 'tough')]), /pins came out easier/);
+  assert.match(said([round(1, 0, 'easy'), round(2, 1, 'fair'), round(3, 2, 'brutal')]), /pins went in harder/);
+  // Opened tough and stayed tough: nothing went in harder.
+  assert.doesNotMatch(said([round(1, 0, 'tough'), round(2, 1, 'tough')]), /pins/);
+  // Went both ways: not a story.
+  assert.doesNotMatch(said([round(1, 0, 'fair'), round(2, 1, 'brutal'), round(3, 2, 'easy')]), /pins/);
+  // A pin id the game does not know says nothing rather than guessing.
+  assert.doesNotMatch(said([round(1, 0, 'fair'), round(2, 1, 'sadistic')]), /pins/);
+});
+
+test('a report with no target does not print an empty range', () => {
+  const prompt = weekPrompt([], { week: { rounds: 2, winningTotal: 2, roundLog: [] } });
+  assert.match(prompt, /The winner finished \+2/);
+  assert.doesNotMatch(prompt, / to  |inside the {2}|wanted \./);
+  const missed = weekPrompt([], {
+    met: ['turf'], missed: ['target'], week: { rounds: 2, winningTotal: 2, roundLog: [] },
+  });
+  assert.doesNotMatch(missed, /They wanted\s*,|wanted  /);
+  assert.match(missed, /misses the target/);
+});
+
+test('the field band comes from the tenth it prints', () => {
+  const [card] = championshipCards({
+    day: 99,
+    tournament: {
+      rung: 'regional', met: ['target'], missed: [], paid: 1, prestige: 0, barDays: 0, setup: 70,
+      band: RUNGS.regional.band, turfQuality: 86, difficulty: 57, minDifficulty: 55, difficultyMet: true,
+      field: { averageToPar: 3.96, underPar: 1, best: 0, hardestHole: 5 },
+      week: { rounds: 2, winningTotal: 0, target: { low: -2, high: 3 }, roundLog: [] },
+    },
+  }, { act: 3 });
+  assert.match(card.field, /4\.0 over par — a fair one/, '3.96 prints as 4.0, so it is called what 4.0 is');
 });

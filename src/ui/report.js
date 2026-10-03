@@ -35,7 +35,7 @@ import { openHoles } from '../sim/state.js';
 import { TARGET_MINUTES_PER_HOLE } from '../sim/schedule.js';
 import { RUNGS, contractFor } from '../sim/tournaments.js';
 import { PINS, projectTotal } from '../sim/championshipWeek.js';
-import { toParText } from './toPar.js';
+import { toParText, averageToParText } from './toPar.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 
 const RATING_SPECS = [
@@ -353,17 +353,6 @@ function trackingFor(leader, round, rounds, target) {
   return 'on';
 }
 
-/**
- * The field's average to par as a golfer says it: "+6.2", "0.4 under par".
- * Rounded to a tenth first so a value that rounds to nothing reads "even
- * par" rather than "+0.0".
- */
-function averageText(n) {
-  const tenth = Math.round(n * 10) / 10;
-  if (tenth === 0) return 'even par';
-  return tenth > 0 ? `+${tenth.toFixed(1)}` : `${Math.abs(tenth).toFixed(1)} under par`;
-}
-
 /** One round of a championship week, read off the day's report. Null on
  * every other day. */
 function roundSection(report) {
@@ -380,7 +369,7 @@ function roundSection(report) {
     // the week.
     projected: projectTotal(r.leaderToPar, r.round, r.rounds),
     averageToPar: r.averageToPar,
-    averageText: averageText(r.averageToPar),
+    averageText: averageToParText(r.averageToPar),
     underPar: r.underPar ?? null,
     hardestHole: r.hardestHole,
     averageRoundMinutes: r.averageRoundMinutes,

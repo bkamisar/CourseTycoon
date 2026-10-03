@@ -20,23 +20,12 @@
  * player at once.
  */
 import { RUNGS, contractFor } from '../sim/tournaments.js';
-import { toParText } from './toPar.js';
+import { PIN_IDS } from '../sim/championshipWeek.js';
+import { toParText, averageToParText } from './toPar.js';
 
 /** One button, for the cards that are announcements rather than choices. */
 function acknowledge(label = 'Understood') {
   return [{ label, cost: '' }];
-}
-
-/**
- * The field's average to par as a golfer says it: "6.2 over par",
- * "0.4 under par". Rounded to a tenth first so a value that rounds to
- * nothing reads "even par" rather than "0.0 over". (The evening report
- * words it the same way; it printed "-0.4 over" here once.)
- */
-function averageText(n) {
-  const tenth = Math.round(n * 10) / 10;
-  if (tenth === 0) return 'even par';
-  return `${Math.abs(tenth).toFixed(1)} ${tenth > 0 ? 'over' : 'under'} par`;
 }
 
 /**
@@ -54,7 +43,9 @@ function averageText(n) {
  */
 function fieldStory(field) {
   if (!field) return '';
-  const over = field.averageToPar;
+  // The band is picked from the tenth the text prints, so "gettable" never
+  // sits beside a figure that reads as something else.
+  const over = Math.round(field.averageToPar * 10) / 10;
   const shape = over >= 8 ? 'a proper test'
     : over >= 4 ? 'a fair one'
       : over >= 1 ? 'gettable'
@@ -64,15 +55,24 @@ function fieldStory(field) {
     : field.underPar === 1
       ? 'One player broke par.'
       : `${field.underPar} players broke par.`;
-  return `In the final round, the field averaged ${averageText(over)} — ${shape}. ${broke} `
+  return `In the final round, the field averaged ${averageToParText(over)} — ${shape}. ${broke} `
     + `The ${ordinalHole(field.hardestHole)} took the most off them.`;
 }
 
 /**
- * The week in a sentence: where the leader stood after the first round
- * and how it moved. Not a table -- the evening reports had the detail.
- * Empty for a week with fewer than two rounds logged, or a log without
- * scores, rather than inventing a story.
+ * The week in a sentence: where the lead stood after the first round and
+ * where it ended. Said of the SCORE, not a person -- the player leading
+ * after round one need not be the one leading at the end, and the card
+ * must not suggest they are. Not a table -- the evening reports had the
+ * detail. Empty for a week with fewer than two rounds logged, or a log
+ * without scores, rather than inventing a story.
+ *
+ * The pins are compared with the FIRST round's, by their order in
+ * `PIN_IDS`. "Harder" only when some later round was set harder than the
+ * opener and none easier, and likewise "easier"; a week that went both
+ * ways, or stayed put, says nothing. Comparing against a fixed word
+ * ("tough") told a week that opened tough and stayed tough that the pins
+ * "went in harder".
  */
 function weekStory(week) {
   const log = week?.roundLog ?? [];
@@ -80,16 +80,20 @@ function weekStory(week) {
   const first = log[0];
   const last = log.at(-1);
   if (!Number.isFinite(first.leaderToPar) || !Number.isFinite(last.leaderToPar)) return '';
-  const moved = last.leaderToPar - first.leaderToPar;
-  const toughened = log.slice(1).some((r) => r.pins === 'tough' || r.pins === 'brutal');
-  const eased = log.slice(1).some((r) => r.pins === 'easy');
-  const steer = toughened && !eased ? ' The pins went in harder as the week went on.'
-    : eased && !toughened ? ' The pins came out easier as the week went on.'
+  const opened = PIN_IDS.indexOf(first.pins);
+  const later = log.slice(1).map((r) => PIN_IDS.indexOf(r.pins));
+  const known = opened >= 0 && later.every((i) => i >= 0);
+  const harder = known && later.some((i) => i > opened);
+  const easier = known && later.some((i) => i < opened);
+  const steer = harder && !easier ? ' The pins went in harder as the week went on.'
+    : easier && !harder ? ' The pins came out easier as the week went on.'
       : '';
-  const drift = moved === 0
-    ? 'was still there at the end'
-    : `${moved > 0 ? 'gave back' : 'found'} ${Math.abs(moved)} by the end`;
-  return `The leader was ${toParText(first.leaderToPar)} after the first round and ${drift}.${steer}`;
+  const a = toParText(first.leaderToPar);
+  const b = toParText(last.leaderToPar);
+  const lead = first.leaderToPar === last.leaderToPar
+    ? `The lead was ${a} after the first round and never moved.`
+    : `The lead was ${a} after the first round and ${b} by the end.`;
+  return lead + steer;
 }
 
 /** "14th", "3rd" — a hole number as somebody would say it aloud. */
@@ -155,19 +159,25 @@ export function championshipCards(report, state) {
     // course under the difficulty floor is its own failure, told as that:
     // a course that was too easy has not been tested, whatever the field
     // shot. Difficulty is printed to the tenth because the report stores it
-    // floored to one, and "45 against at least 45" would read as a pass.
+    // floored to a tenth, and "45 against at least 45" would read as a pass.
     const w = t.week ?? {};
     const range = w.target
       ? `${toParText(w.target.low)} to ${toParText(w.target.high)}`
       : '';
+    // No target on the report (it should always be there) reads as a plain
+    // statement rather than printing an empty range.
+    const measured = typeof t.difficulty === 'number'
+      ? `The course measured ${t.difficulty.toFixed(1)} on the first morning`
+      : 'The course was not hard enough on the first morning';
+    const winner = `The winner finished ${toParText(w.winningTotal)}`;
     const opening = t.difficultyMet === false
-      ? `The course measured ${t.difficulty.toFixed(1)} on the first morning, and they had asked `
-        + `for at least ${t.minDifficulty}. A venue that easy has not staged a championship, whatever `
-        + 'the field shot — the week pays the base fee and nothing on top of it.'
+      ? `${measured}, and they had asked for at least ${t.minDifficulty}. A venue that easy `
+        + 'has not staged a championship, whatever the field shot — the week pays the base '
+        + 'fee and nothing on top of it.'
       : targetMet
-        ? `The winner finished ${toParText(w.winningTotal)}, inside the ${range} they wanted.`
-        : `The winner finished ${toParText(w.winningTotal)}. They wanted ${range}, and a week that `
-          + 'misses it has not tested the field — the base fee, and nothing on top of it.';
+        ? (range ? `${winner}, inside the ${range} they wanted.` : `${winner}, which suited them.`)
+        : `${winner}. ${range ? `They wanted ${range}, and a` : 'A'} week that misses the target `
+          + 'has not tested the field — the base fee, and nothing on top of it.';
 
     const money = `$${(t.paid ?? 0).toLocaleString()} against a ceiling of `
       + `$${(contract?.ceiling ?? 0).toLocaleString()}.`;

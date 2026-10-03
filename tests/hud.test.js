@@ -5,7 +5,7 @@ import { makeHole } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { newWeek, recordRound } from '../src/sim/championshipWeek.js';
 import { RUNGS } from '../src/sim/tournaments.js';
-import { toParText } from '../src/ui/toPar.js';
+import { toParText, averageToParText } from '../src/ui/toPar.js';
 import { computeHudData } from '../src/ui/hud.js';
 
 test('the HUD says nothing about tournaments when none is booked', () => {
@@ -68,6 +68,16 @@ test('a score to par reads like golf', () => {
   assert.equal(toParText(3), '+3');
   assert.equal(toParText(-2), '-2');
   assert.equal(toParText(null), '—');
+});
+
+test('a field average reads in words, from the rounded tenth', () => {
+  assert.equal(averageToParText(6.2), '6.2 over par');
+  assert.equal(averageToParText(-0.4), '0.4 under par');
+  assert.equal(averageToParText(0), 'even par');
+  assert.equal(averageToParText(0.04), 'even par', 'rounds to nothing, so no sign');
+  assert.equal(averageToParText(-0.04), 'even par', 'and no "-0.0"');
+  assert.equal(averageToParText(0.05), '0.1 over par');
+  assert.equal(averageToParText(9), '9.0 over par');
 });
 
 test('the run-up readout says whether the course is hard enough', () => {
