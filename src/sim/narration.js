@@ -96,6 +96,8 @@ export function narrationContext({ report, previousReport, state }) {
     rating: report.courseRating ?? 0,
     prestige: report.prestige ?? 0,
     groups: report.groupsPlayed ?? 0,
+    // False on a championship round day, when no public golfer plays.
+    publicDay: !report.tournamentDay,
     quiet: (report.groupsPlayed ?? 0) <= 6,
     busy: (report.groupsPlayed ?? 0) >= 28,
     slow: (report.averageRoundMinutes ?? 0) > targetMinutes * 1.25,
@@ -129,6 +131,20 @@ export function narrationContext({ report, previousReport, state }) {
   };
 }
 
+/*
+ * A line about the public -- groups on the course, a round, a sheet, a
+ * golfer's mood -- starts its `when` with `c.publicDay`. On a championship
+ * round day the course is closed to the public (`report.tournamentDay`) and
+ * only the field plays, so none of it is true, and a starter who "had two
+ * groups ask if there were forward tees" on a day no group was let on is the
+ * world making something up. Gated the way `hasShop` gates a shop line, on a
+ * fact the context carries (written inline, as those are, because the
+ * speaker-gate test reads each `when`'s source).
+ *
+ * The crowd lines (`dom`, `rising`, `falling`) need no such check: a closed
+ * day's crowd is forced to nothing, so `total` is 0 and they never pass.
+ */
+
 const dom = (key) => (c) => c.total > 0 && c.dominant === key && c.dominantShare >= 0.45;
 
 /**
@@ -144,16 +160,16 @@ export const LINES = [
   // her worth having as a voice: she is the only member of the cast who
   // watches the whole field rather than one spot on it. Every line here is
   // gated on the cart existing.
-  { id: 'dee-1', speaker: 'dee', text: "Ran the loop four times. Ice held. Just.", when: (c) => c.hasCart },
-  { id: 'dee-2', speaker: 'dee', text: "Nobody buys anything on the first two holes. Everybody buys on the sixth.", when: (c) => c.hasCart },
-  { id: 'dee-3', speaker: 'dee', text: "Group on the fourth waved me off. Group behind them bought six.", when: (c) => c.hasCart },
-  { id: 'dee-4', speaker: 'dee', text: "You can tell how the round's going by what they order.", when: (c) => c.hasCart },
-  { id: 'dee-5', speaker: 'dee', text: "Three fellas asked if I do food. Told them to take it up with you.", when: (c) => c.hasCart && !c.sellsFood },
-  { id: 'dee-6', speaker: 'dee', text: "Backed up on the seventh, so I sat there and sold out.", when: (c) => c.hasCart && c.slow },
-  { id: 'dee-7', speaker: 'dee', text: "Quiet out there. I did more waving than selling.", when: (c) => c.hasCart && c.quiet },
-  { id: 'dee-8', speaker: 'dee', text: "Couldn't get round fast enough today. Everyone wanted something.", when: (c) => c.hasCart && c.busy },
-  { id: 'dee-9', speaker: 'dee', text: "They're playing it careful out there. Careful golf is thirsty golf.", when: (c) => c.hasCart && c.tooHard },
-  { id: 'dee-10', speaker: 'dee', text: "Half of them were done before they'd finished a drink.", when: (c) => c.hasCart && c.tooEasy },
+  { id: 'dee-1', speaker: 'dee', text: "Ran the loop four times. Ice held. Just.", when: (c) => c.publicDay && c.hasCart },
+  { id: 'dee-2', speaker: 'dee', text: "Nobody buys anything on the first two holes. Everybody buys on the sixth.", when: (c) => c.publicDay && c.hasCart },
+  { id: 'dee-3', speaker: 'dee', text: "Group on the fourth waved me off. Group behind them bought six.", when: (c) => c.publicDay && c.hasCart },
+  { id: 'dee-4', speaker: 'dee', text: "You can tell how the round's going by what they order.", when: (c) => c.publicDay && c.hasCart },
+  { id: 'dee-5', speaker: 'dee', text: "Three fellas asked if I do food. Told them to take it up with you.", when: (c) => c.publicDay && c.hasCart && !c.sellsFood },
+  { id: 'dee-6', speaker: 'dee', text: "Backed up on the seventh, so I sat there and sold out.", when: (c) => c.publicDay && c.hasCart && c.slow },
+  { id: 'dee-7', speaker: 'dee', text: "Quiet out there. I did more waving than selling.", when: (c) => c.publicDay && c.hasCart && c.quiet },
+  { id: 'dee-8', speaker: 'dee', text: "Couldn't get round fast enough today. Everyone wanted something.", when: (c) => c.publicDay && c.hasCart && c.busy },
+  { id: 'dee-9', speaker: 'dee', text: "They're playing it careful out there. Careful golf is thirsty golf.", when: (c) => c.publicDay && c.hasCart && c.tooHard },
+  { id: 'dee-10', speaker: 'dee', text: "Half of them were done before they'd finished a drink.", when: (c) => c.publicDay && c.hasCart && c.tooEasy },
 
   // --- A locals' course ------------------------------------------------
   { id: 'loc-1', speaker: 'gus', text: "Same faces as yesterday. That's not a complaint.", when: dom('locals') },
@@ -189,47 +205,47 @@ export const LINES = [
   { id: 'fade-ser', speaker: 'gus', text: "The good players have gone quiet on us.", when: (c) => c.falling === 'serious' },
 
   // --- The course does not suit who is playing it -----------------------
-  { id: 'hard-1', speaker: 'gus', text: "Watched a fourball lose six balls between them. They were not laughing by the end.", when: (c) => c.tooHard },
-  { id: 'hard-2', speaker: 'regular', text: "I like a challenge. I don't like that.", when: (c) => c.tooHard },
-  { id: 'hard-3', speaker: 'starter', text: "Had two groups ask if there were forward tees. There aren't.", when: (c) => c.tooHard },
-  { id: 'hard-4', speaker: 'gus', text: "Someone picked up on the 4th and walked in. Just walked in.", when: (c) => c.tooHard },
-  { id: 'hard-5', speaker: 'shop', text: "Selling a remarkable number of golf balls. Make of that what you will.", when: (c) => c.hasShop && (c.tooHard) },
-  { id: 'easy-1', speaker: 'visitor', text: "Shot the best round of my life. Not sure it counts.", when: (c) => c.tooEasy },
-  { id: 'easy-2', speaker: 'gus', text: "Nobody's been in the trees all day. Feels wrong.", when: (c) => c.tooEasy },
-  { id: 'easy-3', speaker: 'visitor', text: "Pleasant enough. Wouldn't make a trip for it.", when: (c) => c.tooEasy },
-  { id: 'easy-4', speaker: 'starter', text: "Chap asked whether we had anything harder. We don't.", when: (c) => c.tooEasy },
+  { id: 'hard-1', speaker: 'gus', text: "Watched a fourball lose six balls between them. They were not laughing by the end.", when: (c) => c.publicDay && c.tooHard },
+  { id: 'hard-2', speaker: 'regular', text: "I like a challenge. I don't like that.", when: (c) => c.publicDay && c.tooHard },
+  { id: 'hard-3', speaker: 'starter', text: "Had two groups ask if there were forward tees. There aren't.", when: (c) => c.publicDay && c.tooHard },
+  { id: 'hard-4', speaker: 'gus', text: "Someone picked up on the 4th and walked in. Just walked in.", when: (c) => c.publicDay && c.tooHard },
+  { id: 'hard-5', speaker: 'shop', text: "Selling a remarkable number of golf balls. Make of that what you will.", when: (c) => c.publicDay && c.hasShop && (c.tooHard) },
+  { id: 'easy-1', speaker: 'visitor', text: "Shot the best round of my life. Not sure it counts.", when: (c) => c.publicDay && c.tooEasy },
+  { id: 'easy-2', speaker: 'gus', text: "Nobody's been in the trees all day. Feels wrong.", when: (c) => c.publicDay && c.tooEasy },
+  { id: 'easy-3', speaker: 'visitor', text: "Pleasant enough. Wouldn't make a trip for it.", when: (c) => c.publicDay && c.tooEasy },
+  { id: 'easy-4', speaker: 'starter', text: "Chap asked whether we had anything harder. We don't.", when: (c) => c.publicDay && c.tooEasy },
 
   // --- Turf -------------------------------------------------------------
-  { id: 'turf-great-1', speaker: 'visitor', text: "Greens are quicker than I expected. In a good way.", when: (c) => c.turf >= 85 },
+  { id: 'turf-great-1', speaker: 'visitor', text: "Greens are quicker than I expected. In a good way.", when: (c) => c.publicDay && c.turf >= 85 },
   { id: 'turf-great-2', speaker: 'keeper', text: "Fairways are holding. Bunkers raked before first light.", when: (c) => c.turf >= 85 },
   { id: 'turf-great-3', speaker: 'gus', text: "Somebody asked who looks after the greens. I told them it was me. Felt good.", when: (c) => c.turf >= 85 },
   { id: 'turf-great-4', speaker: 'press', text: "Conditioning here would not embarrass a club charging three times as much.", when: (c) => c.turf >= 90 },
   { id: 'turf-poor-1', speaker: 'keeper', text: "I can cut it or I can rake it. Not both. Not with this crew.", when: (c) => c.turf <= 40 },
-  { id: 'turf-poor-2', speaker: 'regular', text: "Greens are getting shaggy. You can see the grain from the fairway.", when: (c) => c.turf <= 40 },
-  { id: 'turf-poor-3', speaker: 'visitor', text: "Bunkers haven't been touched in days. Played out of a footprint on the 2nd.", when: (c) => c.turf <= 35 },
-  { id: 'turf-poor-4', speaker: 'gus', text: "Had to apologise for the greens twice today. I don't like apologising for the greens.", when: (c) => c.turf <= 30 },
+  { id: 'turf-poor-2', speaker: 'regular', text: "Greens are getting shaggy. You can see the grain from the fairway.", when: (c) => c.publicDay && c.turf <= 40 },
+  { id: 'turf-poor-3', speaker: 'visitor', text: "Bunkers haven't been touched in days. Played out of a footprint on the 2nd.", when: (c) => c.publicDay && c.turf <= 35 },
+  { id: 'turf-poor-4', speaker: 'gus', text: "Had to apologise for the greens twice today. I don't like apologising for the greens.", when: (c) => c.publicDay && c.turf <= 30 },
 
   // --- How busy it was --------------------------------------------------
-  { id: 'quiet-1', speaker: 'starter', text: "Sheet's thin. Had the first tee to myself most of the morning.", when: (c) => c.quiet },
-  { id: 'quiet-2', speaker: 'gus', text: "Walked the whole course and saw four people. Peaceful. Not profitable.", when: (c) => c.quiet },
-  { id: 'quiet-3', speaker: 'shop', text: "Sold a coffee. That was the day.", when: (c) => c.hasShop && (c.quiet) },
-  { id: 'busy-1', speaker: 'starter', text: "Every slot gone by ten. Turned people away.", when: (c) => c.busy },
-  { id: 'busy-2', speaker: 'gus', text: "Car park's full and there are two cars on the verge.", when: (c) => c.busy },
-  { id: 'busy-3', speaker: 'shop', text: "Ran out of scorecards. Actually ran out.", when: (c) => c.hasShop && (c.busy) },
+  { id: 'quiet-1', speaker: 'starter', text: "Sheet's thin. Had the first tee to myself most of the morning.", when: (c) => c.publicDay && c.quiet },
+  { id: 'quiet-2', speaker: 'gus', text: "Walked the whole course and saw four people. Peaceful. Not profitable.", when: (c) => c.publicDay && c.quiet },
+  { id: 'quiet-3', speaker: 'shop', text: "Sold a coffee. That was the day.", when: (c) => c.publicDay && c.hasShop && (c.quiet) },
+  { id: 'busy-1', speaker: 'starter', text: "Every slot gone by ten. Turned people away.", when: (c) => c.publicDay && c.busy },
+  { id: 'busy-2', speaker: 'gus', text: "Car park's full and there are two cars on the verge.", when: (c) => c.publicDay && c.busy },
+  { id: 'busy-3', speaker: 'shop', text: "Ran out of scorecards. Actually ran out.", when: (c) => c.publicDay && c.hasShop && (c.busy) },
 
   // --- Pace -------------------------------------------------------------
-  { id: 'slow-1', speaker: 'gus', text: "Spent my whole day telling people to keep up. They can't. There's nowhere to go.", when: (c) => c.slow },
-  { id: 'slow-2', speaker: 'regular', text: "Five hours. For nine holes. I've things to be doing.", when: (c) => c.slow },
-  { id: 'slow-3', speaker: 'starter', text: "Backed up onto the first tee before I'd finished my tea.", when: (c) => c.slow },
-  { id: 'slow-4', speaker: 'visitor', text: "Stood on three tees waiting. You lose the rhythm of it.", when: (c) => c.slow },
+  { id: 'slow-1', speaker: 'gus', text: "Spent my whole day telling people to keep up. They can't. There's nowhere to go.", when: (c) => c.publicDay && c.slow },
+  { id: 'slow-2', speaker: 'regular', text: "Five hours. For nine holes. I've things to be doing.", when: (c) => c.publicDay && c.slow },
+  { id: 'slow-3', speaker: 'starter', text: "Backed up onto the first tee before I'd finished my tea.", when: (c) => c.publicDay && c.slow },
+  { id: 'slow-4', speaker: 'visitor', text: "Stood on three tees waiting. You lose the rhythm of it.", when: (c) => c.publicDay && c.slow },
 
   // --- Mood -------------------------------------------------------------
-  { id: 'happy-1', speaker: 'gus', text: "Nobody complained to me all day. That's never happened.", when: (c) => c.satisfaction >= 72 },
-  { id: 'happy-2', speaker: 'starter', text: "Three groups rebooked before they'd left the car park.", when: (c) => c.satisfaction >= 72 },
-  { id: 'happy-3', speaker: 'regular', text: "Told two people at work about this place. Hope you can handle it.", when: (c) => c.satisfaction >= 78 },
-  { id: 'sad-1', speaker: 'gus', text: "Bit of an atmosphere out there today. Not a happy one.", when: (c) => c.satisfaction <= 32 },
-  { id: 'sad-2', speaker: 'starter', text: "Had someone ask for their money back. I said I'd pass it on. I'm passing it on.", when: (c) => c.satisfaction <= 28 },
-  { id: 'sad-3', speaker: 'regular', text: "I'll keep coming. I'm not sure the others will.", when: (c) => c.satisfaction <= 32 },
+  { id: 'happy-1', speaker: 'gus', text: "Nobody complained to me all day. That's never happened.", when: (c) => c.publicDay && c.satisfaction >= 72 },
+  { id: 'happy-2', speaker: 'starter', text: "Three groups rebooked before they'd left the car park.", when: (c) => c.publicDay && c.satisfaction >= 72 },
+  { id: 'happy-3', speaker: 'regular', text: "Told two people at work about this place. Hope you can handle it.", when: (c) => c.publicDay && c.satisfaction >= 78 },
+  { id: 'sad-1', speaker: 'gus', text: "Bit of an atmosphere out there today. Not a happy one.", when: (c) => c.publicDay && c.satisfaction <= 32 },
+  { id: 'sad-2', speaker: 'starter', text: "Had someone ask for their money back. I said I'd pass it on. I'm passing it on.", when: (c) => c.publicDay && c.satisfaction <= 28 },
+  { id: 'sad-3', speaker: 'regular', text: "I'll keep coming. I'm not sure the others will.", when: (c) => c.publicDay && c.satisfaction <= 32 },
 
   // --- Press ------------------------------------------------------------
   { id: 'press-top', speaker: 'press', text: "A short course that plays far longer than its card. Worth the detour.", when: (c) => c.rating >= 85 },
@@ -242,13 +258,13 @@ export const LINES = [
   // --- Prestige ---------------------------------------------------------
   { id: 'prest-1', speaker: 'shop', text: "Someone rang asking if we take society bookings. We've arrived.", when: (c) => c.hasShop && (c.prestige >= 65) },
   { id: 'prest-2', speaker: 'starter', text: "Had a caller ask how far in advance they need to book. That's new.", when: (c) => c.prestige >= 55 },
-  { id: 'prest-low', speaker: 'gus', text: "Man asked me for directions to the golf course. He was standing on it.", when: (c) => c.prestige <= 25 },
+  { id: 'prest-low', speaker: 'gus', text: "Man asked me for directions to the golf course. He was standing on it.", when: (c) => c.publicDay && c.prestige <= 25 },
 
   // --- Act II foreshadowing --------------------------------------------
-  { id: 'gate-1', speaker: 'visitor', text: "I'd play again tomorrow, but the nearest motel is forty minutes out.", when: (c) => c.nearGate },
-  { id: 'gate-2', speaker: 'starter', text: "Third person this week has asked whether we have rooms.", when: (c) => c.nearGate },
-  { id: 'gate-3', speaker: 'gus', text: "Couple drove up from the coast, played, and drove straight back. Seemed a shame.", when: (c) => c.nearGate },
-  { id: 'gate-4', speaker: 'shop', text: "They keep asking where to stay. I keep saying the pub in the village. They keep looking disappointed.", when: (c) => c.hasShop && (c.nearGate) },
+  { id: 'gate-1', speaker: 'visitor', text: "I'd play again tomorrow, but the nearest motel is forty minutes out.", when: (c) => c.publicDay && c.nearGate },
+  { id: 'gate-2', speaker: 'starter', text: "Third person this week has asked whether we have rooms.", when: (c) => c.publicDay && c.nearGate },
+  { id: 'gate-3', speaker: 'gus', text: "Couple drove up from the coast, played, and drove straight back. Seemed a shame.", when: (c) => c.publicDay && c.nearGate },
+  { id: 'gate-4', speaker: 'shop', text: "They keep asking where to stay. I keep saying the pub in the village. They keep looking disappointed.", when: (c) => c.publicDay && c.hasShop && (c.nearGate) },
 
   // --- Always available, so a day is never silent ------------------------
   { id: 'any-1', speaker: 'gus', text: "Nothing to report. Some days that's the report.", when: () => true },

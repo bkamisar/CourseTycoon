@@ -201,10 +201,69 @@ test('Dee stops asking for food once there is food', () => {
   // asking the owner for something already in her own cooler.
   const line = LINES.find((l) => l.id === 'dee-5');
   assert.ok(line, 'dee-5 should still exist');
-  assert.equal(line.when({ hasCart: true, sellsFood: true }), false,
+  assert.equal(line.when({ publicDay: true, hasCart: true, sellsFood: true }), false,
     'she must not ask for food the resort already sells');
-  assert.equal(line.when({ hasCart: true, sellsFood: false }), true,
+  assert.equal(line.when({ publicDay: true, hasCart: true, sellsFood: false }), true,
     'and must still ask when there genuinely is none');
-  assert.equal(line.when({ hasCart: false, sellsFood: false }), false,
+  assert.equal(line.when({ publicDay: true, hasCart: false, sellsFood: false }), false,
     'and never when she is not out there at all');
+});
+
+test('on a championship round day nobody talks about the public', () => {
+  // The course is closed to the public on a round day: the crowd is forced
+  // to nothing and only the field plays. A starter who "had two groups ask
+  // if there were forward tees" that day is making it up. Every sky of
+  // course, turf, mood, pace and prestige is tried, with the gate warning
+  // on, so a line gated on any of them is found.
+  const state = newGame(1);
+  state.resort.amenities.push({ type: 'beverageCart', menu: [] }, { type: 'proShop', menu: [] });
+  const publicTalk = /\b(groups?|foursomes?|fourballs?|golfers?|sheet|slot|people|someone|fellas?|chap|man|couple|rebooked|tee to myself)\b/i;
+  // The only lines a closed day may say: none is about golfers on the
+  // course. A new line has to be put on one side of this on purpose.
+  const closedDayIds = new Set([
+    'any-1', 'any-2', 'any-3', 'any-4', 'any-5', 'any-6',
+    'press-mid', 'press-samey', 'prest-1', 'prest-2',
+    'turf-great-2', 'turf-great-3', 'turf-great-4', 'turf-poor-1',
+  ]);
+  const seen = new Set();
+  for (const turf of [20, 50, 95]) {
+    for (const satisfaction of [20, 50, 80]) {
+      for (const difficulty of [5, 50, 95]) {
+        for (const averageRoundMinutes of [0, 600]) {
+          for (const prestige of [20, 50, 70]) {
+            const report = {
+              tournamentDay: true,
+              groupsPlayed: 0,
+              crowd: { locals: { count: 0 }, serious: { count: 0 }, destination: { count: 0 } },
+              courseDifficulty: difficulty,
+              turfQuality: turf,
+              averageSatisfaction: satisfaction,
+              averageRoundMinutes,
+              courseRating: 50,
+              prestige,
+              gate: { nearGate: true },
+            };
+            const context = narrationContext({ report, previousReport: undefined, state });
+            for (const line of LINES) if (line.when(context)) seen.add(line.id);
+            for (let seed = 1; seed <= 25; seed++) {
+              const picked = pickNarration(context, makeRng(seed), []);
+              assert.ok(picked, 'a closed day still says something');
+              assert.ok(!publicTalk.test(picked.text) || closedDayIds.has(picked.id),
+                `${picked.id} talks about the public on a round day: "${picked.text}"`);
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.deepEqual([...seen].filter((id) => !closedDayIds.has(id)), [],
+    'lines that need the public were eligible on a round day');
+});
+
+test('an ordinary day still draws the public lines', () => {
+  const report = { groupsPlayed: 3, courseDifficulty: 95, turfQuality: 50, crowd: {} };
+  const context = narrationContext({ report, previousReport: undefined, state: newGame(1) });
+  assert.equal(context.publicDay, true);
+  assert.ok(LINES.filter((l) => l.when(context)).some((l) => l.id.startsWith('hard-')));
+  assert.ok(LINES.filter((l) => l.when(context)).some((l) => l.id.startsWith('quiet-')));
 });
