@@ -74,14 +74,18 @@ export const CHAMPIONSHIP_HOLES = 18;
  * reaches 64.4. So each rung asks for some redesign and none asks for a
  * rebuild.
  *
- * `baseFee` and `purseCeiling` are the original purses times 1.6, every
- * rung by the same factor, rounded (2026-10-03): County $18k / $100k ->
- * $29k / $160k, Regional $30k / $240k -> $48k / $380k, National $55k /
- * $500k -> $88k / $800k. The author's rule: a ladder that hits all three
- * targets should roughly break even against never bidding, and one with
- * a miss should lose.
+ * `baseFee` and `purseCeiling` are the original purses times about 1.48,
+ * every rung by the same factor, rounded to the thousand. They were 1.6x
+ * (2026-10-03: County $18k / $100k -> $29k / $160k, Regional $30k / $240k
+ * -> $48k / $380k, National $55k / $500k -> $88k / $800k) and were trimmed
+ * by x0.925 on 2026-10-04 (see the last measurement below) to $27k /
+ * $148k, $44k / $352k, $81k / $740k. The author's rule: a ladder that
+ * hits all three targets should roughly break even against never bidding,
+ * and one with a miss should lose.
  *
- * Measured by `node tools/actThree.js` (8 settled resorts x 4 Act III
+ * The measurements in this comment up to the last paragraph were made at
+ * the 1.6x purses; the money columns scale by 0.925 and nothing else in
+ * them moves. Measured by `node tools/actThree.js` (8 settled resorts x 4 Act III
  * seeds = 32 ladders; the table is above `playActThree` in
  * tools/operator.js), with the operator playing as a competent player
  * would: narrowing the night before the first round and widening after,
@@ -117,7 +121,7 @@ export const CHAMPIONSHIP_HOLES = 18;
  * on, the crowd stands bought on top of the requirements). Weighting
  * toward it would make the National a money-maker and the County a loss.
  *
- * The National's crowd bonus ($92,560 here) is earned by a sensible resort,
+ * The National's crowd bonus ($92,560 at the 1.6x purse) is earned by a sensible resort,
  * without the short course. It was not until 2026-10-04: the gallery was
  * 12,000 and every championship building plus the rest of a built-out
  * property holds 11,600, so the last 400 needed the short course
@@ -139,7 +143,18 @@ export const CHAMPIONSHIP_HOLES = 18;
  * point to rescale (derive the factor from the hosted checkpoints; the
  * purse moves nothing but money). Tables above `playActThree` in tools/operator.js.
  *
- * Base stays the same share of the ceiling (18%, 12.6%, 11%), so a
+ * Trimmed the same day (2026-10-04, third run): every rung's base fee and
+ * ceiling x0.925, rounded to the thousand (County $29k / $160k -> $27k /
+ * $148k, Regional $48k / $380k -> $44k / $352k, National $88k / $800k ->
+ * $81k / $740k). The same 18 ladders hit all three targets with the same
+ * scores and now finished at a median of +$1.7k against never bidding
+ * (quartiles -$21k to +$61k, range -$201k to +$136k, 9 of 18 below zero;
+ * break-even multiplier x0.999); the 14 with a miss all lost (median
+ * -$380k, -$987k to -$66k). The per-rung figures above ("$160k",
+ * "$380k", "$707k") are at the old purses, so scale them by 0.925 to
+ * compare. The National's crowd bonus is $85,670 at the new purse.
+ *
+ * Base stays the same share of the ceiling (18%, 12.5%, 11%), so a
  * missed target still pays well under half.
  */
 const LIST = [
@@ -154,8 +169,8 @@ const LIST = [
     rounds: 2,
     minDifficulty: 45,
     target: { low: -3, high: 3 },
-    baseFee: 29000,
-    purseCeiling: 160000,
+    baseFee: 27000,
+    purseCeiling: 148000,
     prepPerDay: 1600,
   },
   {
@@ -169,8 +184,8 @@ const LIST = [
     rounds: 3,
     minDifficulty: 55,
     target: { low: 2, high: 8 },
-    baseFee: 48000,
-    purseCeiling: 380000,
+    baseFee: 44000,
+    purseCeiling: 352000,
     prepPerDay: 3200,
   },
   {
@@ -184,8 +199,8 @@ const LIST = [
     rounds: 4,
     minDifficulty: 65,
     target: { low: 14, high: 20 },
-    baseFee: 88000,
-    purseCeiling: 800000,
+    baseFee: 81000,
+    purseCeiling: 740000,
     prepPerDay: 5400,
   },
 ];

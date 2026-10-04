@@ -903,7 +903,71 @@ function buildFor(state, rungId) {
  * against never bidding" is a claim about the twenty-one days as much as
  * about the day.
  *
- * RE-MEASURED 2026-10-04 (second run), after two changes to the game: a
+ * RE-MEASURED 2026-10-04 (third run), after trimming the purses to x0.925
+ * of the 1.6x ones (County $27k / $148k, Regional $44k / $352k, National
+ * $81k / $740k; tournaments.js). Only the hosted phase was asked for,
+ * `node tools/actThree.js --seeds 8 --samples 4 --force=hosted`, on the
+ * same settled resorts (the fingerprint changed with the purses, so the
+ * never-bid phase reran too, to the same numbers). The purse moves nothing
+ * but money, and it did: every ladder below has the same weeks, scores and
+ * hits as the second run's table under it, and each `paid` is 0.925 of
+ * its old figure to within rounding of the rungs. Same columns:
+ *
+ *   ladder  weeks played                             paid          worth
+ *    1.1  C +2 H, R +7 H, N +22 m, N +14 H                $1,259,400   -$407,231
+ *    1.2  C -1 H, R +11 m, R +12 m                          $236,000   -$742,845
+ *    1.3  C +2 H, R +6 H, N +15 H                         $1,178,400     +$4,527
+ *    1.4  C +1 H, R +5 H, N +19 H                         $1,178,400   +$110,379
+ *    2.1  C -1 H, R +10 m, R +7 H, N +17 H                $1,284,000   -$168,011
+ *    2.2  C -2 H, R +7 H, N +7 m, N +19 H                 $1,321,000   -$329,068
+ *    2.3  C -1 H, R +7 H, N +21 m, N +20 H                $1,321,000   -$211,164
+ *    2.4  C 0 H, R +6 H, N +17 H                          $1,240,000    -$12,914
+ *    3.1  C +3 H, R +5 H, N +16 H                         $1,240,000    +$55,703
+ *    3.2  C -2 H, R +9 m, R +11 m                           $236,000   -$809,660
+ *    3.3  C +2 H, R +8 H, N +19 H                         $1,240,000    -$17,627
+ *    3.4  C +2 H, R +6 H, N +18 H                         $1,240,000    +$65,431
+ *    4.1  C -1 H, R +6 H, N +21 m, N +20 H                $1,237,840   -$351,806
+ *    4.2  C +2 H, R +4 H, N +19 H                         $1,240,000     -$1,099
+ *    4.3  C +2 H, R +7 H, N +17 H                         $1,240,000    -$21,955
+ *    4.4  C +2 H, R +13 m, R +5 H, N +13 m                  $625,000   -$900,019
+ *    5.1  C -1 H, R +3 H, N +20 H                         $1,000,470   -$200,826
+ *    5.2  C +2 H, R +8 H, N +17 H                         $1,178,400    +$62,205
+ *    5.3  C +4 m, C -2 H, R +5 H, N +15 H                 $1,267,000    -$66,181
+ *    5.4  C 0 H, R +4 H, N +18 H                          $1,178,400    +$44,372
+ *    6.1  C -1 H, R +7 H, N +18 H                         $1,240,000   +$135,859
+ *    6.2  C +3 H, R +6 H, N +22 m, N +17 H                $1,321,000   -$329,952
+ *    6.3  C -2 H, R +5 H, N +20 H                         $1,240,000    +$30,714
+ *    6.4  C +2 H, R +3 H, N +18 H                         $1,240,000     -$8,977
+ *    7.1  C +1 H, R +8 H, N +25 m, N +22 m                  $662,000   -$986,681
+ *    7.2  C -1 H, R +8 H, N +21 m, N +17 H                $1,189,200   -$426,257
+ *    7.3  C +1 H, R +7 H, N +20 H                         $1,240,000    +$67,096
+ *    7.4  C -1 H, R +9 m, R +8 H, N +18 H                 $1,152,200   -$352,470
+ *    8.1  C -1 H, R +7 H, N +19 H                         $1,108,200    -$73,576
+ *    8.2  C +2 H, R +3 H, N +18 H                         $1,108,200    -$49,952
+ *    8.3  C -3 H, R +6 H, N +16 H                         $1,108,200    -$71,046
+ *    8.4  C -1 H, R +11 m, R +10 m                          $236,000   -$653,517
+ *
+ *   All three hit first time (18): median +$1.7k, quartiles -$21k .. +$61k,
+ *                        range -$201k .. +$136k, 9 of 18 below zero.
+ *   A week missed (14):  median -$380k, quartiles -$721k .. -$329k, range
+ *                        -$987k .. -$66k, 14 of 14 lose. Of these, 9 missed a
+ *                        rung and then hit every rung on the retry (median
+ *                        -$330k, -$426k .. -$66k) and 5 never finished the
+ *                        ladder in 240 days (median -$810k, -$987k .. -$654k).
+ *   Every sample (32):   median -$69k, quartiles -$352k .. +$11k.
+ *
+ *   The all-hit median is +$1.7k (was +$99k), inside the +-$50k the trim was
+ *   aiming for; the break-even multiplier on these purses reads x0.999. The
+ *   first-attempt hit rates are the second run's, to the week: target County
+ *   31 of 32, Regional 26 of 32, National 21 of the 29 that got that far;
+ *   turf 31 / 31 / 27, pace 32 / 25 / 22, floor 32 / 32 / 29, crowd 32 / 32 /
+ *   29. Over every week played target 32 / 29 / 27 of 33 / 38 / 36. Profit
+ *   per day, medians: run-up $17.8k, round days -$1.6k, ordinary $25.8k,
+ *   never bidding $26.5k.
+ *
+ * BEFORE THAT (2026-10-04, second run, purses 1.6x: $29k / $160k, $48k /
+ * $380k, $88k / $800k, so its `paid` and `worth` columns are at those
+ * purses, not today's). Measured after two changes to the game: a
  * championship is always played over every open hole (a decision event's
  * closure no longer shortens it, so FLOOR_MARGIN fell from +3 to +1), and
  * the National's gallery fell from 12,000 to 11,000 so its crowd bonus can
@@ -961,12 +1025,12 @@ function buildFor(state, rungId) {
  *   The all-hit median moved from -$17k to +$99k, and the break-even
  *   multiplier on today's purses reads x0.924. The crowd bonus is most of
  *   it: the National's crowd was earned in all 36 National weeks (it was
- *   never earned before, 0 of 34), which is $92,560 at the current purse
+ *   never earned before, 0 of 34), which is $92,560 at the 1.6x purse
  *   on each ladder that reached it; the smaller floor margin may add a
  *   little, by making the week's course easier on the locals. +$99k is inside the +-$100k
  *   past which the purse is rescaled, by $0.7k, so the purses are LEFT at
  *   1.6x. A rescale to x0.924 would be the next move if the all-hit median
- *   drifts further up.
+ *   drifts further up. (Done in the third run above: x0.925.)
  *
  *   First attempts per rung (a retry is not counted): target County 31 of
  *   32, Regional 26 of 32, National 21 of the 29 that got that far (before:

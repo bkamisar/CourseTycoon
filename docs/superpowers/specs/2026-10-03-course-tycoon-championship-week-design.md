@@ -435,8 +435,11 @@ earlier measurements had the host narrowing for the whole run-up, and charged
 the ladder for a course the locals avoid on every one of those days.
 
 So the purse was retuned, not the closure: every rung's base fee and ceiling
-is the original times 1.6 (County $29k / $160k, Regional $48k / $380k,
-National $88k / $800k). One factor, because at 1.6 each rung's own cost and
+was set to the original times 1.6 (County $29k / $160k, Regional $48k / $380k,
+National $88k / $800k) and has since been trimmed by x0.925 to **County $27k /
+$148k, Regional $44k / $352k, National $81k / $740k** (the last paragraph of
+this section). The measurements in between were made at 1.6x, and their money
+figures are at those purses. One factor, because at 1.6 each rung's own cost and
 what a week that hits its target is paid nearly match (County $164k against
 $160k, Regional $383k against $380k, National $566k against $707k, the
 National's surplus covering costs no single week carries); the reasoning is
@@ -477,8 +480,21 @@ floor margin cut from +3 to +1: the 18 ladders that hit all three targets
 first time finished at a median of +$99k against never bidding (quartiles +$78k
 to +$157k, range -$120k to +$236k), and the National's crowd was earned in all 36
 National weeks. Inside the +-$100k rescale line by $0.7k, so the purses were
-left at 1.6x (the break-even multiplier reads x0.924); the rise is mostly the
-bonus itself. Wider Act III money pressure belongs to the run-up spec.
+left at 1.6x for that run (the break-even multiplier read x0.924); the rise is
+mostly the bonus itself. Wider Act III money pressure belongs to the run-up
+spec.
+
+**Trimmed the same day, to x0.925** (the rule is that a ladder that hits all
+three targets roughly breaks even; +$99k, with every all-hit ladder in profit,
+had stopped being that). Base fee and ceiling, rounded to the thousand: County
+$27k / $148k, Regional $44k / $352k, National $81k / $740k; the National's
+crowd bonus is $85,670. Re-run (`node tools/actThree.js --seeds 8 --samples 4
+--force=hosted`): the same 18 ladders hit all three targets with the same
+scores, since a purse moves nothing but money, and finished at a median of
++$1.7k against never bidding (quartiles -$21k to +$61k, range -$201k to +$136k,
+9 of 18 below zero; break-even multiplier x0.999). All 14 ladders with a miss
+still lost (median -$380k, -$987k to -$66k). Table above `playActThree` in
+`tools/operator.js`.
 
 ## 10. Cards
 
