@@ -1,7 +1,6 @@
 import { SPEAKERS as NARRATION_SPEAKERS, narrationContext } from './narration.js';
 import { SEGMENT_KEYS } from './segments.js';
-// A cycle through state.js, harmless: normaliseWeek is only called inside
-// eventContext, at call time.
+// For the championship fields of eventContext.
 import { normaliseWeek } from './championshipWeek.js';
 
 /**

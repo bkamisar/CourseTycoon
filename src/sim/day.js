@@ -18,7 +18,7 @@ import { narrationContext, pickNarration, rememberNarration } from './narration.
 import { SEGMENT_KEYS } from './segments.js';
 import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
 import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEvent } from './events.js';
-import { CHAMPIONSHIP_EVENTS } from './championshipEvents.js';
+import { CHAMPIONSHIP_EVENTS, resolveChoice } from './championshipEvents.js';
 import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
 import { weatherOn, forecast, effectsOf } from './weather.js';
 import {
@@ -40,7 +40,7 @@ import {
 } from './tournaments.js';
 import { playField, drawFieldHandicaps, FIELD_GROUPS } from './field.js';
 import {
-  normaliseWeek, recordRound, winningTotal, weekFinished,
+  normaliseWeek, recordRound, winningTotal, weekFinished, withEventEffect, clearEventEffect,
 } from './championshipWeek.js';
 import {
   practiceForecast, projectSetup, practiceSeed, PRACTICE_DAYS_BEFORE,
@@ -827,10 +827,7 @@ export function runDay(state, seed) {
 
     if (!weekFinished(played)) {
       // An event's effect is on the next round only: this one has used it.
-      next.tournament = {
-        ...played,
-        roundSettings: { ...played.roundSettings, eventHandicap: 0, eventPace: 1 },
-      };
+      next.tournament = clearEventEffect(played);
     } else {
       const result = scoreTournament(played.rung, {
         // The winner's total is the judge; the setup band is guidance on
@@ -956,21 +953,7 @@ export function runDay(state, seed) {
       rng,
       seenEvents
     );
-    if (picked) {
-      pendingEvent = {
-        id: picked.id,
-        speaker: EVENT_SPEAKERS[picked.speaker],
-        prompt: picked.prompt,
-        // Label, cost and stance — everything the card needs to be read,
-        // and nothing the card could act on. The effects deliberately stay
-        // behind in the library: applyEventChoice looks them up by id, so
-        // a report that has been round-tripped through a save cannot apply
-        // numbers that no longer match the event as written.
-        choices: picked.choices.map((c) => ({
-          label: c.label, cost: c.cost, stance: c.stance,
-        })),
-      };
-    }
+    if (picked) pendingEvent = pendingEventFor(picked, next);
   }
   report.pendingEvent = pendingEvent;
   next.eventsSeen = rememberEvent(seenEvents, pendingEvent?.id);
@@ -1260,6 +1243,33 @@ export function runDay(state, seed) {
 }
 
 /**
+ * An event as the decision card shows it, for `report.pendingEvent`.
+ *
+ * Label, cost and stance — everything the card needs to be read, and
+ * nothing the card could act on. The effects deliberately stay behind in
+ * the library: applyEventChoice looks them up by id, so a report that has
+ * been round-tripped through a save cannot apply numbers that no longer
+ * match the event as written.
+ *
+ * Each choice goes through `resolveChoice` at the booked rung, which fills
+ * a championship event's `{money}` with the sum `applyEventChoice` will
+ * move (championshipEvents.js). An ordinary event's choice comes back
+ * unchanged.
+ */
+export function pendingEventFor(event, state) {
+  const rung = state.tournament?.rung;
+  return {
+    id: event.id,
+    speaker: EVENT_SPEAKERS[event.speaker],
+    prompt: event.prompt,
+    choices: event.choices.map((c) => {
+      const { label, cost, stance } = resolveChoice(c, rung);
+      return { label, cost, stance };
+    }),
+  };
+}
+
+/**
  * Applies a decision event's outcome: the player answered `report.
  * pendingEvent` and picked `choiceIndex`. Pure, like everything else here —
  * returns a new state, and the one passed in is never mutated.
@@ -1278,7 +1288,9 @@ export function applyEventChoice(state, eventId, choiceIndex) {
   if (!choice) throw new Error(`applyEventChoice: "${eventId}" has no choice at index ${choiceIndex}`);
 
   const next = structuredClone(state);
-  const effects = choice.effects ?? {};
+  // Priced at the booked rung, by the same function that wrote the card's
+  // figure (`pendingEventFor`). An ordinary event's effects pass through.
+  const effects = resolveChoice(choice, state.tournament?.rung).effects;
   next.money = (next.money ?? 0) + (effects.money ?? 0);
   next.prestige = clamp((next.prestige ?? 0) + (effects.prestige ?? 0), 0, 100);
   next.turfQuality = clamp((next.turfQuality ?? 0) + (effects.turf ?? 0), 0, 100);
@@ -1299,21 +1311,12 @@ export function applyEventChoice(state, eventId, choiceIndex) {
     next.resort.setup = clamp((next.resort.setup ?? 0) + effects.setup, 0, 100);
   }
   // The next round's handicap and pace, held on the week until `runDay`
-  // plays that round and clears them. Summed and multiplied, so two events
-  // in one evening (possible only in a save edited by hand, or a test)
-  // both count. With nothing booked there is no next round to hold them
-  // for, and nothing is stored: the rhythm only fires week events on an
-  // evening before a round, so this is a guard rather than a path.
+  // plays that round and clears them (`withEventEffect`). With nothing
+  // booked there is no next round to hold them for, and nothing is stored:
+  // the rhythm only fires week events on an evening before a round, so this
+  // is a guard rather than a path.
   if (effects.nextRound && next.tournament) {
-    const week = normaliseWeek(next.tournament);
-    next.tournament = {
-      ...week,
-      roundSettings: {
-        ...week.roundSettings,
-        eventHandicap: week.roundSettings.eventHandicap + (effects.nextRound.handicap ?? 0),
-        eventPace: week.roundSettings.eventPace * (effects.nextRound.pace ?? 1),
-      },
-    };
+    next.tournament = withEventEffect(next.tournament, effects.nextRound);
   }
 
   /**

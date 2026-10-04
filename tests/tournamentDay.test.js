@@ -1245,13 +1245,14 @@ test('a pending next-round effect survives a save', () => {
 test('a championship event\'s setup lands on the course now, inside 0-100', () => {
   const event = CHAMPIONSHIP_EVENTS.find((e) => e.choices.some((c) => c.effects.setup > 0));
   const index = event.choices.findIndex((c) => c.effects.setup > 0);
-  const { setup, money = 0 } = event.choices[index].effects;
+  const { setup, moneyDays = 0 } = event.choices[index].effects;
   const state = openFullCourse(actThreeResort(84));
   state.tournament = newWeek('countyOpen', state.day + 15);
   state.resort.setup = 40;
   const after = applyEventChoice(state, event.id, index);
   assert.equal(after.resort.setup, 40 + setup);
-  assert.equal(after.money, state.money + money, 'and the rest of the choice with it');
+  assert.equal(after.money, state.money + moneyDays * RUNGS.countyOpen.prepPerDay,
+    'and the rest of the choice with it, priced at the booked rung');
   assert.equal(state.resort.setup, 40, 'without touching the state it was given');
 
   state.resort.setup = 99;
@@ -1269,4 +1270,31 @@ test('a next-round effect answered with nothing booked is dropped, not stored', 
   const state = actThreeResort(85);
   state.tournament = null;
   assert.equal(applyEventChoice(state, easing.id, easing.index).tournament, null);
+});
+
+test('the sheet shows a pending next-round effect beside the pins', () => {
+  // The player sets the pins the morning after answering the event, and
+  // the event moves the same round: the sheet has to say so, read off the
+  // week playField will be handed.
+  const easing = choicesWith({ nextRound: { handicap: -0.375 } })[0];
+  const slowing = CHAMPIONSHIP_EVENTS.flatMap((e) => e.choices.map((c, index) => ({ id: e.id, index, c })))
+    .find(({ c }) => Object.keys(c.effects).join() === 'nextRound' && c.effects.nextRound.pace > 1);
+  const tonight = regionalAfterRoundOne(86);
+  const before = computeChampionshipData(tonight).booked;
+  assert.equal(before.inWeek, true);
+  assert.equal(before.pendingEffect, null, 'nothing pending, nothing said');
+  assert.equal(before.eventHandicap, 0);
+  assert.equal(before.eventPace, 1);
+
+  let evented = applyEventChoice(tonight, easing.id, easing.index);
+  evented = applyEventChoice(evented, slowing.id, slowing.index);
+  const pending = computeChampionshipData(evented).booked;
+  assert.equal(pending.eventHandicap, -0.375);
+  assert.equal(pending.eventPace, slowing.c.effects.nextRound.pace);
+  assert.equal(pending.pendingEffect, `Last night’s call: this round plays half a pin setting easier, `
+    + `and every hole plays ${Math.round((slowing.c.effects.nextRound.pace - 1) * 100)}% slower.`);
+
+  // And gone once the round has used it.
+  const played = runDay(evented, 8601).state;
+  assert.equal(computeChampionshipData(played).booked.pendingEffect, null);
 });

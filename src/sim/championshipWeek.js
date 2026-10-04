@@ -115,6 +115,30 @@ export function withPins(week, id) {
 }
 
 /**
+ * The same week with a championship event's effect on the next round added
+ * (championshipEvents.js): handicap points summed, pace multiplied, so two
+ * calls both count. Normalises first, so an old-shaped booking gains the
+ * defaults rather than adding to undefined.
+ */
+export function withEventEffect(week, { handicap = 0, pace = 1 } = {}) {
+  const w = normaliseWeek(week);
+  return {
+    ...w,
+    roundSettings: {
+      ...w.roundSettings,
+      eventHandicap: w.roundSettings.eventHandicap + handicap,
+      eventPace: w.roundSettings.eventPace * pace,
+    },
+  };
+}
+
+/** The same week with no event effect pending: what a round leaves behind
+ * once it has been played with one. The player's pins are kept. */
+export function clearEventEffect(week) {
+  return { ...week, roundSettings: { ...week.roundSettings, eventHandicap: 0, eventPace: 1 } };
+}
+
+/**
  * A round played, added to the week.
  *
  * `playerToPar` is indexed by player, the same order every round, so a

@@ -30,6 +30,7 @@ import {
   normaliseWeek, championshipStatus, withPins, PINS, PIN_IDS,
 } from '../sim/championshipWeek.js';
 import { weatherOn, effectsOf } from '../sim/weather.js';
+import { pendingEffectNote } from '../sim/championshipEvents.js';
 import { toParText } from './toPar.js';
 import { PALETTE } from '../render/palette.js';
 
@@ -131,6 +132,13 @@ export function computeChampionshipData(state) {
           roundLog: status.week.roundLog,
           pins: status.week.roundSettings.pins,
           pinChoices: PIN_IDS.map((id) => PINS[id]),
+          // What last night's championship event did to the round the pins
+          // are being set for (championshipEvents.js): read off the week
+          // `playField` will be handed, and worded by the same phrases as
+          // the card that caused it. Null when nothing is pending.
+          eventHandicap: status.week.roundSettings.eventHandicap,
+          eventPace: status.week.roundSettings.eventPace,
+          pendingEffect: pendingEffectNote(status.week.roundSettings),
           // Today's, because the pins are set in the morning for the round
           // about to be played -- and the forecast is the weather, read
           // early (weather.js), so this cannot disagree with the day.
@@ -294,6 +302,15 @@ function weekSection(data, state, commit) {
   note.className = 'champ-detail';
   note.textContent = PINS[b.pins].blurb;
   wrap.appendChild(note);
+
+  // Beside the pins, because it is the same round: an event answered last
+  // night moves this round on top of whatever is set here.
+  if (b.pendingEffect) {
+    const pending = document.createElement('div');
+    pending.className = 'champ-detail';
+    pending.textContent = b.pendingEffect;
+    wrap.appendChild(pending);
+  }
 
   // Pace is judged on every round, and the interval is the lever for it.
   // 22 is the operator's measurement (FIELD_TEE_INTERVAL in

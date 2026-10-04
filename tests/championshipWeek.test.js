@@ -11,6 +11,7 @@ import { RUNGS, setupDifficultyBonus } from '../src/sim/tournaments.js';
 import {
   PINS, PIN_IDS, pinHandicap, newWeek, normaliseWeek, recordRound,
   winningTotal, weekFinished, weekUnderWay, withPins, championshipStatus, projectTotal,
+  withEventEffect, clearEventEffect,
 } from '../src/sim/championshipWeek.js';
 
 test('four pin settings, harder in order, fair changing nothing', () => {
@@ -313,4 +314,19 @@ test('a new week carries no event\'s effect on the next round', () => {
   assert.deepEqual(newWeek('regional', 10).roundSettings, { pins: 'fair', eventHandicap: 0, eventPace: 1 });
   const old = normaliseWeek({ rung: 'regional', day: 10, roundSettings: { pins: 'tough' } });
   assert.deepEqual(old.roundSettings, { pins: 'tough', eventHandicap: 0, eventPace: 1 });
+});
+
+test('an event effect adds to the next round and a played round clears it', () => {
+  const week = withPins(newWeek('national', 10), 'tough');
+  const once = withEventEffect(week, { handicap: -0.375 });
+  const twice = withEventEffect(once, { handicap: -0.375, pace: 1.05 });
+  assert.equal(twice.roundSettings.eventHandicap, -0.75);
+  assert.equal(twice.roundSettings.eventPace, 1.05);
+  assert.equal(week.roundSettings.eventHandicap, 0, 'without touching the week it was given');
+  const cleared = clearEventEffect(twice);
+  assert.deepEqual(cleared.roundSettings, { pins: 'tough', eventHandicap: 0, eventPace: 1 });
+  // An old-shaped booking gains the defaults rather than adding to nothing.
+  const old = withEventEffect({ rung: 'regional', day: 10, resolved: false }, { pace: 1.02 });
+  assert.equal(old.roundSettings.eventPace, 1.02);
+  assert.equal(old.roundSettings.eventHandicap, 0);
 });

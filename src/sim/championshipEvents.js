@@ -1,23 +1,26 @@
 import { effectAxes } from './events.js';
 import { PINS } from './championshipWeek.js';
+import { RUNGS } from './tournaments.js';
 
 /**
  * The championship's own decision events (spec 2026-10-04 §4).
  *
- * Exactly the shape of `EVENTS` (events.js) -- id, speaker, prompt, `when`,
- * choices with label, cost, stance and effects -- so the existing decision
- * card shows them and `applyEventChoice` applies them. Two pools: seven for
- * the run-up and nine for the week itself, marked by `phase`. When they
- * fire is the rhythm's business (spec §4 "The rhythm"); this file is only
- * what they say and do.
+ * The shape of `EVENTS` (events.js) -- id, speaker, prompt, `when`, choices
+ * with label, cost, stance and effects -- so the existing decision card
+ * shows them and `applyEventChoice` applies them. Two pools: seven for the
+ * run-up and nine for the week itself, marked by `phase`. When they fire is
+ * the rhythm's business (spec §4 "The rhythm"); this file is only what they
+ * say and do.
  *
- * Effects are the four every event has -- money, prestige, turf, one
- * segment's goodwill -- and three that only a championship has a use for:
+ * Effects are three every event has -- prestige, turf, one segment's
+ * goodwill -- plus four only a championship has a use for:
  *
+ *   moneyDays              money, in days of the booked rung's prep bill
+ *                          (below). Positive is paid to the resort.
  *   setup                  points on or off the course's setup, now.
  *   nextRound.handicap     handicap points on the field for the next round
  *                          only, on the pins' own scale (harder is +).
- *   nextRound.pace         a multiplier on the next round's time.
+ *   nextRound.pace         a multiplier on every hole of the next round.
  *
  * `nextRound` is for week events only: a run-up evening is days from any
  * round. No `condition` and no `fallout` here, deliberately: a run-up is
@@ -25,30 +28,74 @@ import { PINS } from './championshipWeek.js';
  * condition or a reckoning a fortnight later would outlive the thing it was
  * about, landing on a resort that has gone back to being a resort.
  *
- * Magnitudes, and why:
+ * MONEY IS IN PREP DAYS. A flat $3,000 was a real sum at the County and
+ * nothing at the National, where the bank and every other figure on the
+ * card is four times bigger. So money is `moneyDays` x the booked rung's
+ * `prepPerDay` (County $1,600, Regional $3,200, National $5,400), and a
+ * cost line says `{money}` (this choice's sum) or `{days:N}` (N days' worth,
+ * for "turns down their {days:3}"). `resolveChoice` fills both in, and it is
+ * the one function the card (`pendingEventFor` in day.js) and the
+ * simulation (`applyEventChoice`) both call, so the figure the player reads
+ * is the figure the bank moves by.
  *
- * - Money is a few thousand dollars, on the scale of one or two days of a
- *   rung's prep bill (`prepPerDay`: County $1,600, Regional $3,200,
- *   National $5,400). An event does not know the rung's bill, so the
- *   figures are pitched to read as a real sum at the County and still as a
- *   decision at the National, where the bank is bigger but so is every
- *   other number on the card.
- * - Setup moves at most 8 and mostly 2-5. A six-keeper crew climbs 4.8 a
- *   day (SETUP_PER_KEEPER 0.8), so these are a day or so of the crew's
- *   work: a choice that costs setup in the run-up costs days of the climb
- *   and the prep bill that comes with them. In the week, a course knocked
- *   below its target climbs back from the next morning and one pushed
- *   above it eases back 3.5 a day (`nextSetup`), so a week event's setup
- *   is mostly that night's and the next round's.
- * - The next round's handicap is always half or a whole pin setting
- *   (0.375 or 0.75), so the card can say it in the unit the player sets
- *   every morning, exactly, rather than as a stroke estimate that would be
- *   wrong on half the seeds. For scale: the pins' full 2.25 span moved the
- *   field 1.92 strokes a round over 200 seed pairs (tests/field.test.js),
- *   so half a setting is about a third of a stroke per player per round.
- * - Pace runs 2-8% slower. A Regional round is about 290 minutes against a
- *   288 target, so 3% is nine minutes -- enough to tip a round over the
- *   officials' line on a wet day, not enough to fail a dry one alone.
+ * Setup moves at most 8 and mostly 2-5. A six-keeper crew climbs 4.8 a day
+ * (SETUP_PER_KEEPER 0.8), so these are a day or so of the crew's work. In
+ * the week a course knocked below its target climbs back from the next
+ * morning and one pushed above it eases back 3.5 a day (`nextSetup`), so a
+ * week event's setup is mostly that night's and the next round's.
+ *
+ * The next round's handicap is always half or a whole pin setting (0.375
+ * or 0.75), so the card says it in the unit the player sets every morning,
+ * exactly. For scale: the pins' full 2.25 span moved the field 1.92
+ * strokes a round over 200 seed pairs (tests/field.test.js).
+ *
+ * PACE, MEASURED (2026-10-04, `playField`, 18 holes, 20 seeds, pace target
+ * 288 minutes). An event's pace stretches every hole before the tee sheet
+ * is scheduled, so on a tight interval the field backs up behind it and
+ * the round grows by MORE than the card's figure; on a wide one, by
+ * exactly it. Hence the card says "every hole plays N% slower", which is
+ * what is applied, not "the round runs N% slower", which it is not.
+ *
+ *   round lengthened by, and rounds over 288 of 20, setup 70 (Regional):
+ *   interval, sky     +2%          +3%          +5%          +6%       +8%
+ *   14, fair          3.0%  0      4.5%  0      7.5%  8      9.0% 17   12.0% 20
+ *   14, drizzle       3.0%  8      4.4% 20      7.4% 20      8.9% 20   11.8% 20
+ *   18, blowing       3.3%  0      4.9%  0      8.2%  8      9.9% 17   13.2% 20
+ *   22, fair          2.0%  0      3.0%  0      5.0%  0      6.0%  0    8.0%  0
+ *   22, heavy rain    2.0%  0      3.0%  0      5.0%  2      6.0% 17    8.1% 20
+ *
+ *   (The percentages are against the same sky with no event.) At setup 86
+ *   (National) everything is slower: at 22 in heavy rain +3% fails 2/20,
+ *   +4% 9/20, +5% 20/20; at 14 in fair weather +4% fails 13/20. Up to +8%
+ *   never failed a fair-weather round at 18 or 22; wind or drizzle at 18,
+ *   and heavy rain at 22, are where it bites. (Heavy rain at 18 fails
+ *   every round at setup 70 with no event at all.)
+ *
+ * So whether a pace choice risks the contract's pace bonus (County
+ * $26,200, Regional $66,400, National $142,400 -- `contractFor`, judged on
+ * every round) depends on two things the player can see the evening it is
+ * asked: their tee interval (on the sheet) and tomorrow's forecast (on the
+ * report). That is what makes these judgement calls rather than traps, and
+ * they were re-pitched (2026-10-04, after review) to keep them that way:
+ *
+ * - Free choices that only cost pace cost little of it (2-4%): they are the
+ *   "do nothing" answers, and at 22 in the dry they genuinely cost nothing,
+ *   while at 14, or in rain, they are the reason to pay.
+ * - The one choice that sells pace (television's later tee times, Regional
+ *   and National only) pays 5 prep days for 5% -- $16,000 against a $66,400
+ *   bonus, $27,000 against $142,400: about a fifth of what it risks. At 22
+ *   in the dry it is free money; in heavy rain at the National it is very
+ *   nearly a certain $142,400 lost for $27,000. The forecast decides.
+ * - First drafts had 6% and 8% for free and 6% for $6,000 flat; at a
+ *   14-minute interval in fair weather those failed 17/20 and 20/20 rounds,
+ *   which is a trap with a cost line on it.
+ *
+ * Turf: the contract pays its turf bonus (County $35,370, Regional $89,640,
+ * National $192,240) on the turf the week ends on, against 78. Week turf
+ * hits are kept to 2-4 points, and the one free choice that trades turf for
+ * something the player may want (letting the greens bake in a heatwave)
+ * also pays in prestige, so it is a bet on how much margin the greens have
+ * -- which the HUD shows -- rather than a hidden tax.
  *
  * Written nameless: the field is weather with a scorecard (field.js), and
  * "the player half the gallery came to see" is as close as it gets.
@@ -71,14 +118,14 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Hire one in today',
-        cost: '$3,200 for a hire machine and a fitter, and the crew does not lose a day.',
-        effects: { money: -3200 },
+        cost: '{money} for a hire machine and a fitter, and the crew does not lose a day.',
+        effects: { moneyDays: -2 },
       },
       {
         stance: 'pragmatic',
         label: 'Cut them with the fairway mower',
-        cost: '$600 in new blades. It tears the greens a little: turf -4, setup -3.',
-        effects: { money: -600, turf: -4, setup: -3 },
+        cost: '{money} in new blades. It tears the greens a little: turf -4, setup -3.',
+        effects: { moneyDays: -0.5, turf: -4, setup: -3 },
       },
       {
         stance: 'thrifty',
@@ -99,19 +146,19 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'commercial',
         label: 'Put it up',
-        cost: 'They pay $5,000. The officials think less of a finishing hole with a bus parked on it: prestige -3.',
-        effects: { money: 5000, prestige: -3 },
+        cost: 'They pay {money}. The officials think less of a finishing hole with a bus parked on it: prestige -3.',
+        effects: { moneyDays: 3, prestige: -3 },
       },
       {
         stance: 'pragmatic',
         label: 'Offer them the walk to the 1st',
-        cost: 'They pay $1,800 for the smaller spot, and nobody minds.',
-        effects: { money: 1800 },
+        cost: 'They pay {money} for the smaller spot, and nobody minds.',
+        effects: { moneyDays: 1 },
       },
       {
         stance: 'ambitious',
         label: 'Keep the 18th clean',
-        cost: 'Turns down their $5,000. Nothing leaves the bank, and the last hole looks like one: prestige +2, serious goodwill +4.',
+        cost: 'Turns down their {days:3}. Nothing leaves the bank, and the last hole looks like one: prestige +2, serious goodwill +4.',
         effects: { prestige: 2, goodwill: { serious: 4 } },
       },
     ],
@@ -127,14 +174,14 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'populist',
         label: 'Give them the day, on the house',
-        cost: '$1,900 in green fees not collected, and a full sheet on greens being firmed: setup -4. Locals goodwill +10.',
-        effects: { money: -1900, setup: -4, goodwill: { locals: 10 } },
+        cost: '{money} in green fees not collected, and a full sheet on greens being firmed: setup -4. Locals goodwill +10.',
+        effects: { moneyDays: -1, setup: -4, goodwill: { locals: 10 } },
       },
       {
         stance: 'pragmatic',
         label: 'A members’ evening, nine holes',
-        cost: '$700 in fees waived for a short evening: setup -1, locals goodwill +4.',
-        effects: { money: -700, setup: -1, goodwill: { locals: 4 } },
+        cost: '{money} in fees waived for a short evening: setup -1, locals goodwill +4.',
+        effects: { moneyDays: -0.5, setup: -1, goodwill: { locals: 4 } },
       },
       {
         stance: 'defiant',
@@ -157,14 +204,14 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'ambitious',
         label: 'Firm it up for the cameras',
-        cost: '$2,800 in crew overtime: setup +4 now, and prestige +3 when the scout’s report goes in.',
-        effects: { money: -2800, setup: 4, prestige: 3 },
+        cost: '{money} in crew overtime: setup +4 now, and prestige +3.',
+        effects: { moneyDays: -1.5, setup: 4, prestige: 3 },
       },
       {
         stance: 'commercial',
         label: 'Sell them a gantry behind the 16th',
-        cost: 'They pay $3,500 for the spot, and the crew works round the scaffolding: setup -2.',
-        effects: { money: 3500, setup: -2 },
+        cost: 'They pay {money} for the spot, and the crew works round the scaffolding: setup -2.',
+        effects: { moneyDays: 2, setup: -2 },
       },
       {
         stance: 'thrifty',
@@ -185,8 +232,8 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Hire a second pump',
-        cost: '$2,600 for a pump and a bowser, and the greens drink what they want: turf +4.',
-        effects: { money: -2600, turf: 4 },
+        cost: '{money} for a pump and a bowser, and the greens drink what they want: turf +4.',
+        effects: { moneyDays: -1.5, turf: 4 },
       },
       {
         stance: 'thrifty',
@@ -197,8 +244,8 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'pragmatic',
         label: 'Buy water from the town',
-        cost: '$1,200 to the water board, during a hosepipe ban: turf +1, locals goodwill -4.',
-        effects: { money: -1200, turf: 1, goodwill: { locals: -4 } },
+        cost: '{money} to the water board, during a hosepipe ban: turf +1, locals goodwill -4.',
+        effects: { moneyDays: -0.75, turf: 1, goodwill: { locals: -4 } },
       },
     ],
   },
@@ -213,8 +260,8 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Grow it and feed it',
-        cost: '$2,200 in feed and an extra cut a week: setup +5, prestige +2.',
-        effects: { money: -2200, setup: 5, prestige: 2 },
+        cost: '{money} in feed and an extra cut a week: setup +5, prestige +2.',
+        effects: { moneyDays: -1.5, setup: 5, prestige: 2 },
       },
       {
         stance: 'pragmatic',
@@ -241,14 +288,14 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Run buses from the station',
-        cost: '$3,000 for buses all week, and the lane stays a lane. Locals goodwill +6.',
-        effects: { money: -3000, goodwill: { locals: 6 } },
+        cost: '{money} for buses all week, and the lane stays a lane. Locals goodwill +6.',
+        effects: { moneyDays: -2, goodwill: { locals: 6 } },
       },
       {
         stance: 'pragmatic',
         label: 'Plant a hedge and promise a quiet week',
-        cost: '$900 for a hedge that will be a hedge in about four years. Locals goodwill +2.',
-        effects: { money: -900, goodwill: { locals: 2 } },
+        cost: '{money} for a hedge that will be a hedge in about four years. Locals goodwill +2.',
+        effects: { moneyDays: -0.5, goodwill: { locals: 2 } },
       },
       {
         stance: 'defiant',
@@ -274,8 +321,8 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Squeegee it through the night',
-        cost: '$2,400 for a night crew. The green is ready by morning, if tired: turf -3.',
-        effects: { money: -2400, turf: -3 },
+        cost: '{money} for a night crew. The green is ready by morning, if tired: turf -2.',
+        effects: { moneyDays: -1.5, turf: -2 },
       },
       {
         stance: 'pragmatic',
@@ -284,10 +331,12 @@ export const CHAMPIONSHIP_EVENTS = [
         effects: { nextRound: { handicap: -0.375 } },
       },
       {
+        // Keeps the round as hard as it was set, for nothing but time: the
+        // answer for a week heading under its target on a wide tee sheet.
         stance: 'defiant',
         label: 'Play it as it lies',
-        cost: 'Free, and every group waits while the officials argue about casual water: the next round runs 8% slower.',
-        effects: { nextRound: { pace: 1.08 } },
+        cost: 'Free, and the round plays as set while the officials rule on casual water: every hole plays 4% slower, and a tight tee sheet backs up behind it.',
+        effects: { nextRound: { pace: 1.04 } },
       },
     ],
   },
@@ -308,14 +357,14 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'defiant',
         label: 'It stays where it is',
-        cost: 'Free, and prestige +2 for standing by the course. The field takes it up with every referee: the next round runs 5% slower.',
-        effects: { prestige: 2, nextRound: { pace: 1.05 } },
+        cost: 'Free, and prestige +2 for standing by the course. The field takes it up with every referee: every hole plays 3% slower.',
+        effects: { prestige: 2, nextRound: { pace: 1.03 } },
       },
       {
         stance: 'principled',
         label: 'Let the officials rule on it',
-        cost: '$800 for a rules panel and a late night. The next round plays as set: prestige +1.',
-        effects: { money: -800, prestige: 1 },
+        cost: '{money} for a rules panel and a late night. The next round plays as set: prestige +1.',
+        effects: { moneyDays: -0.5, prestige: 1 },
       },
     ],
   },
@@ -329,21 +378,23 @@ export const CHAMPIONSHIP_EVENTS = [
     when: (c) => c.championship?.rung !== 'countyOpen',
     choices: [
       {
+        // Five prep days for 5%: about a fifth of the pace bonus it puts at
+        // risk. See PACE, MEASURED above for when that risk is real.
         stance: 'commercial',
         label: 'Push the tee times back',
-        cost: 'They pay $6,000. The cameras hold on every putt: the next round runs 6% slower.',
-        effects: { money: 6000, nextRound: { pace: 1.06 } },
+        cost: 'They pay {money}. The cameras hold on every putt: every hole plays 5% slower, and a tight tee sheet backs up behind it.',
+        effects: { moneyDays: 5, nextRound: { pace: 1.05 } },
       },
       {
         stance: 'pragmatic',
         label: 'Move the last six groups only',
-        cost: 'They pay $2,500, and the next round runs 2% slower.',
-        effects: { money: 2500, nextRound: { pace: 1.02 } },
+        cost: 'They pay {money}, and every hole plays 2% slower.',
+        effects: { moneyDays: 2, nextRound: { pace: 1.02 } },
       },
       {
         stance: 'principled',
         label: 'Tee times stay where the officials put them',
-        cost: 'Turns down their $6,000. Nothing leaves the bank, and the officials notice: prestige +2.',
+        cost: 'Turns down their {days:5}. Nothing leaves the bank, and the officials notice: prestige +2.',
         effects: { prestige: 2 },
       },
     ],
@@ -359,20 +410,20 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Syringe them through the night',
-        cost: '$1,800 in overtime to keep them alive: turf +3, setup -2.',
-        effects: { money: -1800, turf: 3, setup: -2 },
+        cost: '{money} in overtime to keep them alive: turf +3, setup -2.',
+        effects: { moneyDays: -1, turf: 3, setup: -2 },
       },
       {
         stance: 'ambitious',
         label: 'Let them bake',
-        cost: 'Free. Setup +4 and the next round plays half a pin setting harder, and the greens pay for it: turf -6.',
-        effects: { setup: 4, turf: -6, nextRound: { handicap: 0.375 } },
+        cost: 'Free, and the greens everyone talks about: prestige +2, setup +4, and the next round plays half a pin setting harder. They pay for it: turf -4.',
+        effects: { prestige: 2, setup: 4, turf: -4, nextRound: { handicap: 0.375 } },
       },
       {
         stance: 'pragmatic',
         label: 'A light watering at dawn',
-        cost: '$500 for an early crew, and the greens hold as they are.',
-        effects: { money: -500 },
+        cost: '{money} for an early crew, and the greens hold as they are.',
+        effects: { moneyDays: -0.25 },
       },
     ],
   },
@@ -387,20 +438,20 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Stake it properly and double the marshals',
-        cost: '$2,200 for posts and eight more marshals. What is done is done: turf -2.',
-        effects: { money: -2200, turf: -2 },
+        cost: '{money} for posts and eight more marshals. What is done is done: turf -2.',
+        effects: { moneyDays: -1.5, turf: -2 },
       },
       {
         stance: 'pragmatic',
         label: 'Move the line back ten yards',
-        cost: 'Free, but the crowd now stands in the rough: turf -5, and the next round runs 3% slower while they shuffle along it.',
-        effects: { turf: -5, nextRound: { pace: 1.03 } },
+        cost: 'Free, but the crowd now stands in the rough: turf -4, and every hole plays 2% slower while they shuffle along it.',
+        effects: { turf: -4, nextRound: { pace: 1.02 } },
       },
       {
         stance: 'commercial',
         label: 'Make the 17th ticket-only',
-        cost: 'Ticket holders pay you $1,500, and the rest are turned away: turf -2, locals goodwill -5.',
-        effects: { money: 1500, turf: -2, goodwill: { locals: -5 } },
+        cost: 'Ticket holders pay you {money}, and the rest are turned away: turf -2, locals goodwill -5.',
+        effects: { moneyDays: 1, turf: -2, goodwill: { locals: -5 } },
       },
     ],
   },
@@ -415,8 +466,8 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'principled',
         label: 'Refund the day tickets',
-        cost: '$3,000 back to the gallery, and nobody leaves angry: locals goodwill +5, destination goodwill +3.',
-        effects: { money: -3000, goodwill: { locals: 5, destination: 3 } },
+        cost: '{money} back to the gallery, and nobody leaves angry: locals goodwill +5, destination goodwill +3.',
+        effects: { moneyDays: -2, goodwill: { locals: 5, destination: 3 } },
       },
       {
         stance: 'populist',
@@ -443,14 +494,14 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Bring in a replacement overnight',
-        cost: '$4,500 for a board and a crew by morning: prestige +1.',
-        effects: { money: -4500, prestige: 1 },
+        cost: '{money} for a board and a crew by morning: prestige +1.',
+        effects: { moneyDays: -2.5, prestige: 1 },
       },
       {
         stance: 'pragmatic',
         label: 'Runners with chalkboards',
-        cost: '$600 for twenty runners, and every green waits on them: the next round runs 4% slower.',
-        effects: { money: -600, nextRound: { pace: 1.04 } },
+        cost: '{money} for twenty runners, and every green waits on them: every hole plays 3% slower.',
+        effects: { moneyDays: -0.5, nextRound: { pace: 1.03 } },
       },
       {
         stance: 'thrifty',
@@ -471,8 +522,8 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Re-mark it tonight',
-        cost: '$900 for paint, a surveyor and a late finish, and the 14th plays as it was built.',
-        effects: { money: -900 },
+        cost: '{money} for paint, a surveyor and a late finish, and the 14th plays as it was built.',
+        effects: { moneyDays: -0.5 },
       },
       {
         stance: 'pragmatic',
@@ -483,8 +534,8 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'ambitious',
         label: 'Take the drop zone away',
-        cost: 'Free: prestige +1, and the 14th becomes the hole everyone talks about. The next round plays half a pin setting harder and runs 3% slower.',
-        effects: { prestige: 1, nextRound: { handicap: 0.375, pace: 1.03 } },
+        cost: 'Free: prestige +1, and the 14th becomes the hole everyone talks about. The next round plays half a pin setting harder, and every hole plays 2% slower.',
+        effects: { prestige: 1, nextRound: { handicap: 0.375, pace: 1.02 } },
       },
     ],
   },
@@ -499,8 +550,8 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'A new marquee by morning',
-        cost: '$4,000 for a marquee and a crew through the night. The sponsor is delighted: prestige +2.',
-        effects: { money: -4000, prestige: 2 },
+        cost: '{money} for a marquee and a crew through the night. The sponsor is delighted: prestige +2.',
+        effects: { moneyDays: -2.5, prestige: 2 },
       },
       {
         stance: 'pragmatic',
@@ -511,17 +562,57 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'commercial',
         label: 'Pitch it on the practice ground',
-        cost: 'The sponsor pays you $1,000 for the ground, and every group squeezes past the tent to the 1st tee: the next round runs 3% slower.',
-        effects: { money: 1000, nextRound: { pace: 1.03 } },
+        cost: 'The sponsor pays you {money} for the ground, and every group squeezes past the tent to the 1st tee: every hole plays 2% slower.',
+        effects: { moneyDays: 1.5, nextRound: { pace: 1.02 } },
       },
     ],
   },
 ];
 
+// --- Resolving a choice against the booked rung ---------------------------
+
+/**
+ * The rung whose prep bill a championship choice is priced in. A choice is
+ * only ever offered with a championship booked; the County's bill is the
+ * fallback so a choice answered without one (a save edited by hand, a
+ * test) prices at the smallest figure rather than throwing.
+ */
+function prepPerDayFor(rungId) {
+  return (RUNGS[rungId] ?? RUNGS.countyOpen).prepPerDay;
+}
+
+/** Whole dollars, as a card prints them. */
+function dollars(n) {
+  return `$${Math.abs(Math.round(n)).toLocaleString('en-US')}`;
+}
+
+/**
+ * A choice as the card shows it and the simulation applies it, at a rung.
+ *
+ * `moneyDays` becomes `money` (days x the rung's `prepPerDay`, rounded to a
+ * dollar), and the cost's `{money}` and `{days:N}` are filled in with the
+ * same arithmetic. The card (`pendingEventFor` in day.js) and
+ * `applyEventChoice` both call this, so they cannot disagree about a sum.
+ * An ordinary event's choice has neither and comes back unchanged.
+ */
+export function resolveChoice(choice, rungId) {
+  const perDay = prepPerDayFor(rungId);
+  const { moneyDays, ...rest } = choice.effects ?? {};
+  const effects = moneyDays === undefined
+    ? { ...rest }
+    : { ...rest, money: Math.round(moneyDays * perDay) };
+  const cost = choice.cost
+    .replace(/\{money\}/g, dollars(effects.money ?? 0))
+    .replace(/\{days:([\d.]+)\}/g, (_, n) => dollars(Number(n) * perDay));
+  return { ...choice, cost, effects };
+}
+
+// --- Comparing choices, and saying them -----------------------------------
+
 /**
  * A choice's effects as one vector, for comparing choices in the same event
- * (the dominated-choice test). `effectAxes` for the four every event has,
- * plus the championship's three:
+ * (the dominated-choice test), from its resolved effects. `effectAxes` for
+ * the four every event has, plus the championship's three:
  *
  * - `setup` is ORDERED, more is better: the run-up is a climb, and a
  *   week's course is held at its target, so points lost are days of work.
@@ -555,19 +646,37 @@ const PIN_STEP = PINS.tough.handicap - PINS.fair.handicap;
 
 /**
  * How a card says a next-round handicap: "half a pin setting easier",
- * "a whole pin setting harder". The library only uses half and whole
- * steps; anything else is spelled as a number of settings.
+ * "a whole pin setting harder". Each choice uses half or whole steps; a sum
+ * of two (the sheet's pending line) can be anything, spelled as a number.
  */
 export function pinSettingPhrase(handicap) {
   const steps = Math.abs(handicap) / PIN_STEP;
   const way = handicap > 0 ? 'harder' : 'easier';
   if (steps === 0.5) return `half a pin setting ${way}`;
   if (steps === 1) return `a whole pin setting ${way}`;
-  return `${steps} pin settings ${way}`;
+  return `${Number(steps.toFixed(2))} pin settings ${way}`;
 }
 
-/** How a card says a next-round pace: "8% slower", "5% quicker". */
+/**
+ * How a card says a next-round pace: "every hole plays 4% slower". Every
+ * HOLE, because that is what is applied; the round grows by more on a
+ * tight tee sheet (see PACE, MEASURED above).
+ */
 export function pacePhrase(pace) {
   const percent = Math.round(Math.abs(pace - 1) * 100);
-  return `${percent}% ${pace > 1 ? 'slower' : 'quicker'}`;
+  return `every hole plays ${percent}% ${pace > 1 ? 'slower' : 'quicker'}`;
+}
+
+/**
+ * What tonight's events have done to the next round, in one line for the
+ * championship sheet, or null when nothing is pending. Built from the same
+ * phrases as the cards, so the sheet cannot word it differently from the
+ * choice that caused it.
+ */
+export function pendingEffectNote({ eventHandicap = 0, eventPace = 1 } = {}) {
+  const parts = [];
+  if (eventHandicap) parts.push(`this round plays ${pinSettingPhrase(eventHandicap)}`);
+  if (eventPace !== 1) parts.push(pacePhrase(eventPace));
+  if (parts.length === 0) return null;
+  return `Last night’s call: ${parts.join(', and ')}.`;
 }

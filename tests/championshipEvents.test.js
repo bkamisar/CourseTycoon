@@ -4,10 +4,12 @@ import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import { EVENTS, SPEAKERS, STANCES, eventContext } from '../src/sim/events.js';
 import {
   CHAMPIONSHIP_EVENTS, championshipAxes, ORDERED_AXES, UNORDERED_AXES,
-  pinSettingPhrase, pacePhrase,
+  pinSettingPhrase, pacePhrase, resolveChoice, pendingEffectNote,
 } from '../src/sim/championshipEvents.js';
 import { newGame } from '../src/sim/state.js';
 import { newWeek } from '../src/sim/championshipWeek.js';
+import { RUNGS, RUNG_IDS, contractFor } from '../src/sim/tournaments.js';
+import { applyEventChoice, pendingEventFor } from '../src/sim/day.js';
 
 /*
  * The invariants every ordinary event meets (tests/events.test.js), ported
@@ -17,6 +19,14 @@ import { newWeek } from '../src/sim/championshipWeek.js';
  */
 
 const RUN_UP = CHAMPIONSHIP_EVENTS.filter((e) => e.phase === 'runUp');
+
+/** Every choice of every event as a card at `rung` would show it. */
+function resolvedAt(rung) {
+  return CHAMPIONSHIP_EVENTS.map((event) => ({
+    ...event,
+    choices: event.choices.map((c) => resolveChoice(c, rung)),
+  }));
+}
 const WEEK = CHAMPIONSHIP_EVENTS.filter((e) => e.phase === 'week');
 
 test('seven run-up events and nine for the week, and nothing else', () => {
@@ -46,7 +56,8 @@ test('every championship event has an id, a known speaker, a prompt, a condition
 });
 
 test('every choice has a label and an explicit, concrete cost', () => {
-  for (const event of CHAMPIONSHIP_EVENTS) {
+  // As the card shows it: "{money}" is a figure once it is filled in.
+  for (const event of RUNG_IDS.flatMap(resolvedAt)) {
     for (const choice of event.choices) {
       assert.ok(choice.label && choice.label.length > 1, `${event.id}: choice missing a label`);
       assert.ok(choice.cost && choice.cost.length > 8,
@@ -74,7 +85,8 @@ test('effects only use money, prestige, turf, goodwill, setup and nextRound', ()
   // No `condition` and no `fallout`: a championship lasts three weeks, and
   // a reckoning or a month-long condition would outlive the thing it was
   // about. `nextRound` carries only `handicap` and `pace`.
-  const allowedTop = new Set(['money', 'prestige', 'turf', 'goodwill', 'setup', 'nextRound']);
+  // Money is `moneyDays`, never a flat `money`: see the next test.
+  const allowedTop = new Set(['moneyDays', 'prestige', 'turf', 'goodwill', 'setup', 'nextRound']);
   for (const event of CHAMPIONSHIP_EVENTS) {
     for (const choice of event.choices) {
       const where = `${event.id}/${choice.label}`;
@@ -86,6 +98,72 @@ test('effects only use money, prestige, turf, goodwill, setup and nextRound', ()
       }
       for (const key of Object.keys(choice.effects.nextRound ?? {})) {
         assert.ok(['handicap', 'pace'].includes(key), `${where}: unexpected nextRound field "${key}"`);
+      }
+    }
+  }
+});
+
+test('every sum on a card is priced in the booked rung\'s prep days', () => {
+  // A flat $3,000 was real money at the County and nothing at the
+  // National. So no cost line may carry a literal dollar figure: it says
+  // {money} or {days:N}, and a choice says {money} exactly when it moves
+  // money.
+  for (const event of CHAMPIONSHIP_EVENTS) {
+    for (const choice of event.choices) {
+      const where = `${event.id}/${choice.label}`;
+      assert.ok(!/\$\d/.test(choice.cost), `${where}: a flat dollar figure — "${choice.cost}"`);
+      assert.equal(choice.cost.includes('{money}'), Boolean(choice.effects.moneyDays),
+        `${where}: says {money} without moving money, or the reverse — "${choice.cost}"`);
+    }
+  }
+  const choice = { cost: 'They pay {money}; turns down {days:2.5}.', effects: { moneyDays: 1.5, turf: 1 } };
+  assert.deepEqual(resolveChoice(choice, 'regional').effects, { money: 4800, turf: 1 });
+  assert.equal(resolveChoice(choice, 'national').cost, 'They pay $8,100; turns down $13,500.');
+  assert.equal(resolveChoice(choice, 'countyOpen').cost, 'They pay $2,400; turns down $4,000.');
+  const ordinary = EVENTS[0].choices[0];
+  assert.deepEqual(resolveChoice(ordinary, 'national').effects, ordinary.effects,
+    'an ordinary choice passes through unchanged');
+  assert.equal(resolveChoice(ordinary, 'national').cost, ordinary.cost);
+});
+
+test('the figure on the card is the figure the bank moves by, at every rung', () => {
+  // The card is built by pendingEventFor, the bank moved by
+  // applyEventChoice. Both resolve through resolveChoice; this proves it
+  // end to end, for every choice that moves money, at all three rungs.
+  for (const rung of RUNG_IDS) {
+    const state = newGame(9);
+    state.money = 500000;
+    state.tournament = newWeek(rung, state.day + 3);
+    for (const event of CHAMPIONSHIP_EVENTS) {
+      const card = pendingEventFor(event, state);
+      event.choices.forEach((choice, index) => {
+        if (!choice.effects.moneyDays) return;
+        const moved = applyEventChoice(state, event.id, index).money - state.money;
+        assert.equal(moved, choice.effects.moneyDays * RUNGS[rung].prepPerDay, `${rung} ${event.id}`);
+        const sum = `$${Math.abs(moved).toLocaleString('en-US')}`;
+        assert.ok(card.choices[index].cost.includes(sum),
+          `${rung} ${event.id}/${choice.label}: moves ${moved}, card says "${card.choices[index].cost}"`);
+      });
+    }
+  }
+});
+
+test('a choice that risks the pace bonus is a call, not a trap', () => {
+  // The re-pitch of 2026-10-04 (PACE, MEASURED in championshipEvents.js):
+  // a choice that costs more than 4% a hole pays at least a seventh of the
+  // pace bonus it risks, at every rung it can be offered at.
+  for (const event of WEEK) {
+    for (const choice of event.choices) {
+      const pace = choice.effects.nextRound?.pace ?? 1;
+      if (pace <= 1.04) continue;
+      for (const rung of RUNG_IDS) {
+        const offered = event.when({ weather: 'rain', championship: { rung } })
+          || event.when({ weather: 'clear', championship: { rung } });
+        if (!offered) continue;
+        const paid = resolveChoice(choice, rung).effects.money ?? 0;
+        const bonus = contractFor(rung).bonuses.find((b) => b.id === 'pace').amount;
+        assert.ok(paid >= bonus / 7,
+          `${event.id}/${choice.label} at ${rung}: ${Math.round((pace - 1) * 100)}% a hole for $${paid} against a $${bonus} bonus`);
       }
     }
   }
@@ -111,8 +189,8 @@ test('nextRound effects belong to the week only', () => {
 test('magnitudes stay on the scale of the levers they sit beside', () => {
   // Handicap within a point either way (the four pins span 2.25), pace
   // within 0.9-1.15 (heavy rain is 1.16), setup within 8 (about a day and
-  // a half of a six-keeper crew's climb), money within a National's prep
-  // bill for two days.
+  // a half of a six-keeper crew's climb), money within five days of the
+  // booked rung's prep bill.
   for (const event of CHAMPIONSHIP_EVENTS) {
     for (const choice of event.choices) {
       const e = choice.effects;
@@ -124,7 +202,7 @@ test('magnitudes stay on the scale of the levers they sit beside', () => {
         assert.ok(e.nextRound.pace >= 0.9 && e.nextRound.pace <= 1.15, `${where}: pace ${e.nextRound.pace}`);
       }
       if (e.setup !== undefined) assert.ok(Math.abs(e.setup) <= 8, `${where}: setup ${e.setup}`);
-      if (e.money !== undefined) assert.ok(Math.abs(e.money) <= 10800, `${where}: money ${e.money}`);
+      if (e.moneyDays !== undefined) assert.ok(Math.abs(e.moneyDays) <= 5, `${where}: ${e.moneyDays} prep days`);
     }
   }
 });
@@ -137,7 +215,7 @@ test('no championship event has a choice that dominates every alternative', () =
   // its target and hurts one heading over, so two choices that move it
   // differently are never comparable on it.
   const offenders = [];
-  for (const event of CHAMPIONSHIP_EVENTS) {
+  for (const event of RUNG_IDS.flatMap(resolvedAt)) {
     const vectors = event.choices.map((c) => championshipAxes(c.effects));
     vectors.forEach((a, i) => {
       const dominatesAll = vectors.every((b, j) => j === i || (
@@ -156,7 +234,7 @@ test('every number a choice moves is named in its cost, the right way round', ()
   // its goodwill loosely: here every effect is printed as the player would
   // read it off the card.
   const signed = (n) => `${n > 0 ? '+' : '-'}${Math.abs(n)}`;
-  for (const event of CHAMPIONSHIP_EVENTS) {
+  for (const event of RUNG_IDS.flatMap(resolvedAt)) {
     for (const choice of event.choices) {
       const e = choice.effects;
       const cost = choice.cost.toLowerCase();
@@ -199,14 +277,14 @@ test('the next round\'s handicap is always a half or whole pin setting', () => {
   }
   assert.equal(pinSettingPhrase(-0.375), 'half a pin setting easier');
   assert.equal(pinSettingPhrase(0.75), 'a whole pin setting harder');
-  assert.equal(pacePhrase(1.08), '8% slower');
-  assert.equal(pacePhrase(0.95), '5% quicker');
+  assert.equal(pacePhrase(1.08), 'every hole plays 8% slower');
+  assert.equal(pacePhrase(0.95), 'every hole plays 5% quicker');
 });
 
 test('a choice that pays the player says so, and none pretends to charge for nothing', () => {
   const income = /pays? you|paid|you get|into the bank|they pay|nets?|revenue|brings? in/i;
   const outgoing = /(costs? (the|you)|you put in|you pay)[^.]*\$[\d,]+/i;
-  for (const event of CHAMPIONSHIP_EVENTS) {
+  for (const event of RUNG_IDS.flatMap(resolvedAt)) {
     for (const choice of event.choices) {
       const money = choice.effects.money ?? 0;
       const where = `${event.id}/${choice.label}`;
@@ -222,8 +300,10 @@ test('a choice that pays the player says so, and none pretends to charge for not
 });
 
 test('no championship event shows an unrendered escape sequence', () => {
-  const badly = /\\u[0-9a-fA-F]{4}|\\n|\\t/;
-  for (const event of CHAMPIONSHIP_EVENTS) {
+  // And no template left unfilled: a card reading "They pay {money}" is
+  // the same fault, one layer up.
+  const badly = /\\u[0-9a-fA-F]{4}|\\n|\\t|[{}]/;
+  for (const event of RUNG_IDS.flatMap(resolvedAt)) {
     const fields = [['prompt', event.prompt]];
     for (const choice of event.choices) {
       fields.push([`"${choice.label}" label`, choice.label], [`"${choice.label}" cost`, choice.cost]);
@@ -313,4 +393,15 @@ test('the event context carries the championship, and nothing when none is booke
 
   state.tournament = { ...state.tournament, resolved: true };
   assert.equal(contextFor(state).championship, null);
+});
+
+test('the sheet\'s pending line says what the cards said', () => {
+  assert.equal(pendingEffectNote({ eventHandicap: 0, eventPace: 1 }), null);
+  assert.equal(pendingEffectNote({}), null);
+  assert.equal(pendingEffectNote({ eventHandicap: -0.375, eventPace: 1.04 }),
+    'Last night’s call: this round plays half a pin setting easier, and every hole plays 4% slower.');
+  assert.equal(pendingEffectNote({ eventHandicap: 0.75, eventPace: 1 }),
+    'Last night’s call: this round plays a whole pin setting harder.');
+  assert.equal(pendingEffectNote({ eventHandicap: 0, eventPace: 1.02 }),
+    'Last night’s call: every hole plays 2% slower.');
 });
