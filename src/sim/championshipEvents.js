@@ -18,7 +18,8 @@ import { PRACTICE_DAYS_BEFORE } from './practiceRound.js';
  *
  *   moneyDays              money, in days of the booked rung's prep bill
  *                          (below). Positive is paid to the resort.
- *   setup                  points on or off the course's setup, now.
+ *   setup                  points on or off the course's setup, now (run-up
+ *                          events only).
  *   nextRound.handicap     handicap points on the field for the next round
  *                          only, on the pins' own scale (harder is +).
  *   nextRound.pace         a multiplier on every hole of the next round.
@@ -39,11 +40,13 @@ import { PRACTICE_DAYS_BEFORE } from './practiceRound.js';
  * simulation (`applyEventChoice`) both call, so the figure the player reads
  * is the figure the bank moves by.
  *
- * Setup moves at most 8 and mostly 2-5. A six-keeper crew climbs 4.8 a day
- * (SETUP_PER_KEEPER 0.8), so these are a day or so of the crew's work. In
- * the week a course knocked below its target climbs back from the next
- * morning and one pushed above it eases back 3.5 a day (`nextSetup`), so a
- * week event's setup is mostly that night's and the next round's.
+ * Setup moves at most 8 and mostly 2-5, in the run-up only. A six-keeper
+ * crew climbs 4.8 a day (SETUP_PER_KEEPER 0.8), so these are a day or so of
+ * the crew's work. In the week a course knocked below its target climbs
+ * back from the next morning and one pushed above it eases back 3.5 a day
+ * (`nextSetup`), so a week event's setup would be gone before the round it
+ * was about: week events carry none (tested), and say what they want of the
+ * next round with `nextRound.handicap` instead.
  *
  * The next round's handicap is always half or a whole pin setting (0.375
  * or 0.75), so the card says it in the unit the player sets every morning,
@@ -411,14 +414,22 @@ export const CHAMPIONSHIP_EVENTS = [
       {
         stance: 'thorough',
         label: 'Syringe them through the night',
-        cost: '{money} in overtime to keep them alive: turf +3, setup -2.',
-        effects: { moneyDays: -1, turf: 3, setup: -2 },
+        // A week event cannot carry `setup` (the header says why), so the
+        // old "setup -2" -- a quarter of a pin's feel, and gone by the next
+        // morning's climb -- is dropped rather than turned into a handicap:
+        // it is not worth a half pin. The choice is still a trade, money
+        // for turf, against a dawn watering that costs a quarter as much.
+        cost: '{money} in overtime to keep them alive: turf +3.',
+        effects: { moneyDays: -1, turf: 3 },
       },
       {
         stance: 'ambitious',
         label: 'Let them bake',
-        cost: 'Free, and the greens everyone talks about: prestige +2, setup +4, and the next round plays half a pin setting harder. They pay for it: turf -4.',
-        effects: { prestige: 2, setup: 4, turf: -4, nextRound: { handicap: 0.375 } },
+        // The "setup +4" this once carried was the same hardness the half
+        // pin already says, and the course eased it back overnight; the
+        // half pin is the part that reaches the field, so it stays alone.
+        cost: 'Free, and the greens everyone talks about: prestige +2, and the next round plays half a pin setting harder. They pay for it: turf -4.',
+        effects: { prestige: 2, turf: -4, nextRound: { handicap: 0.375 } },
       },
       {
         stance: 'pragmatic',

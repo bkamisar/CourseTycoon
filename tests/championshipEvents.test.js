@@ -189,6 +189,22 @@ test('nextRound effects belong to the week only', () => {
     'and some its pace');
 });
 
+test('a week event never moves the setup', () => {
+  // The week holds the course at its target: the next morning's `nextSetup`
+  // eases an overshoot back (+4 to about +0.5) and climbs a shortfall back
+  // in a day, so a setup figure on a week card is a promise that evaporates
+  // before the round it was about. A week event that wants the next round
+  // harder or easier says so with `nextRound.handicap`, which is applied.
+  for (const event of CHAMPIONSHIP_EVENTS.filter((e) => e.phase === 'week')) {
+    for (const choice of event.choices) {
+      assert.equal(choice.effects.setup, undefined,
+        `${event.id}/${choice.label}: a week choice cannot carry a setup effect`);
+      assert.ok(!/setup [+-]\d/i.test(choice.cost),
+        `${event.id}/${choice.label}: the cost promises a setup figure — "${choice.cost}"`);
+    }
+  }
+});
+
 test('magnitudes stay on the scale of the levers they sit beside', () => {
   // Handicap within a point either way (the four pins span 2.25), pace
   // within 0.9-1.15 (heavy rain is 1.16), setup within 8 (about a day and
