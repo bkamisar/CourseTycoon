@@ -149,4 +149,3 @@ finished too high (the winner at +9 to +14 against a range of +2 to +8), none to
 The cause has not been diagnosed: it may be weather on the setup climb, the practice
 round, an event effect, or noise at this sample size. The measuring operator never reads
 the practice round's forecast, so it cannot correct course the way a player can.
-
