@@ -135,3 +135,26 @@ test('weather actually moves the day', () => {
   assert.ok(differingDays >= 5,
     `only ${differingDays} of 30 days differed between two climates`);
 });
+
+test('wet greens cannot be firmed, and wind dries them', () => {
+  // Act III's run-up (spec 2026-10-04 §3): the crew's daily climb toward a
+  // championship setup is multiplied by the day's sky, and heavy rain
+  // softens a booked course. Both live on the condition so the weather
+  // table stays the one place weather is described.
+  for (const key of CONDITION_KEYS) {
+    const c = CONDITIONS[key];
+    assert.equal(typeof c.setupClimb, 'number', `${key}.setupClimb must be a number`);
+    assert.ok(c.setupClimb >= 0 && c.setupClimb <= 1.5, `${key}.setupClimb ${c.setupClimb} outside 0-1.5`);
+    assert.equal(typeof c.setupSoften, 'number', `${key}.setupSoften must be a number`);
+    assert.ok(c.setupSoften >= 0, `${key}.setupSoften must not be negative`);
+  }
+  assert.equal(CONDITIONS.storm.setupClimb, 0, 'nobody firms a green in a storm');
+  assert.ok(CONDITIONS.rain.setupClimb < CONDITIONS.drizzle.setupClimb);
+  assert.ok(CONDITIONS.drizzle.setupClimb < CONDITIONS.fair.setupClimb);
+  assert.ok(CONDITIONS.clear.setupClimb > CONDITIONS.fair.setupClimb, 'a dry day is a good day to firm greens');
+  // Only real rain softens; a dry day never undoes the crew's work.
+  for (const key of ['clear', 'fair', 'breezy', 'blowy']) {
+    assert.equal(CONDITIONS[key].setupSoften, 0, `${key} should not soften a course`);
+  }
+  assert.ok(CONDITIONS.storm.setupSoften > CONDITIONS.rain.setupSoften && CONDITIONS.rain.setupSoften > 0);
+});

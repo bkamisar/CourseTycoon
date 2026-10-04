@@ -352,20 +352,34 @@ export function setupClimb(keepers = 0) {
  * Easing off on arrival is also what the job actually looks like. The
  * greens are brought to a condition and held there, not overshot every
  * Tuesday and allowed to relax back.
+ *
+ * `climb` and `soften` are the day's weather (`setupClimb`/`setupSoften`
+ * in weather.js, run-up spec 2026-10-04 §3). `climb` multiplies the
+ * crew's work: wet greens cannot be firmed. `soften` is what heavy rain
+ * takes off a BOOKED course before the day's work, climbing or holding;
+ * a held course therefore drops by exactly `soften` today and, being
+ * below its target, climbs back from tomorrow. Unbooked, softening is
+ * ignored -- the course is already decaying, and rain is not a second
+ * decay on top. Both default to a neutral day so callers that know
+ * nothing of weather are unchanged.
  */
 export function nextSetup(setup = 0, {
   keepers = 0, conditioning = false, target = 100, hold = false,
+  climb = 1, soften = 0,
 } = {}) {
+  // Softened first and floored at zero on its own, so a storm on a bare
+  // course does not eat into the day's work as well.
+  const start = hold ? Math.max(0, setup - soften) : setup;
   // Never past the asking. A crew with more hands than the target needs
   // arrives sooner and then holds, rather than overshooting by the
   // difference.
-  if (conditioning) return clamp(Math.min(setup + setupClimb(keepers), target), 0, 100);
+  if (conditioning) return clamp(Math.min(start + setupClimb(keepers) * climb, target), 0, 100);
   // Booked and already there (or above, because the target was lowered):
   // ease down to the target and stop, rather than falling one day's decay
   // below it and climbing back the next morning. Not booked, it falls all
   // the way.
-  const floor = hold ? Math.min(setup, target) : 0;
-  return clamp(Math.max(setup - SETUP_DECAY_PER_DAY, floor), 0, 100);
+  const floor = hold ? Math.min(start, target) : 0;
+  return clamp(Math.max(start - SETUP_DECAY_PER_DAY, floor), 0, 100);
 }
 
 /**

@@ -187,6 +187,15 @@ export function runDay(state, seed) {
    */
   const keepers = next.resort.staff.filter((m) => m.role === 'groundskeeper').length;
 
+  // The sky, decided once. A pure function of the resort's weather seed
+  // and the day number, so the forecast the player saw two days ago is
+  // this exact value rather than a prediction of it (see weather.js).
+  // Read before the setup update below because the crew's climb depends
+  // on it (wet greens cannot be firmed); being a pure function of seed
+  // and day, it does not matter how early in the day it is read.
+  const weatherKey = weatherOn(next.weatherSeed ?? 1, next.day);
+  const sky = effectsOf(weatherKey);
+
   // Act III. The course hardens toward the player's target while a
   // championship is booked, holds there once it arrives, and drifts back
   // when nothing is booked or the target has been brought down. The target
@@ -219,6 +228,10 @@ export function runDay(state, seed) {
     // that climbed back, so a week of rounds alternated 86 and 83 and the
     // prep bill landed every other day. See `nextSetup`.
     hold: booked,
+    // The day's weather: rain slows the climb and softens a booked course,
+    // a dry or windy day firms it a little faster. See weather.js.
+    climb: sky.setupClimb,
+    soften: sky.setupSoften,
   });
 
   // The open holes less today's closures (see `playableHoles`: the same
@@ -245,12 +258,6 @@ export function runDay(state, seed) {
   const snackShack = next.resort.amenities.find((a) => a.type === 'snackShack');
   const snackEnergy = snackShack ? snackRestoreTo(snackShack.menu) : 0;
   const snackHoleIndex = Math.min(1, Math.max(0, holes.length - 1));
-
-  // The sky, decided once. A pure function of the resort's weather seed
-  // and the day number, so the forecast the player saw two days ago is
-  // this exact value rather than a prediction of it (see weather.js).
-  const weatherKey = weatherOn(next.weatherSeed ?? 1, next.day);
-  const sky = effectsOf(weatherKey);
 
   const beverageCart = next.resort.amenities.find((a) => a.type === 'beverageCart');
   const cartEnergy = beverageCart ? cartRestoreTo(beverageCart.menu) : 0;

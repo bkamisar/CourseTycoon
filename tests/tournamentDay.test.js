@@ -886,11 +886,17 @@ test('a booked course already at its target stays there, and holding it is bille
   // it stopped dipping; it is billed every day of the booking, because
   // keeping greens firm is the crew's job as much as making them firm.
   let state = openFullCourse(actThreeResort(80));
+  // Heavy rain now softens a held course (weather.js, setupSoften), so
+  // this is a claim about dry days. Weather seed 80 has none wetter than
+  // blowing hard on days 1-7; asserted per day below so a change to the
+  // weather roll fails loudly rather than as a mystery slip.
   state.resort.setup = 86;
   state.resort.setupTarget = 86;
   state.tournament = { rung: 'national', day: state.day + 3, resolved: false };
   for (let d = 0; d < 7; d++) {
     const { state: after, report } = runDay(state, 8000 + d);
+    assert.equal(report.weather.key === 'rain' || report.weather.key === 'storm', false,
+      `precondition: day ${d} is ${report.weather.key}, which softens the course by design`);
     assert.equal(after.resort.setup, 86, `day ${d}: the course slipped to ${after.resort.setup}`);
     assert.equal(report.costs.championshipPrep, conditioningCostPerDay('national'),
       `day ${d}: holding the course at its target went unbilled`);
@@ -933,4 +939,34 @@ test('a crew with real margin holds the turf through the week', () => {
       `seed ${seed}: ten keepers let the turf fall to ${t.turfQuality}`);
     assert.ok(t.met.includes('turf'));
   }
+});
+
+// --- Weather on the setup climb (run-up spec 2026-10-04 §3) ------------
+
+test('a run of heavy rain slows the crew\'s climb toward a national', () => {
+  // Weather seeds found by search: 11621 gives heavy rain on days 1-3 and
+  // 6 gives fair on the same days. Asserted as a precondition so a change
+  // to the weather roll cannot quietly turn this into a fair-against-fair
+  // comparison that passes for the wrong reason.
+  function climbIn(weatherSeed, expected) {
+    let state = openFullCourse(actThreeResort(40));
+    state.weatherSeed = weatherSeed;
+    state.resort.staff = state.resort.staff.filter((m) => m.role !== 'groundskeeper');
+    for (let i = 0; i < 8; i++) state.resort.staff.push({ role: 'groundskeeper' });
+    state.resort.setup = 40;
+    state.resort.setupTarget = 86;
+    state.tournament = newWeek('national', state.day + RUN_UP_DAYS);
+    const start = state.resort.setup;
+    for (let d = 0; d < 3; d++) {
+      const { state: after, report } = runDay(state, 4600 + d);
+      assert.equal(report.weather.key, expected, `precondition: day ${state.day} under seed ${weatherSeed}`);
+      state = after;
+    }
+    return state.resort.setup - start;
+  }
+  const fair = climbIn(6, 'fair');
+  const rain = climbIn(11621, 'rain');
+  assert.ok(Math.abs(fair - 3 * 8 * 0.8) < 1e-9, `three fair days with eight keepers climbed ${fair.toFixed(2)}`);
+  assert.ok(rain < fair / 2,
+    `three days of heavy rain climbed ${rain.toFixed(2)} against ${fair.toFixed(2)} in fair weather`);
 });

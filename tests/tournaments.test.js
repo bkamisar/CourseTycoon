@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RUNGS, RUNG_IDS, rungFor, eligibleFor, SETUP_DECAY_PER_DAY, setupClimb, nextSetup, setupDifficultyBonus, withinBand, withinTarget, RUN_UP_DAYS, bidFor, nextRungFor, scoreTournament, contractFor } from '../src/sim/tournaments.js';
+import { weatherOn, effectsOf } from '../src/sim/weather.js';
 
 test('there are three rungs, each fully specified', () => {
   assert.equal(RUNG_IDS.length, 3);
@@ -364,4 +365,91 @@ test('the target includes both edges and nothing outside them', () => {
   assert.equal(withinTarget(3, target), false);
   assert.equal(withinTarget(null, target), false, 'no rounds played is not a winner');
   assert.equal(withinTarget(undefined, target), false);
+});
+
+// --- Weather on the climb (run-up spec 2026-10-04 §3) ------------------
+
+test('a wet day slows the climb by exactly its multiplier', () => {
+  const dry = nextSetup(50, { keepers: 8, conditioning: true, target: 90 });
+  const wet = nextSetup(50, { keepers: 8, conditioning: true, target: 90, climb: 0.25 });
+  assert.ok(dry > 50, 'sanity: the crew climbs');
+  assert.ok(Math.abs((wet - 50) - 0.25 * (dry - 50)) < 1e-9,
+    `a quarter-climb day added ${(wet - 50).toFixed(3)} against a full day's ${(dry - 50).toFixed(3)}`);
+  // And the multiplier still never takes the crew past the target.
+  assert.equal(nextSetup(89, { keepers: 8, conditioning: true, target: 90, climb: 1.15 }), 90);
+});
+
+test('climb defaults to 1, so every caller that ignores the weather is unchanged', () => {
+  for (const opts of [
+    { keepers: 6, conditioning: true, target: 86 },
+    { keepers: 6, conditioning: false, target: 86, hold: true },
+    { keepers: 6, conditioning: false },
+  ]) {
+    assert.equal(nextSetup(60, opts), nextSetup(60, { ...opts, climb: 1, soften: 0 }));
+  }
+});
+
+test('heavy rain softens a held course, and the crew climbs it back', () => {
+  // Held at its target: rain takes exactly `soften` off today...
+  const softened = nextSetup(86, { keepers: 8, conditioning: false, target: 86, hold: true, soften: 2 });
+  assert.equal(softened, 84);
+  // ...never below zero...
+  assert.equal(nextSetup(3, { keepers: 8, conditioning: false, target: 3, hold: true, soften: 4 }), 0);
+  // ...and tomorrow the crew is conditioning again (the course is below
+  // its target) and climbs back at the normal rate.
+  assert.equal(nextSetup(softened, { keepers: 8, conditioning: softened < 86, target: 86, hold: true }), 86);
+  // Softening applies while climbing too: the day's work lands on a
+  // softened course.
+  const climbingInRain = nextSetup(50, { keepers: 8, conditioning: true, target: 90, hold: true, climb: 0.25, soften: 2 });
+  assert.ok(Math.abs(climbingInRain - (50 - 2 + 8 * 0.8 * 0.25)) < 1e-9, `got ${climbingInRain}`);
+});
+
+test('softening means nothing when no championship is booked', () => {
+  // Not booked, the course is already decaying on its own; rain is not a
+  // second decay on top.
+  assert.equal(
+    nextSetup(50, { keepers: 8, conditioning: false, hold: false, soften: 4 }),
+    nextSetup(50, { keepers: 8, conditioning: false, hold: false }),
+  );
+  assert.equal(nextSetup(50, { keepers: 8, conditioning: false, hold: false, soften: 4 }), 50 - SETUP_DECAY_PER_DAY);
+});
+
+test('weather is a risk to plan around, not a tax: the neutral-weather crew still arrives', () => {
+  // Run-up spec 2026-10-04 §7.2. For each rung, the smallest crew that
+  // reaches the band midpoint in RUN_UP_DAYS of neutral weather must still
+  // reach it by the first round in real weather. Calibrated at >= 90% on
+  // 120 seeds (see the table in weather.js); asserted at 85% on 40 here
+  // for slack.
+  //
+  // Mirrors runDay rather than calling it (2,640 simulated days would be
+  // far too slow for the suite): a booking made on day D plays round 1 on
+  // D + RUN_UP_DAYS, and every runDay from D to that morning updates the
+  // setup before play, so the real course gets RUN_UP_DAYS + 1 updates,
+  // booked (`hold`) throughout. tests/tournamentDay.test.js checks the
+  // weather reaches nextSetup through the real day.
+  function runUp(keepers, target, weatherSeed) {
+    let setup = 0;
+    let arrived = false;
+    const updates = weatherSeed === null ? RUN_UP_DAYS : RUN_UP_DAYS + 1;
+    for (let i = 0; i < updates; i++) {
+      const sky = weatherSeed === null ? { setupClimb: 1, setupSoften: 0 } : effectsOf(weatherOn(weatherSeed, 1 + i));
+      setup = nextSetup(setup, {
+        keepers, conditioning: setup < target, target, hold: true,
+        climb: sky.setupClimb, soften: sky.setupSoften,
+      });
+      if (setup >= target) arrived = true;
+    }
+    return arrived;
+  }
+  for (const id of RUNG_IDS) {
+    const { band } = RUNGS[id];
+    const target = Math.round((band.low + band.high) / 2);
+    let crew = 1;
+    while (!runUp(crew, target, null)) crew++;
+    const seeds = 40;
+    let arrived = 0;
+    for (let s = 1; s <= seeds; s++) if (runUp(crew, target, s)) arrived++;
+    assert.ok(arrived / seeds >= 0.85,
+      `${id}: ${crew} keepers reach ${target} in neutral weather but only ${arrived}/${seeds} seeds in real weather`);
+  }
 });
