@@ -262,10 +262,10 @@ export function championshipCards(report, state) {
     // A good week is one the venue delivered: the target, the turf and the
     // pace, the three things the host controls on the course. It used to
     // need the whole ceiling, which needs the crowd bonus too -- and the
-    // National's crowd bonus is out of reach for a sensible resort (its
-    // gallery needs the short course, $0.99M-$1.25M of lost trade over 240
-    // days for a $92,560 bonus; see docs/known-issues.md), so the National,
-    // the week the act is for, could never be called a good one.
+    // National's crowd bonus was out of reach until its gallery was lowered
+    // so that cheap hotel amenities could hold it, so the National, the week
+    // the act is for, could never be called a good one. The crowd is still a
+    // separate bonus; it just no longer decides what the venue is told.
     const goodWeek = ['target', 'turf', 'pace'].every((id) => (t.met ?? []).includes(id));
 
     cards.push({
