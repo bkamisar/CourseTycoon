@@ -432,7 +432,9 @@ Measured after (`node tools/actThree.js --seeds 8 --samples 4`, 32 ladders,
 the table above `playActThree` in `tools/operator.js`): the 13 ladders that
 hit all three targets finished at a median of +$21k against never bidding
 (quartiles -$42k to +$101k, range -$121k to +$189k); all 19 with a miss lost,
-by $144k to $999k (median -$635k). So Act III is no longer a money-maker: a
+by $144k to $999k (median -$635k) — measured before a missed rung could be
+retried after its bar, so a miss followed by a hit on retry is not yet
+measured. So Act III is no longer a money-maker: a
 championship pays for itself only when it is done well, and its reward is
 prestige and the act.
 

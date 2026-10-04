@@ -89,7 +89,9 @@ export const CHAMPIONSHIP_HOLES = 18;
  * round mornings. The 13 ladders that hit all three targets finished at
  * a median of +$21k against never bidding (quartiles -$42k to +$101k,
  * range -$121k to +$189k); all 19 with a miss lost, $144k to $999k
- * (median -$635k).
+ * (median -$635k). Measured before a missed rung could be retried after
+ * its bar: the all-hit ladders, which set the purse, are unaffected, but
+ * a miss followed by a hit on retry has not been measured.
  *
  * The factor was picked from the same samples at the purses before it
  * (twice the originals, briefly): there the all-hit median was +$338k,

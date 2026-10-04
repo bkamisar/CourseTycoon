@@ -205,6 +205,16 @@ export function deserialize(text) {
   if (!Array.isArray(parsed.tournamentsHosted)) parsed.tournamentsHosted = [];
   if (typeof parsed.actThreeArrived !== 'boolean') parsed.actThreeArrived = false;
   if (typeof parsed.actThreePassed !== 'boolean') parsed.actThreePassed = false;
+  // Builds up to 2026-10-03 counted a MISSED week as hosted, so a save
+  // that missed its National shows the ladder climbed and can never pass
+  // the act. Under the current rule a hosted National always means the act
+  // is passed, so a hosted National without a pass can only be that old
+  // miss: un-host it and the National is biddable again (its old bar has
+  // long run out). Deliberately not "has a bar, so un-host": a bar
+  // survives a successful retry, and that test would undo a real win.
+  if (parsed.tournamentsHosted.includes('national') && !parsed.actThreePassed) {
+    parsed.tournamentsHosted = parsed.tournamentsHosted.filter((id) => id !== 'national');
+  }
   // A save written before HISTORY_LIMIT existed can carry hundreds of
   // days and be too large to write back. Trimmed on the way in so it
   // shrinks on the first load rather than a fortnight later.

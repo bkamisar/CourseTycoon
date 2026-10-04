@@ -257,3 +257,19 @@ test('projectTotal has no pace to project before a leader or a round', () => {
   assert.equal(projectTotal(undefined, 1, 4), null);
   assert.equal(projectTotal(3, 0, 4), null);
 });
+
+test('a save that missed its National under the old rule gets the National back', () => {
+  // Builds up to 2026-10-03 counted a missed week as hosted, which left a
+  // missed National with the ladder "climbed" and the act unpassable.
+  const stuck = newGame(3);
+  stuck.tournamentsHosted = ['countyOpen', 'regional', 'national'];
+  stuck.actThreePassed = false;
+  assert.deepEqual(deserialize(serialize(stuck)).tournamentsHosted, ['countyOpen', 'regional']);
+
+  // And a real win is left alone, even with a stale bar from an earlier miss.
+  const won = newGame(4);
+  won.tournamentsHosted = ['countyOpen', 'regional', 'national'];
+  won.actThreePassed = true;
+  won.tournamentBars = { national: 50 };
+  assert.deepEqual(deserialize(serialize(won)).tournamentsHosted, ['countyOpen', 'regional', 'national']);
+});
