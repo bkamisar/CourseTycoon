@@ -623,9 +623,8 @@ function narrowFor(state, rungId, widths) {
   narrowToDifficulty(holes, RUNGS[rungId].minDifficulty + FLOOR_MARGIN);
 }
 
-/** True on the last run-up morning (the night before the first round),
- * or later if that morning was somehow missed, but never once the week
- * is under way: the editor locks then. */
+/** True only on the last run-up morning, the night before the first
+ * round. Never once the week is under way: the editor locks then. */
 function lastRunUpMorning(state, week) {
   return state.day >= week.day - 1 && state.day < week.day;
 }

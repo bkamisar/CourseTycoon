@@ -109,3 +109,14 @@ played over the holes still open. The field's score for it is to par over
 fewer holes, so it is lower, and it goes into the same running totals as the
 full eighteen-hole rounds. The leaderboard and the winning total then read
 better than the course played, and the evening report does not say why.
+
+### The last groups of a championship round can run off the end of the playback
+
+**Found:** 2026-10-03, in review of the championship week. Not seen in play yet.
+
+The playback clock runs 07:00 to 18:00. With a wide tee interval for the field
+(22 minutes is what holds the pace at a National), the last threeball tees off
+around two in the afternoon and, on a hard course, finishes a little after six.
+Those last groups may vanish from the playback before they hole out. Scores and
+pace are judged on the simulated round, not the clock, so nothing is lost but
+the view.
