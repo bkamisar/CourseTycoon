@@ -334,15 +334,18 @@ export function dialNote(dial, band) {
  *
  * Null before it has been played and once the week is under way, when the
  * leader's real pace replaces it. One line because the sheet is read on a
- * phone, and labelled with the day and the setup it assumed so a player
- * who has moved the target since can see it is an older reading. The
- * setup is rounded like "Course is set to" above it.
+ * phone, and labelled with the day, the setup it assumed and the course
+ * difficulty it measured, so a player who has moved the target or
+ * reworked a hole since can see it is an older reading. The setup is
+ * rounded like "Course is set to" above it; the difficulty floored to a
+ * tenth like the card, so 64.96 does not read as 65.0.
  */
 export function practiceNote(booked) {
   const p = booked?.practice;
   if (!p || booked.inWeek) return null;
   return `Practice round (day ${p.day}): on pace for about ${toParText(p.median)} `
-    + `(${toParText(p.low)} to ${toParText(p.high)}) at setup ${Math.round(p.setupAtRoundOne)}.`;
+    + `(${toParText(p.low)} to ${toParText(p.high)}) at setup ${Math.round(p.setupAtRoundOne)} `
+    + `on a ${(Math.floor(p.difficulty * 10) / 10).toFixed(1)} course.`;
 }
 
 /**

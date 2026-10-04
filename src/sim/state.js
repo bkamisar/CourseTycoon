@@ -307,3 +307,27 @@ export function playableHoles(state) {
   const closed = conditionEffects(state.conditions ?? []).holesClosed;
   return closed > 0 ? all.slice(0, Math.max(1, all.length - closed)) : all;
 }
+
+/**
+ * The holes a later `day` would play if nothing changed but the calendar:
+ * today's design, less only the closures that will still be running then.
+ *
+ * `state` is read as it stands at the start of `state.day`, which is how
+ * every saved state and every morning sees it. A condition with `daysLeft`
+ * L that morning is in force on `state.day` through `state.day + L - 1`:
+ * `runDay` reads the conditions in force at the top of the day and
+ * `tickConditions` takes one off each at the end, dropping it at zero.
+ * So it is still in force on `day` exactly when L > day - state.day. A
+ * condition with no `daysLeft` is dropped by the first tick, so it counts
+ * for today only, as `playableHoles` already counts it.
+ *
+ * Today or earlier is just `playableHoles`. Written for the officials'
+ * practice round (day.js), which measures the course the field will meet
+ * on the first morning rather than tonight's temporary closures.
+ */
+export function playableHolesOn(state, day) {
+  const ahead = day - (state.day ?? 0);
+  if (!(ahead > 0)) return playableHoles(state);
+  const still = (state.conditions ?? []).filter((c) => c.daysLeft > ahead);
+  return playableHoles({ ...state, conditions: still });
+}

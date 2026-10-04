@@ -182,6 +182,8 @@ Listed so they can be reviewed in the morning:
 
 - Practice round on the evening eleven days before round 1; 16 simulated weeks;
   range = 10th–90th percentile; neutral weather for the setup projection.
+  - The practice round measures the course as it will be on the first
+    morning: temporary closures that end before round 1 are ignored.
 - Weather multipliers and softening values in §3 (starting values; calibrated
   against §7.2).
   - **Rain climb raised to ×0.35 (from ×0.25)** to meet §7.2: at 0.25 the

@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serialize, deserialize, newGame, openHoles, playableHoles } from '../src/sim/state.js';
+import {
+  serialize, deserialize, newGame, openHoles, playableHoles, playableHolesOn,
+} from '../src/sim/state.js';
 import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { runDay } from '../src/sim/day.js';
@@ -283,4 +285,23 @@ test('a new week has had no practice round, and an old booking has not either', 
   // And one that has had it keeps it.
   const practice = { day: 29, setupAtRoundOne: 86, difficulty: 66.2, median: 11, low: 8, high: 14, samples: 16 };
   assert.deepEqual(normaliseWeek({ ...newWeek('national', 40), practice }).practice, practice);
+});
+
+test('the holes a later day will play keep only the closures still running then', () => {
+  // A condition added this morning with `days` left is in force today and
+  // the next days - 1 mornings (tickConditions runs at the end of each
+  // day), so a 5-day closure from day D last plays on D + 4.
+  const state = statusResort();
+  state.conditions = addCondition([], { id: 'stormDamage', days: 5, holesClosed: 4 });
+  const d = state.day;
+  assert.deepEqual(playableHolesOn(state, d), playableHoles(state), 'today is today');
+  assert.equal(playableHolesOn(state, d + 4).length, 14, 'still shut on its last day');
+  assert.equal(playableHolesOn(state, d + 5).length, 18, 'open again the morning after');
+  // And the arithmetic is the real day's, not a guess at it.
+  let s = state;
+  for (let i = 0; i < 5; i++) {
+    assert.equal(playableHoles(s).length, playableHolesOn(state, s.day).length, `day ${s.day}`);
+    s = runDay(s, 30 + i).state;
+  }
+  assert.equal(playableHoles(s).length, playableHolesOn(state, s.day).length, `day ${s.day}`);
 });

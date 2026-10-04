@@ -245,7 +245,9 @@ test('the sheet carries the practice round for the rest of the run-up', () => {
   assert.deepEqual(b.practice, PRACTICE, 'the stored forecast, not a recomputation');
   assert.equal(b.inWeek, false);
   const note = practiceNote(b);
-  assert.equal(note, 'Practice round (day 29): on pace for about +11 (+8 to +14) at setup 86.');
+  assert.equal(note, 'Practice round (day 29): on pace for about +11 (+8 to +14) at setup 86 on a 66.2 course.');
+  // Floored like every other difficulty on the sheet: 64.96 is not 65.0.
+  assert.match(practiceNote({ ...b, practice: { ...PRACTICE, difficulty: 64.96 } }), /on a 64\.9 course/);
 });
 
 test('no practice line before the practice round, or once the week is under way', () => {

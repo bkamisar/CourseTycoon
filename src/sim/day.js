@@ -11,7 +11,7 @@ import { HISTORY_LIMIT, SATISFACTION_HISTORY_LIMIT } from './state.js';
 import {
   addCondition, tickConditions, conditionEffects,
 } from './conditions.js';
-import { playableHoles } from './state.js';
+import { playableHoles, playableHolesOn } from './state.js';
 import { menuBestEnergy } from './menu.js';
 import { kitchenCapacity, kitchenLoad, serviceFactor } from './kitchen.js';
 import { narrationContext, pickNarration, rememberNarration } from './narration.js';
@@ -1127,9 +1127,8 @@ export function runDay(state, seed) {
   //
   // Here, at the very end of the day, for two reasons. It reads the
   // evening's course -- today's setup update done, today's turf, and the
-  // closures as they stand after tonight's tick, so the difficulty it
-  // quotes is the one the sheet shows the same evening. And nothing after
-  // it can read it, so it cannot move any other figure in the day. It does
+  // conditions after tonight's tick. And nothing after it can read it, so
+  // it cannot move any other figure in the day. It does
   // not touch the day's `rng` either: the forecast runs on a seed of its
   // own, from the save's seed and the day (`practiceSeed`), so a replay
   // prints the same report and every other number in the day is what it
@@ -1145,7 +1144,17 @@ export function runDay(state, seed) {
   if (runUp && runUp.practice == null && next.day === runUp.day - PRACTICE_DAYS_BEFORE) {
     const rung = RUNGS[runUp.rung];
     const target = next.resort.setupTarget ?? 0;
-    const forecast = practiceForecast(playableHoles(next), {
+    // The holes the field will meet on the first morning: tonight's
+    // design, less only the closures still running on round 1. A two-day
+    // closure tonight is over long before the week, and measuring through
+    // it would forecast a course nobody plays (decision of 2026-10-04,
+    // run-up spec §8). It can differ from the sheet's live difficulty
+    // while such a closure runs; the sheet's line says which course the
+    // forecast was made on. The conditions were ticked above, so they are
+    // tomorrow morning's: `playableHolesOn` reads a state as it stands at
+    // the start of its `day`, hence `next.day + 1`.
+    const fieldHoles = playableHolesOn({ ...next, day: next.day + 1 }, runUp.day);
+    const forecast = practiceForecast(fieldHoles, {
       rungId: runUp.rung,
       // The evening before round 1, because the forecast takes the round
       // mornings itself in each sample's weather (see practiceForecast).

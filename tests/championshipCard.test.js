@@ -360,7 +360,7 @@ test('the practice round is an announcement from the governing body, numbers fro
   assert.equal(card.choices.length, 1, 'information, not a decision');
   const t = RUNGS.national.target;
   for (const text of ['about +11', '+8 to +14', `${t.low > 0 ? '+' : ''}${t.low} to +${t.high}`,
-    '(86)', '66.2', `${RUNGS.national.minDifficulty}`, 'as it stands']) {
+    '(86)', '66.2', `${RUNGS.national.minDifficulty}`, 'first morning']) {
     assert.ok(card.prompt.includes(text), `expected "${text}" in: ${card.prompt}`);
   }
 });
@@ -380,6 +380,19 @@ test('the practice round says which way the forecast misses the target', () => {
   assert.match(over.prompt, /too hard/i);
   const right = championshipCards(practiceReport({ median: t.low + 1, low: t.low - 2, high: t.high }), {})[0];
   assert.doesNotMatch(right.prompt, /too (easy|hard)/i);
+  // The target is inclusive at both ends, as the judge reads it.
+  for (const median of [t.low, t.high]) {
+    const edge = championshipCards(practiceReport({ median, low: t.low - 3, high: t.high + 3 }), {})[0];
+    assert.doesNotMatch(edge.prompt, /too (easy|hard)/i, `median ${median}`);
+  }
+});
+
+test('the practice round says when the course is short of the minimum, and only then', () => {
+  const min = RUNGS.national.minDifficulty;
+  const short = championshipCards(practiceReport({ difficulty: min - 0.04 }), {})[0];
+  assert.match(short.prompt, /short of it/);
+  const clears = championshipCards(practiceReport({ difficulty: min }), {})[0];
+  assert.doesNotMatch(clears.prompt, /short of it/);
 });
 
 test('a practice card comes before any result card the same evening', () => {

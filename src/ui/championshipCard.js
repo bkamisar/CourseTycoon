@@ -109,12 +109,13 @@ function ordinalHole(n) {
  * `report.practiceRound` and nothing else.
  *
  * Kept short for a phone: the setup it assumed, the forecast and its
- * range, the target, the difficulty against the floor, and one clause
- * saying which way the forecast misses -- the decision the card exists to
- * prompt, with ten days left to act on it. "On the course as it stands"
- * and "a projection" because it is: a redesign, a new target or a
- * different crew changes the real week, and the weather and the field's
- * luck are not in it.
+ * range, the target, the difficulty against the floor, and a clause on
+ * each saying which way it misses -- the decision the card exists to
+ * prompt, with ten days left to act on it. "As it will be laid out on the
+ * first morning" because it is today's design less only the closures that
+ * will still be running then (day.js); "a projection" because a redesign,
+ * a new target or a different crew changes the real week, and the
+ * weather and the field's luck are not in it.
  *
  * The setup is rounded like the sheet's "Course is set to"; the
  * difficulty is floored to a tenth like the result card, so 64.96 against
@@ -131,16 +132,18 @@ function practiceCard(report) {
         : p.median > p.target.high ? ' — on these numbers, too hard.'
           : '.')
     : '';
+  // Compared unfloored, as the judge compares it; printed floored.
   const measured = typeof p.difficulty === 'number' && p.minDifficulty != null
     ? ` The course measures ${(Math.floor(p.difficulty * 10) / 10).toFixed(1)} against `
-      + `their minimum of ${p.minDifficulty}.`
+      + `their minimum of ${p.minDifficulty}`
+      + (p.difficulty < p.minDifficulty ? ' — short of it.' : '.')
     : '';
   return {
     id: `practice-round-${report.day ?? ''}`,
     kicker: 'THE PRACTICE ROUND',
     speaker: 'The governing body',
-    prompt: 'The officials played it today. On the course as it stands, with the greens '
-      + `where your crew should have them by the first morning (${Math.round(p.setupAtRoundOne)}), `
+    prompt: 'The officials played it today. On the course as it will be laid out on the first '
+      + `morning, with the greens where your crew should have them (${Math.round(p.setupAtRoundOne)}), `
       + `${forecast}${wanted}${measured} A projection, not a promise.`,
     choices: acknowledge('Noted'),
   };

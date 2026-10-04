@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, serialize, deserialize, playableHoles } from '../src/sim/state.js';
+import {
+  newGame, serialize, deserialize, playableHoles, playableHolesOn, openHoles,
+} from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import {
@@ -15,6 +17,7 @@ import { computeChampionshipData, practiceNote } from '../src/ui/championship.js
 import { toParText } from '../src/ui/toPar.js';
 import { narrowToDifficulty } from '../tools/championshipPolicy.js';
 import { CONDITIONS } from '../src/sim/weather.js';
+import { addCondition } from '../src/sim/conditions.js';
 
 /** A resort that has finished Act II, which is where Act III begins. */
 function actThreeResort(seed = 3) {
@@ -1063,13 +1066,13 @@ test('the officials play the course once, eleven days before the first round', (
   }));
   assert.ok(p.setupAtRoundOne > after.resort.setup, 'sanity: the crew is still climbing');
   assert.ok(p.setupAtRoundOne < 86, `sanity: and will fall short (${p.setupAtRoundOne})`);
-  // The course as it stands that evening, the one the sheet measures.
-  assert.equal(p.difficulty, courseDifficultyOf(playableHoles(after)));
+  // The course as it will be laid out on the first morning.
+  assert.equal(p.difficulty, courseDifficultyOf(playableHolesOn(after, roundOne)));
   // And the whole forecast is the documented call on the evening's state:
   // the course projected to the evening before round 1 (ten more updates),
   // the crew and target as they stand, and a seed from the save and the
   // day rather than from the day's rng.
-  assert.deepEqual(forecast, practiceForecast(playableHoles(after), {
+  assert.deepEqual(forecast, practiceForecast(playableHolesOn(after, roundOne), {
     rungId: 'national',
     setup: projectSetup({
       setup: after.resort.setup, target: after.resort.setupTarget, keepers,
@@ -1131,4 +1134,29 @@ test('the practice round changes no other number in the day', () => {
     runDay(held.state, 6400).report.revenue,
     runDay(notHeld.state, 6400).report.revenue,
   );
+});
+
+test("the practice round measures the course the field will meet, not tonight's closures", () => {
+  // A closure added on the practice morning with `days` left is in force
+  // that day and the next days - 1: eleven days ends on the eve of round 1,
+  // twelve reaches round 1 itself. Only the second is on the course the
+  // field meets, so only the second may move the forecast's difficulty.
+  let state = nationalRunUp(64);
+  const roundOne = state.tournament.day;
+  const practiceDay = roundOne - PRACTICE_DAYS_BEFORE;
+  for (let i = 0; state.day < practiceDay; i++) state = runDay(state, 6400 + i).state;
+  function difficultyWith(days) {
+    const s = structuredClone(state);
+    if (days) s.conditions = addCondition(s.conditions ?? [], { id: 'greensWorks', days, holesClosed: 3 });
+    const { report } = runDay(s, 6499);
+    assert.ok(report.practiceRound, `sanity: a practice round with a ${days}-day closure`);
+    return report.practiceRound.difficulty;
+  }
+  const whole = difficultyWith(0);
+  assert.equal(difficultyWith(2), whole, 'a two-day closure is over long before round 1');
+  assert.equal(difficultyWith(11), whole, 'nor one that reopens on the eve of round 1');
+  const shut = difficultyWith(12);
+  assert.equal(shut, courseDifficultyOf(openHoles(state).slice(0, 15)),
+    'a closure still running on round 1 is the course they will play');
+  assert.notEqual(shut, whole, 'and the closure has to matter for this to mean anything');
 });
