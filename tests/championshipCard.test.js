@@ -306,3 +306,26 @@ test('the field band comes from the tenth it prints', () => {
   }, { act: 3 });
   assert.match(card.field, /4\.0 over par — a fair one/, '3.96 prints as 4.0, so it is called what 4.0 is');
 });
+
+test('a National that met the target, turf and pace is a good week without the crowd', () => {
+  // The kicker used to need the whole ceiling, which needs the crowd bonus,
+  // which the National's gallery puts out of a sensible resort's reach --
+  // so the week the act is for could never be called a good one.
+  const week = (met) => ({
+    day: 94,
+    tournament: {
+      rung: 'national', met, missed: ['target', 'turf', 'pace', 'crowd'].filter((m) => !met.includes(m)),
+      paid: 500000, prestige: 18, barDays: 0,
+      setup: 86, band: RUNGS.national.band, turfQuality: 84,
+      field: { averageToPar: 9.1, underPar: 0, best: 3, hardestHole: 9, averageRoundMinutes: 270 },
+      difficulty: 65.2, minDifficulty: 65, difficultyMet: true,
+      week: { rounds: 4, winningTotal: 16, target: { low: 14, high: 20 }, roundLog: [{ round: 1, leaderToPar: 4, pins: 'fair', weather: 'fair' }] },
+    },
+  });
+  assert.equal(championshipCards(week(['target', 'turf', 'pace']), { act: 3 })[0].kicker, 'A GOOD WEEK');
+  assert.equal(championshipCards(week(['target', 'turf', 'pace', 'crowd']), { act: 3 })[0].kicker, 'A GOOD WEEK');
+  // And it is not handed out: each of the three is needed.
+  for (const met of [['target', 'turf'], ['target', 'pace', 'crowd'], ['turf', 'pace', 'crowd']]) {
+    assert.equal(championshipCards(week(met), { act: 3 })[0].kicker, 'THE WRITE-UP', met.join(','));
+  }
+});

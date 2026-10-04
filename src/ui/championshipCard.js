@@ -200,9 +200,18 @@ export function championshipCards(report, state) {
         ? ' Word gets round, and it gets round in your favour.'
         : '';
 
+    // A good week is one the venue delivered: the target, the turf and the
+    // pace, the three things the host controls on the course. It used to
+    // need the whole ceiling, which needs the crowd bonus too -- and the
+    // National's crowd bonus is out of reach for a sensible resort (its
+    // gallery needs the short course, $0.99M-$1.25M of lost trade over 240
+    // days for a $92,560 bonus; see docs/known-issues.md), so the National,
+    // the week the act is for, could never be called a good one.
+    const goodWeek = ['target', 'turf', 'pace'].every((id) => (t.met ?? []).includes(id));
+
     cards.push({
       id: `championship-result-${report.day ?? ''}`,
-      kicker: targetMet && t.paid >= (contract?.ceiling ?? 0) ? 'A GOOD WEEK' : 'THE WRITE-UP',
+      kicker: goodWeek ? 'A GOOD WEEK' : 'THE WRITE-UP',
       speaker: rung?.label ?? 'The championship',
       prompt: [opening, weekStory(t.week), fieldStory(t.field)].filter(Boolean).join(' ')
         + ` ${money}${withheld}${standing}`,
