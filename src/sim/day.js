@@ -11,7 +11,7 @@ import { HISTORY_LIMIT, SATISFACTION_HISTORY_LIMIT } from './state.js';
 import {
   addCondition, tickConditions, conditionEffects,
 } from './conditions.js';
-import { playableHoles, playableHolesOn } from './state.js';
+import { openHoles, playableHoles } from './state.js';
 import { menuBestEnergy } from './menu.js';
 import { kitchenCapacity, kitchenLoad, serviceFactor } from './kitchen.js';
 import { narrationContext, pickNarration, rememberNarration } from './narration.js';
@@ -321,6 +321,18 @@ export function runDay(state, seed) {
   const championshipToday = Boolean(
     next.tournament && !next.tournament.resolved && next.day >= next.tournament.day
   );
+
+  // The holes the field plays. A championship is always over every open
+  // hole: a decision event's temporary closure (`holesClosed`) shuts the
+  // public's course, which is closed all week anyway, and does not shorten
+  // the officials' (decision of 2026-10-04, week spec §5). Playing the
+  // shortened course was measured to do two wrong things: it dropped a
+  // course set exactly at its floor under it on the first morning (4 of 24
+  // weeks in the 8-seed ladder: a Regional at 53.4, three Nationals at
+  // 62.6, each failing the week whatever the winner shot), and it added a
+  // round of fewer holes to the totals of full rounds. Ordinary days keep
+  // the closure exactly as `playableHoles` has it.
+  const fieldHoles = championshipToday ? openHoles(next) : holes;
 
   const demand = holes.length && !championshipToday
     ? demandGroups({
@@ -763,13 +775,12 @@ export function runDay(state, seed) {
     // Keyed on the measurement being missing rather than on round 1, so a
     // save taken mid-week before the measurement existed is measured on
     // its next round instead of failing the floor on a null. The design is
-    // locked for the week (championshipWeek.weekUnderWay), so measuring
-    // late normally gives the same answer. Not always: a decision event
-    // can close holes mid-week, and `holes` is the open ones (see "A round
-    // played on a short course counts as a full one" in
-    // docs/known-issues.md).
+    // locked for the week (championshipWeek.weekUnderWay), and the field
+    // always plays every open hole (`fieldHoles`), so measuring late gives
+    // the same answer whatever a decision event has closed.
+    const fieldDifficulty = courseDifficultyOf(fieldHoles);
     const measured = week.difficulty == null
-      ? { ...week, difficulty: baseDifficulty, difficultyMet: baseDifficulty >= rung.minDifficulty }
+      ? { ...week, difficulty: fieldDifficulty, difficultyMet: fieldDifficulty >= rung.minDifficulty }
       : week;
     // Drawn once, on the first round, and carried in the week thereafter,
     // so the same sixty play every round and their totals add up.
@@ -778,7 +789,7 @@ export function runDay(state, seed) {
     // congestion rule that paces the resort's own tee sheet, pointed at
     // 20 championship threeballs instead. Played on the day's own rng so
     // a replay of this seed plays out the same tournament.
-    const { playback, playerToPar, ...field } = playField(rng, holes, {
+    const { playback, playerToPar, ...field } = playField(rng, fieldHoles, {
       setup: next.resort.setup ?? 0,
       turfQuality: next.turfQuality,
       teeInterval,
@@ -795,7 +806,7 @@ export function runDay(state, seed) {
     // Pace is the existing flow-shop target, pointed at a new audience.
     // No grace period here — the 10% the resort's own tee sheet gets is
     // what made this condition unfailable, and officials don't give it.
-    const paceOnTarget = field.averageRoundMinutes <= holes.length * TARGET_MINUTES_PER_HOLE;
+    const paceOnTarget = field.averageRoundMinutes <= fieldHoles.length * TARGET_MINUTES_PER_HOLE;
 
     const played = recordRound(measured, {
       handicaps,
@@ -1195,17 +1206,12 @@ export function runDay(state, seed) {
   if (runUp && runUp.practice == null && next.day === runUp.day - PRACTICE_DAYS_BEFORE) {
     const rung = RUNGS[runUp.rung];
     const target = next.resort.setupTarget ?? 0;
-    // The holes the field will meet on the first morning: tonight's
-    // design, less only the closures still running on round 1. A two-day
-    // closure tonight is over long before the week, and measuring through
-    // it would forecast a course nobody plays (decision of 2026-10-04,
-    // run-up spec §8). It can differ from the sheet's live difficulty
-    // while such a closure runs; the sheet's line says which course the
-    // forecast was made on. The conditions were ticked above, so they are
-    // tomorrow morning's: `playableHolesOn` reads a state as it stands at
-    // the start of its `day`, hence `next.day + 1`.
-    const fieldHoles = playableHolesOn({ ...next, day: next.day + 1 }, runUp.day);
-    const forecast = practiceForecast(fieldHoles, {
+    // The holes the field will meet on the first morning: every open hole
+    // in tonight's design. Temporary closures are ignored entirely, as
+    // they are for the championship itself (decision of 2026-10-04, week
+    // spec §5 and run-up spec §8), so the forecast and the sheet's live
+    // difficulty measure the same course.
+    const forecast = practiceForecast(openHoles(next), {
       rungId: runUp.rung,
       // The evening before round 1, because the forecast takes the round
       // mornings itself in each sample's weather (see practiceForecast).

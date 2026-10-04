@@ -179,6 +179,19 @@ who pay for ordinary days, and the course rating's fairness term dips until the
 clientele catches up. Climbing the ladder now costs trade between championships,
 not only during them.
 
+### Always the full course
+
+A championship is played over **every open hole**. A decision event can close
+holes for a few days (`holesClosed`); that shuts the public's course, which is
+closed for the week anyway, and does not shorten the officials'. The field
+plays all of them, the difficulty floor is measured on all of them (on the
+first morning, and in the HUD, the sheet and the practice round), and a round's
+score to par is over the full par. Decided 2026-10-04, replacing a rule that
+measured the playable holes: that dropped a course set exactly at its floor
+under it when two holes closed on the first morning (4 of 24 measured weeks),
+and put rounds over fewer holes into the same totals as full ones. Ordinary
+days are unchanged: a closure still shortens the public's course.
+
 ### Locked during the week
 
 Holes cannot be edited on a round day or between rounds. The design the field
@@ -415,7 +428,8 @@ never bidding on every seed, near-perfect ladders included.
 break even against never bidding, and a ladder with a miss should lose. And
 the difficulty minimum is a planning hurdle, not a running cost: narrowing the
 fairways at the last minute is allowed, so the measurement's host narrows the
-night before the first round (to the floor plus a margin for hole closures),
+night before the first round (to the floor plus a margin, +3 when it also had to cover a hole closure
+and +1, for rounding, since championships ignore closures; §5),
 widens back after the week, and spaces the field out on round mornings. Two
 earlier measurements had the host narrowing for the whole run-up, and charged
 the ladder for a course the locals avoid on every one of those days.

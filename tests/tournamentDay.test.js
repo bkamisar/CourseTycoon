@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  newGame, serialize, deserialize, playableHoles, playableHolesOn, openHoles,
+  newGame, serialize, deserialize, playableHoles, openHoles,
 } from '../src/sim/state.js';
 import { runDay, applyEventChoice } from '../src/sim/day.js';
 import { CHAMPIONSHIP_EVENTS, drawEventPlan, eventPlanSeed } from '../src/sim/championshipEvents.js';
@@ -1092,13 +1092,13 @@ test('the officials play the course once, eleven days before the first round', (
   }));
   assert.ok(p.setupAtRoundOne > after.resort.setup, 'sanity: the crew is still climbing');
   assert.ok(p.setupAtRoundOne < 86, `sanity: and will fall short (${p.setupAtRoundOne})`);
-  // The course as it will be laid out on the first morning.
-  assert.equal(p.difficulty, courseDifficultyOf(playableHolesOn(after, roundOne)));
+  // The course as it will be laid out on the first morning: every open hole.
+  assert.equal(p.difficulty, courseDifficultyOf(openHoles(after)));
   // And the whole forecast is the documented call on the evening's state:
   // the course projected to the evening before round 1 (ten more updates),
   // the crew and target as they stand, and a seed from the save and the
   // day rather than from the day's rng.
-  assert.deepEqual(forecast, practiceForecast(playableHolesOn(after, roundOne), {
+  assert.deepEqual(forecast, practiceForecast(openHoles(after), {
     rungId: 'national',
     setup: projectSetup({
       setup: after.resort.setup, target: after.resort.setupTarget, keepers,
@@ -1162,11 +1162,10 @@ test('the practice round changes no other number in the day', () => {
   );
 });
 
-test("the practice round measures the course the field will meet, not tonight's closures", () => {
-  // A closure added on the practice morning with `days` left is in force
-  // that day and the next days - 1: eleven days ends on the eve of round 1,
-  // twelve reaches round 1 itself. Only the second is on the course the
-  // field meets, so only the second may move the forecast's difficulty.
+test('the practice round measures every open hole, whatever a closure has shut', () => {
+  // A championship is always played over the full open course (week spec
+  // §5), so no closure -- one that ends tonight, on the eve of round 1, or
+  // on round 1 itself -- moves the forecast's difficulty.
   let state = nationalRunUp(64);
   const roundOne = state.tournament.day;
   const practiceDay = roundOne - PRACTICE_DAYS_BEFORE;
@@ -1179,12 +1178,56 @@ test("the practice round measures the course the field will meet, not tonight's 
     return report.practiceRound.difficulty;
   }
   const whole = difficultyWith(0);
-  assert.equal(difficultyWith(2), whole, 'a two-day closure is over long before round 1');
-  assert.equal(difficultyWith(11), whole, 'nor one that reopens on the eve of round 1');
-  const shut = difficultyWith(12);
-  assert.equal(shut, courseDifficultyOf(openHoles(state).slice(0, 15)),
-    'a closure still running on round 1 is the course they will play');
-  assert.notEqual(shut, whole, 'and the closure has to matter for this to mean anything');
+  assert.equal(whole, courseDifficultyOf(openHoles(state)));
+  for (const days of [2, 11, 12, 30]) {
+    assert.equal(difficultyWith(days), whole, `a ${days}-day closure`);
+  }
+  assert.notEqual(courseDifficultyOf(openHoles(state).slice(0, 15)), whole,
+    'and the shorter course would have read differently, so this means something');
+});
+
+/** A round day for a County Open on a full course, with the given holes shut. */
+function roundDay(closedHoles, { championship = true } = {}) {
+  const state = actThreeResort(11);
+  openFullCourse(state);
+  if (championship) state.tournament = newWeek('countyOpen', state.day);
+  if (closedHoles) {
+    state.conditions = addCondition([], { id: 'stormDamage', days: 5, holesClosed: closedHoles });
+  }
+  return state;
+}
+/** How many different holes were holed out in a day's timeline. */
+const holesPlayed = (timeline) =>
+  new Set(timeline.filter((e) => e.type === 'holed').map((e) => e.holeId)).size;
+
+test('a championship round is played over every open hole, whatever a closure has shut', () => {
+  // The decision of 2026-10-04: a decision event's closure shuts the
+  // public's course, not the officials'. Before it the field played the
+  // shortened course, its round was to par over fewer holes and went into
+  // the same totals as full ones, and a course at its floor failed it.
+  for (const closed of [0, 2, 4]) {
+    const state = roundDay(closed);
+    assert.equal(playableHoles(state).length, 18 - closed, 'sanity: the public course is shorter');
+    const { state: after, report, timeline } = runDay(state, 7);
+    assert.equal(report.tournamentDay, true);
+    assert.equal(holesPlayed(timeline), 18, `${closed} holes shut: the field plays all eighteen`);
+    assert.equal(after.tournament.difficulty, courseDifficultyOf(openHoles(state)),
+      'and the floor is measured on all eighteen');
+  }
+  // The same round takes the same time on the full course whatever is shut
+  // (the field's pace is judged against eighteen holes' worth).
+  assert.equal(
+    runDay(roundDay(4), 7).report.tournamentRound.averageRoundMinutes,
+    runDay(roundDay(0), 7).report.tournamentRound.averageRoundMinutes,
+  );
+});
+
+test('an ordinary day with a closure still plays the shortened course', () => {
+  // Closures are unchanged for the public: only a championship ignores them.
+  for (const closed of [0, 2, 4]) {
+    const { timeline } = runDay(roundDay(closed, { championship: false }), 7);
+    assert.equal(holesPlayed(timeline), 18 - closed, `${closed} holes shut`);
+  }
 });
 
 // --- Championship events reach the course and the next round --------------

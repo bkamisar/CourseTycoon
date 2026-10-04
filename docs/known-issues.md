@@ -79,37 +79,6 @@ days on eight measured resorts. So the bonus is on the contract, visibly
 missed every time, and the only way to earn it loses ten times what it pays.
 A player will reasonably read that as a bonus the game will not let them have.
 
-### A course set exactly at the floor fails it when holes close on the first morning
-
-**Found:** 2026-10-03, measuring the championship ladder (`tools/actThree.js`).
-Seen by the operator, not yet by a player.
-
-A championship measures the course's difficulty on the first round's morning,
-over the holes playing that day. If a decision event has closed holes then (a
-drain dug out, a tree down), the course is measured on the shorter layout, and
-the closed holes are the last ones. A course narrowed to exactly the rung's
-floor -- the HUD showing 65.0 against 65 -- then reads 62.6 on sixteen holes,
-and the week fails the floor, and with it the target, the bonuses and the
-rung, whatever the winner shoots. The player cannot fix it that morning,
-because the editor locks when the week starts. In the 8-seed measurement it
-happened in 4 of 24 weeks (one Regional at 53.4, three Nationals at 62.6).
-Narrowing to exactly the floor leaves no margin for it. The measurement's
-operator now narrows three points above the floor (`FLOOR_MARGIN` in
-`tools/operator.js`), which covers a two-hole closure at every rung; nothing
-in the game tells a player to. Related to "A round played on a short course
-counts as a full one" below.
-
-### A round played on a short course counts as a full one
-
-**Found:** 2026-10-03, in review of the championship week. Not seen in play yet.
-
-If a decision event closes holes for a few days (digging out a failed
-drain, a tree down across a fairway) during a championship week, that round is
-played over the holes still open. The field's score for it is to par over
-fewer holes, so it is lower, and it goes into the same running totals as the
-full eighteen-hole rounds. The leaderboard and the winning total then read
-better than the course played, and the evening report does not say why.
-
 ### Regional championships overshoot their target more often since the run-up work
 
 **Found:** 2026-10-04, re-measuring the ladder.

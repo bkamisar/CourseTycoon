@@ -8,7 +8,8 @@ import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { RUNGS } from '../src/sim/tournaments.js';
 import { newWeek, recordRound } from '../src/sim/championshipWeek.js';
 import { CHAMPIONSHIP_EVENTS } from '../src/sim/championshipEvents.js';
-import { applyEventChoice } from '../src/sim/day.js';
+import { applyEventChoice, runDay } from '../src/sim/day.js';
+import { addCondition } from '../src/sim/conditions.js';
 import {
   spendTheMorning, spendTheTournamentMorning, playActThree, FIELD_TEE_INTERVAL, FLOOR_MARGIN,
   championshipChoiceIndex, championshipChoiceScore,
@@ -104,18 +105,25 @@ test('the bid morning of an ordinary three-week run-up leaves the course alone',
   assert.equal(openDifficulty(state), before);
 });
 
-test('the margin over the floor survives the worst hole closure an event can make', () => {
-  // Decision events close at most two holes at a time, and closures take
-  // the last holes first (playableHoles). Four of 24 measured weeks fell
-  // under the floor that way when the operator narrowed to it exactly.
+test('the margin over the floor is a rounding margin, and a closure on the first morning cannot undo it', () => {
+  // The floor is measured over every open hole (a championship ignores a
+  // decision event's closures, decision of 2026-10-04), so the margin was
+  // cut from +3, which covered a two-hole closure, to +1. A week narrowed
+  // to the floor and the margin passes it with two holes closed on round 1.
+  assert.equal(FLOOR_MARGIN, 1);
   for (const rung of ['countyOpen', 'regional', 'national']) {
     const state = actThreeCourse(7);
     state.tournament = newWeek(rung, state.day + 1);
     spendTheTournamentMorning(state, { holesOpen: 18 });
     const open = state.resort.courses[0].holes.filter((h) => h.open);
-    const sixteen = courseDifficultyOf(open.slice(0, open.length - 2));
-    assert.ok(sixteen >= RUNGS[rung].minDifficulty,
-      `${rung}: two holes closed leaves ${sixteen.toFixed(1)} against a floor of ${RUNGS[rung].minDifficulty}`);
+    const whole = courseDifficultyOf(open);
+    assert.ok(whole >= RUNGS[rung].minDifficulty,
+      `${rung}: narrowed to ${whole.toFixed(1)} against a floor of ${RUNGS[rung].minDifficulty}`);
+    state.day = state.tournament.day;
+    state.conditions = addCondition([], { id: 'stormDamage', days: 5, holesClosed: 2 });
+    const { state: after } = runDay(state, 11);
+    assert.equal(after.tournament.difficulty, whole, `${rung}: the closure did not shorten the judged course`);
+    assert.equal(after.tournament.difficultyMet, true, `${rung}: and the floor is met`);
   }
 });
 

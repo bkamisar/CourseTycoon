@@ -2,7 +2,7 @@ import { makeHole } from './hole.js';
 import { emptyGoodwill } from './goodwill.js';
 // A cycle with championshipWeek.js, harmless: each side only uses the
 // other's exports inside functions (normaliseWeek in deserialize,
-// playableHoles in championshipStatus), at call time.
+// openHoles in championshipStatus), at call time.
 import { normaliseWeek } from './championshipWeek.js';
 import { conditionEffects } from './conditions.js';
 import {
@@ -299,9 +299,13 @@ export function openHoles(state) {
  * and only ticks them down at the very end of the day, so the closures in
  * force when a day starts are exactly the ones in force all through it.
  * That makes this morning's view and the in-day view the same list, which
- * is why `runDay` calls this rather than keeping its own copy -- and why
- * the HUD and the championship sheet can quote the course's difficulty
- * from here and agree with the judge (`championshipStatus`).
+ * is why `runDay` calls this rather than keeping its own copy, and why the
+ * HUD can quote the course rating from here and agree with the day.
+ *
+ * Not what a championship plays: the field always plays every open hole
+ * (`openHoles`), and the difficulty floor is measured on that, so a closure
+ * can neither shorten the week nor drop a course under its floor (week spec
+ * 2026-10-03 §5).
  *
  * Closures take the last holes first, so the course shortens from the far
  * end rather than leaving a gap in the middle that the flow-shop scheduler
@@ -311,28 +315,4 @@ export function playableHoles(state) {
   const all = openHoles(state);
   const closed = conditionEffects(state.conditions ?? []).holesClosed;
   return closed > 0 ? all.slice(0, Math.max(1, all.length - closed)) : all;
-}
-
-/**
- * The holes a later `day` would play if nothing changed but the calendar:
- * today's design, less only the closures that will still be running then.
- *
- * `state` is read as it stands at the start of `state.day`, which is how
- * every saved state and every morning sees it. A condition with `daysLeft`
- * L that morning is in force on `state.day` through `state.day + L - 1`:
- * `runDay` reads the conditions in force at the top of the day and
- * `tickConditions` takes one off each at the end, dropping it at zero.
- * So it is still in force on `day` exactly when L > day - state.day. A
- * condition with no `daysLeft` is dropped by the first tick, so it counts
- * for today only, as `playableHoles` already counts it.
- *
- * Today or earlier is just `playableHoles`. Written for the officials'
- * practice round (day.js), which measures the course the field will meet
- * on the first morning rather than tonight's temporary closures.
- */
-export function playableHolesOn(state, day) {
-  const ahead = day - (state.day ?? 0);
-  if (!(ahead > 0)) return playableHoles(state);
-  const still = (state.conditions ?? []).filter((c) => c.daysLeft > ahead);
-  return playableHoles({ ...state, conditions: still });
 }

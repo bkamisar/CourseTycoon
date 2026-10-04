@@ -155,8 +155,9 @@ function percentile(sorted, p) {
 /**
  * What the officials' practice round reports.
  *
- * `holes` are today's playable holes -- the course "as it will be laid out
- * on the first morning", as the card says; a redesign before the first
+ * `holes` are every open hole in tonight's design -- the course "as it will
+ * be laid out on the first morning", as the card says (temporary closures
+ * are ignored: a championship is always played over the full course); a redesign before the first
  * round changes the real week and the card says so.
  *
  * With `keepers` and `target` (the crew and the target as they stand

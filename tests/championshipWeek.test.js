@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  serialize, deserialize, newGame, openHoles, playableHoles, playableHolesOn,
+  serialize, deserialize, newGame, openHoles, playableHoles,
 } from '../src/sim/state.js';
 import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
@@ -216,19 +216,27 @@ test('once the week has measured the course the figure is frozen', () => {
   assert.equal(later.difficultyMet, false, 'the frozen verdict ignores the new corridors');
 });
 
-test('a closure from a decision event moves the figure the way the judge sees it', () => {
+test('a closure from a decision event does not change the championship difficulty, however long it runs', () => {
+  // A championship is always played over every open hole (week spec §5), so
+  // the sheet's figure, the judge's and the field's course are one number
+  // whatever a decision event has closed. A short closure and one still
+  // running on round 1 are the same: nothing about the week reads them.
   const state = statusResort();
   state.tournament = newWeek('countyOpen', state.day);
   const whole = championshipStatus(state).difficulty;
+  assert.equal(whole, courseDifficultyOf(openHoles(state)));
+  // The shorter course would have read differently, so the equalities below
+  // mean something.
+  assert.notEqual(courseDifficultyOf(openHoles(state).slice(0, 14)), whole);
 
-  state.conditions = addCondition([], { id: 'stormDamage', days: 5, holesClosed: 4 });
-  assert.equal(playableHoles(state).length, 14);
-  const closed = championshipStatus(state);
-  assert.equal(closed.difficulty, courseDifficultyOf(openHoles(state).slice(0, 14)));
-  assert.notEqual(closed.difficulty, whole, 'the closure has to matter for this test to mean anything');
-
-  const judged = runDay(state, 3).state.tournament.difficulty;
-  assert.equal(closed.difficulty, judged, 'the morning view is the number the judge uses');
+  for (const days of [2, 5, 30]) {
+    const closed = structuredClone(state);
+    closed.conditions = addCondition([], { id: 'stormDamage', days, holesClosed: 4 });
+    assert.equal(playableHoles(closed).length, 14, 'sanity: the public course is shorter');
+    assert.equal(championshipStatus(closed).difficulty, whole, `${days}-day closure, on the sheet`);
+    const judged = runDay(closed, 3).state.tournament.difficulty;
+    assert.equal(judged, whole, `${days}-day closure, as judged on the first morning`);
+  }
 });
 
 test("the leader's pace is projected over the whole week", () => {
@@ -286,25 +294,6 @@ test('a new week has had no practice round, and an old booking has not either', 
   // And one that has had it keeps it.
   const practice = { day: 29, setupAtRoundOne: 86, difficulty: 66.2, median: 11, low: 8, high: 14, samples: 16 };
   assert.deepEqual(normaliseWeek({ ...newWeek('national', 40), practice }).practice, practice);
-});
-
-test('the holes a later day will play keep only the closures still running then', () => {
-  // A condition added this morning with `days` left is in force today and
-  // the next days - 1 mornings (tickConditions runs at the end of each
-  // day), so a 5-day closure from day D last plays on D + 4.
-  const state = statusResort();
-  state.conditions = addCondition([], { id: 'stormDamage', days: 5, holesClosed: 4 });
-  const d = state.day;
-  assert.deepEqual(playableHolesOn(state, d), playableHoles(state), 'today is today');
-  assert.equal(playableHolesOn(state, d + 4).length, 14, 'still shut on its last day');
-  assert.equal(playableHolesOn(state, d + 5).length, 18, 'open again the morning after');
-  // And the arithmetic is the real day's, not a guess at it.
-  let s = state;
-  for (let i = 0; i < 5; i++) {
-    assert.equal(playableHoles(s).length, playableHolesOn(state, s.day).length, `day ${s.day}`);
-    s = runDay(s, 30 + i).state;
-  }
-  assert.equal(playableHoles(s).length, playableHolesOn(state, s.day).length, `day ${s.day}`);
 });
 
 test('a new week carries no event\'s effect on the next round', () => {

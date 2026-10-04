@@ -43,8 +43,8 @@ card arrives with what they found:
 - **The setup at round 1:** the current setup carried forward day by day with
   `nextSetup` to the first round, using today's crew, today's target and the
   hold rule, in neutral weather. The report says it is a projection.
-- **The course as it will be laid out on the first morning:** today's playable
-  holes. A last-minute redesign will change the real outcome; the card says
+- **The course as it will be laid out on the first morning:** every open hole
+  in today's design (temporary closures are ignored, as for the championship). A last-minute redesign will change the real outcome; the card says
   "as it will be laid out on the first morning".
 - **The forecast:** **16 simulated weeks** of the rung's rounds through the
   real `playField`, with fair pins, the week's real fixed-field mechanics, and
@@ -187,7 +187,9 @@ Listed so they can be reviewed in the morning:
 - Practice round on the evening eleven days before round 1; 16 simulated weeks;
   range = 10th–90th percentile; neutral weather for the setup projection.
   - The practice round measures the course as it will be on the first
-    morning: temporary closures that end before round 1 are ignored.
+    morning: all temporary closures are ignored for the championship, whether
+    or not they end before round 1 (a championship is always played over every
+    open hole; week spec §5).
 - Weather multipliers and softening values in §3 (starting values; calibrated
   against §7.2).
   - **Rain climb raised to ×0.35 (from ×0.25)** to meet §7.2: at 0.25 the

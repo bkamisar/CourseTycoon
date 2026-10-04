@@ -18,7 +18,7 @@ import { RUNGS } from './tournaments.js';
 import { courseDifficultyOf } from './hole.js';
 // A cycle with state.js, harmless: each side only uses the other's
 // exports inside functions, at call time (see the note in state.js).
-import { playableHoles } from './state.js';
+import { openHoles } from './state.js';
 
 /**
  * Where the holes are cut, the one call the player makes each morning.
@@ -218,10 +218,11 @@ export function projectTotal(leaderToPar, roundsPlayed, rounds) {
  *
  * Both screens used to compute these separately, and the review found
  * three ways the interface could disagree with the judge: they measured
- * the difficulty over every open hole where the judge measures the
- * playable ones (a decision event can have closed some, `playableHoles`);
- * they kept re-measuring a live figure after the judge had settled it on
- * the first morning; and a leader's partial total sat beside a target
+ * the difficulty over the playable holes where the judge measures the open
+ * ones (a decision event can close some for a few days, `playableHoles`;
+ * a championship ignores that, `runDay`'s `fieldHoles`); they kept
+ * re-measuring a live figure after the judge had settled it on the first
+ * morning; and a leader's partial total sat beside a target
  * that is for the whole week. One selector, so there is one answer.
  *
  * `difficulty` is raw, not floored: callers floor it for display
@@ -231,7 +232,7 @@ export function projectTotal(leaderToPar, roundsPlayed, rounds) {
  * Once the week has measured the course (`week.difficulty`, set on the
  * first round's day in `runDay`) that measurement is returned, frozen,
  * because it is the one the verdict will use; before that it is this
- * morning's measure of the holes the day would play.
+ * morning's measure of every open hole, which is what the field will play.
  *
  * `projectedTotal` is the leader's pace over the full week, rounded --
  * null before a round is in, when there is no pace to project.
@@ -248,7 +249,7 @@ export function championshipStatus(state) {
   const frozen = week.difficulty != null;
   const difficulty = frozen
     ? week.difficulty
-    : courseDifficultyOf(playableHoles(state));
+    : courseDifficultyOf(openHoles(state));
   const leaderToPar = winningTotal(week);
   return {
     rungId: booked.rung,

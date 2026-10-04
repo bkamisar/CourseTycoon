@@ -117,10 +117,11 @@ function ordinalHole(n) {
  * range, the target, the difficulty against the floor, and a clause on
  * each saying which way it misses -- the decision the card exists to
  * prompt, with ten days left to act on it. "As it will be laid out on the
- * first morning" because it is today's design less only the closures that
- * will still be running then (day.js); "a projection" because a redesign,
- * a new target or a different crew changes the real week, and the
- * weather and the field's luck are not in it.
+ * first morning" because it is tonight's design over every open hole, a
+ * decision event's temporary closure being ignored for a championship
+ * (day.js); "a projection" because a redesign, a new target or a
+ * different crew changes the real week, and the weather and the field's
+ * luck are not in it.
  *
  * The setup is rounded like the sheet's "Course is set to"; the
  * difficulty is floored to a tenth like the result card, so 64.96 against

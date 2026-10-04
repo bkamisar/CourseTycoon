@@ -16,7 +16,7 @@
  * other is the interface telling the player something the simulation
  * disagrees with.
  */
-import { openHoles, playableHoles, amenity } from '../sim/state.js';
+import { openHoles, amenity } from '../sim/state.js';
 import {
   RUNG_IDS, RUNGS, contractFor, nextRungFor, eligibleFor, withinBand, bidFor,
   CHAMPIONSHIP_HOLES, RUN_UP_DAYS,
@@ -77,11 +77,12 @@ export function computeChampionshipData(state) {
   const band = subject ? RUNGS[subject].band : null;
   // The course's difficulty against the rung's floor, from the same
   // selector as the HUD so the two cannot disagree with each other or with
-  // the judge (it measures the playable holes, and keeps the figure the
-  // week settled on its first morning). With nothing booked there is no
-  // week to settle anything, so the live measure of the playable holes.
+  // the judge (it measures every open hole -- a closure does not shorten a
+  // championship -- and keeps the figure the week settled on its first
+  // morning). With nothing booked there is no week to settle anything, so
+  // the live measure of the open holes.
   const status = championshipStatus(state);
-  const rawDifficulty = status ? status.difficulty : courseDifficultyOf(playableHoles(state));
+  const rawDifficulty = status ? status.difficulty : courseDifficultyOf(openHoles(state));
   // A missed rung stays the next rung and is given to somebody else for a
   // while (bidFor refuses it until the day after). Without this the sheet
   // offered an Apply button that did nothing when pressed.

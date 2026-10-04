@@ -237,9 +237,9 @@ export const LEVERS_NOT_PULLED = [
   + 'its fairway. It only narrows, so nothing here says whether bunkers, '
   + 'water or a re-routed hole are a better way to reach the floor.',
   'Act III: reading the event log before narrowing. It narrows the night '
-  + 'before the first round to the floor plus a fixed FLOOR_MARGIN, sized '
-  + 'for the worst closure an event can make, whether or not a hole is '
-  + 'actually closed; a host who checked would play some weeks easier.',
+  + 'before the first round to the floor plus a fixed FLOOR_MARGIN (one point, '
+  + 'for rounding), without reading the pins or the weather; a host who did '
+  + 'would play some weeks easier.',
   'Act III: a field interval other than FIELD_TEE_INTERVAL, or one that '
   + 'changes with the weather or the rung. It is one value chosen where '
   + 'the pace failures stop falling, so nothing here says what a tighter '
@@ -659,26 +659,29 @@ function crewUpFor(state) {
 /**
  * How far above the rung's floor the operator narrows.
  *
- * The floor is measured on the first round's morning over the holes
- * playing that day, and a decision event can have closed up to two of
- * them (the drain and the storm-damage events close two; closures take
- * the last holes first, `playableHoles`). Narrowed to the floor exactly,
- * 4 of 24 measured weeks fell under it that way (2026-10-03, one Regional
- * at 53.4, three Nationals at 62.6). Measured on the template course,
- * difficulty with the last one / two holes closed:
+ * A rounding margin only. The floor is measured on the first round's
+ * morning over every open hole (a championship ignores a decision event's
+ * temporary closures, `runDay`'s `fieldHoles`, decision of 2026-10-04),
+ * so the HUD's figure is the judge's and one point over it is all that a
+ * floored display and a narrowing that lands a hair under need.
+ *
+ * It was +3 until that decision, which covered the closure of up to two
+ * holes (the drain and storm-damage events close two, last holes first):
+ * narrowed to the floor exactly, 4 of 24 measured weeks fell under it
+ * (2026-10-03, one Regional at 53.4, three Nationals at 62.6). Measured on
+ * the template course, difficulty with the last one / two holes closed:
  *
  *              floor +0        +2              +3
  *   County     44.8 / 44.1     46.6 / 45.7     47.4 / 46.6
  *   Regional   54.2 / 53.1     56.1 / 54.9     57.1 / 55.9
  *   National   63.7 / 62.1     65.6 / 64.0     66.6 / 65.1
  *
- * +2 covers one closed hole at every rung and two at the County only; +3
- * is the smallest margin that covers two everywhere. The National cannot
- * go much further: every fairway at its narrowest reaches about 68.1.
- * The cost is a slightly harder week than the targets were calibrated on
- * (the calibration narrows to the floor exactly).
+ * Every table below that says "floor + FLOOR_MARGIN" -- the field interval,
+ * the ladder distribution -- was measured at +3 and not re-run for +1. The
+ * difference is small: difficulty moves the winner about 0.1 stroke a
+ * point, so two points is a fifth of a stroke on a week's total.
  */
-export const FLOOR_MARGIN = 3;
+export const FLOOR_MARGIN = 1;
 
 /**
  * The tee interval the field is sent off at on a round morning.
@@ -1034,7 +1037,8 @@ function buildFor(state, rungId) {
  *   A week missed (19):  median -$635k, range -$999k .. -$144k, all lose.
  *
  * Per rung, out of 32: target County 28, Regional 25, National 19; floor
- * 32 / 32 / 32 (with FLOOR_MARGIN; 4 of 24 weeks failed it without);
+ * 32 / 32 / 32 (measured at FLOOR_MARGIN +3, when a closure could drop a
+ * course under its floor; it cannot now);
  * turf 27 / 32 / 27; pace 32 / 27 / 28 (with FIELD_TEE_INTERVAL; the
  * National's was missed on every seed at the public interval); crowd
  * 32 / 32 / 0 (the National's cannot be had profitably, see
