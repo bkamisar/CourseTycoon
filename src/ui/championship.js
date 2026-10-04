@@ -135,6 +135,10 @@ export function computeChampionshipData(state) {
           // about to be played -- and the forecast is the weather, read
           // early (weather.js), so this cannot disagree with the day.
           weather: effectsOf(weatherOn(state.weatherSeed ?? 1, state.day)),
+          // The field tees off at the resort's own interval (day.js passes
+          // pricing.teeInterval to playField), which makes it the week's
+          // pace lever -- and nothing on the sheet said so.
+          teeInterval: state.resort.pricing?.teeInterval ?? null,
         }
       : null,
     dial: {
@@ -286,6 +290,19 @@ function weekSection(data, state, commit) {
   note.className = 'champ-detail';
   note.textContent = PINS[b.pins].blurb;
   wrap.appendChild(note);
+
+  // Pace is judged on every round, and the interval is the lever for it.
+  // 22 is the operator's measurement (FIELD_TEE_INTERVAL in
+  // tools/operator.js, 2026-10-03): the widest any rung needed to stop
+  // failing pace on anything but the weather. The course is shut on a
+  // round day, so a wider interval costs nothing.
+  if (b.teeInterval !== null) {
+    const pace = document.createElement('div');
+    pace.className = 'champ-detail';
+    pace.textContent = `The field tees off at your tee interval, ${b.teeInterval} min. `
+      + 'Wider keeps the rounds on pace; 22 holds a National.';
+    wrap.appendChild(pace);
+  }
   return wrap;
 }
 

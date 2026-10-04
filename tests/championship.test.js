@@ -116,6 +116,14 @@ test('the note under the dial treats the band as advice, not the judge', () => {
     'and a firm one names the risk, in terms of what is judged');
 });
 
+test('the week carries the tee interval the field will tee off at', () => {
+  // The resort's own interval paces the field, so the sheet says so.
+  const state = championshipResort(10);
+  state.resort.pricing.teeInterval = 18;
+  state.tournament = newWeek('regional', state.day);
+  assert.equal(computeChampionshipData(state).booked.teeInterval, 18);
+});
+
 test('the sheet says whether the crowd is covered, and by how much', () => {
   const state = championshipResort(4);
   state.tournament = { rung: 'countyOpen', day: state.day + 5, resolved: false };
