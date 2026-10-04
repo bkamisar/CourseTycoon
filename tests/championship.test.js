@@ -7,7 +7,7 @@ import { RUNGS } from '../src/sim/tournaments.js';
 import { newWeek, recordRound, PIN_IDS } from '../src/sim/championshipWeek.js';
 import { runDay } from '../src/sim/day.js';
 import { effectsOf } from '../src/sim/weather.js';
-import { computeChampionshipData, dialNote } from '../src/ui/championship.js';
+import { computeChampionshipData, dialNote, practiceNote } from '../src/ui/championship.js';
 
 function championshipResort(seed = 1) {
   const state = newGame(seed);
@@ -230,4 +230,35 @@ test("during the week the sheet has the pins, the leader and today's weather", (
   // Not just present: the very sky the round is then played in.
   assert.deepEqual(b.weather, effectsOf(runDay(state, 5).report.weather.key));
   assert.equal(b.projectedTotal, 16, 'one round of four in at +4 is on pace for +16');
+});
+
+// --- The practice round (run-up spec 2026-10-04 §2) -------------------
+
+const PRACTICE = Object.freeze({
+  day: 29, setupAtRoundOne: 85.6, difficulty: 66.2, median: 11, low: 8, high: 14, samples: 16,
+});
+
+test('the sheet carries the practice round for the rest of the run-up', () => {
+  const state = championshipResort(4);
+  state.tournament = { ...newWeek('national', state.day + 9), practice: { ...PRACTICE } };
+  const b = computeChampionshipData(state).booked;
+  assert.deepEqual(b.practice, PRACTICE, 'the stored forecast, not a recomputation');
+  assert.equal(b.inWeek, false);
+  const note = practiceNote(b);
+  assert.equal(note, 'Practice round (day 29): on pace for about +11 (+8 to +14) at setup 86.');
+});
+
+test('no practice line before the practice round, or once the week is under way', () => {
+  const before = championshipResort(5);
+  before.tournament = newWeek('national', before.day + 15);
+  const b = computeChampionshipData(before).booked;
+  assert.equal(b.practice, null);
+  assert.equal(practiceNote(b), null);
+
+  // The week has its own numbers by then: the leader and the pace.
+  const during = championshipResort(5);
+  during.tournament = { ...newWeek('national', during.day), practice: { ...PRACTICE } };
+  const w = computeChampionshipData(during).booked;
+  assert.equal(w.inWeek, true);
+  assert.equal(practiceNote(w), null);
 });

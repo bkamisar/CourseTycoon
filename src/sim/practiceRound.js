@@ -24,6 +24,27 @@ import { weatherOn, effectsOf } from './weather.js';
 import { newWeek, recordRound, winningTotal, withPins } from './championshipWeek.js';
 
 /**
+ * The practice evening is this many days before the first round: the
+ * run-up's middle evening (spec §2). Ten days of crew left to act on what
+ * it says -- enough to move the target and have the crew get there, or to
+ * rework a hole -- and late enough that the crew's climb is mostly done,
+ * so the setup it projects is not a guess. On a 21-day run-up booked on
+ * day D it is the evening of D + 10.
+ */
+export const PRACTICE_DAYS_BEFORE = 11;
+
+/**
+ * The forecast's own seed, from the save's seed and the practice day --
+ * never from the day's `rng`, so holding the practice round cannot move
+ * any other number in the day. The same mix `applyEventChoice` uses, plus
+ * an offset so the two streams never coincide; cut to 32 bits like the
+ * per-sample seeds in `practiceForecast`. A replay prints the same report.
+ */
+export function practiceSeed(stateSeed, day) {
+  return ((stateSeed ?? 1) * 7919 + day * 104729 + 7) >>> 0;
+}
+
+/**
  * The setup the crew will have after `days` more setup updates, carried
  * forward day by day with `nextSetup` in neutral weather (climb 1,
  * soften 0).

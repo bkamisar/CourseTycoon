@@ -42,6 +42,9 @@ import {
   normaliseWeek, recordRound, winningTotal, weekFinished,
 } from './championshipWeek.js';
 import {
+  practiceForecast, projectSetup, practiceSeed, PRACTICE_DAYS_BEFORE,
+} from './practiceRound.js';
+import {
   championshipUpkeep, crowdHandledFor, championshipTrade,
 } from './championshipBuildings.js';
 
@@ -1117,6 +1120,54 @@ export function runDay(state, seed) {
   report.conditions = next.conditions.map((c) => ({
     id: c.id, label: c.label, note: c.note, daysLeft: c.daysLeft,
   }));
+
+  // Act III. The officials' practice round, eleven days before the first
+  // round (run-up spec 2026-10-04 §2): a forecast of the winning score
+  // while there is still time to act on it.
+  //
+  // Here, at the very end of the day, for two reasons. It reads the
+  // evening's course -- today's setup update done, today's turf, and the
+  // closures as they stand after tonight's tick, so the difficulty it
+  // quotes is the one the sheet shows the same evening. And nothing after
+  // it can read it, so it cannot move any other figure in the day. It does
+  // not touch the day's `rng` either: the forecast runs on a seed of its
+  // own, from the save's seed and the day (`practiceSeed`), so a replay
+  // prints the same report and every other number in the day is what it
+  // would have been without it (tests/tournamentDay.test.js). Nothing
+  // after this point draws from `rng` today either, but the block should
+  // be movable without that becoming a trap.
+  //
+  // Exactly on that evening, not "on or after": a booking made with fewer
+  // than eleven days to go (only tests do that today) skips it rather than
+  // holding it late, and `practice` being set means it is never held twice.
+  const runUp = next.tournament && !next.tournament.resolved
+    ? normaliseWeek(next.tournament) : null;
+  if (runUp && runUp.practice == null && next.day === runUp.day - PRACTICE_DAYS_BEFORE) {
+    const rung = RUNGS[runUp.rung];
+    const target = next.resort.setupTarget ?? 0;
+    const forecast = practiceForecast(playableHoles(next), {
+      rungId: runUp.rung,
+      // The evening before round 1, because the forecast takes the round
+      // mornings itself in each sample's weather (see practiceForecast).
+      // Tonight's update is done, so the mornings left before round 1 are
+      // d+1 .. round 1 - 1: `week.day - d - 1` of them.
+      setup: projectSetup({
+        setup: next.resort.setup ?? 0, target, keepers, days: runUp.day - next.day - 1,
+      }),
+      keepers,
+      target,
+      turfQuality: next.turfQuality,
+      teeInterval,
+      seed: practiceSeed(next.seed, next.day),
+    });
+    next.tournament = { ...next.tournament, practice: { day: next.day, ...forecast } };
+    report.practiceRound = {
+      rung: runUp.rung,
+      target: rung?.target ?? null,
+      minDifficulty: rung?.minDifficulty ?? null,
+      ...forecast,
+    };
+  }
 
   next.history.push(report);
   // Bounded, because nothing reads further back than the day before

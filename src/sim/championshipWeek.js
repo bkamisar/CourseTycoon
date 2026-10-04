@@ -72,6 +72,12 @@ export function newWeek(rungId, day) {
     // judged against the rung's minimum.
     difficulty: null,
     difficultyMet: null,
+    // The officials' practice round, once it has been played eleven days
+    // out: { day, setupAtRoundOne, difficulty, median, low, high, samples }
+    // (practiceRound.js). Null until then, and for good on a booking made
+    // too late to have one. Kept, not recomputed, so the sheet shows what
+    // the card said.
+    practice: null,
   };
 }
 

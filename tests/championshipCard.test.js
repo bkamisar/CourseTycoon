@@ -329,3 +329,69 @@ test('a National that met the target, turf and pace is a good week without the c
     assert.equal(championshipCards(week(met), { act: 3 })[0].kicker, 'THE WRITE-UP', met.join(','));
   }
 });
+
+// --- The practice round (run-up spec 2026-10-04 §2) -------------------
+
+function practiceReport(overrides = {}) {
+  return {
+    day: 29,
+    practiceRound: {
+      rung: 'national',
+      target: RUNGS.national.target,
+      minDifficulty: RUNGS.national.minDifficulty,
+      setupAtRoundOne: 86,
+      difficulty: 66.27,
+      median: 11,
+      low: 8,
+      high: 14,
+      samples: 16,
+      ...overrides,
+    },
+  };
+}
+
+test('the practice round is an announcement from the governing body, numbers from the report', () => {
+  const cards = championshipCards(practiceReport(), { act: 3 });
+  assert.equal(cards.length, 1);
+  const card = cards[0];
+  assert.equal(card.id, 'practice-round-29');
+  assert.equal(card.kicker, 'THE PRACTICE ROUND');
+  assert.equal(card.speaker, 'The governing body');
+  assert.equal(card.choices.length, 1, 'information, not a decision');
+  const t = RUNGS.national.target;
+  for (const text of ['about +11', '+8 to +14', `${t.low > 0 ? '+' : ''}${t.low} to +${t.high}`,
+    '(86)', '66.2', `${RUNGS.national.minDifficulty}`, 'as it stands']) {
+    assert.ok(card.prompt.includes(text), `expected "${text}" in: ${card.prompt}`);
+  }
+});
+
+test('the practice round floors the difficulty to a tenth, like the report', () => {
+  // 64.96 against a floor of 65 is under it, and "65.0" would read as met.
+  const card = championshipCards(practiceReport({ difficulty: 64.96, minDifficulty: 65 }), {})[0];
+  assert.ok(card.prompt.includes('64.9'), card.prompt);
+  assert.ok(!card.prompt.includes('65.0'), card.prompt);
+});
+
+test('the practice round says which way the forecast misses the target', () => {
+  const t = RUNGS.national.target;
+  const under = championshipCards(practiceReport({ median: t.low - 3, low: t.low - 6, high: t.low - 1 }), {})[0];
+  assert.match(under.prompt, /too easy/i);
+  const over = championshipCards(practiceReport({ median: t.high + 3, low: t.high, high: t.high + 6 }), {})[0];
+  assert.match(over.prompt, /too hard/i);
+  const right = championshipCards(practiceReport({ median: t.low + 1, low: t.low - 2, high: t.high }), {})[0];
+  assert.doesNotMatch(right.prompt, /too (easy|hard)/i);
+});
+
+test('a practice card comes before any result card the same evening', () => {
+  const report = {
+    ...practiceReport(),
+    tournament: {
+      rung: 'countyOpen', met: ['target'], missed: [], paid: 1, prestige: 1, barDays: 0,
+      difficulty: 47, minDifficulty: 45, difficultyMet: true,
+      week: { rounds: 2, winningTotal: -1, target: { low: -4, high: 2 }, roundLog: [] },
+    },
+  };
+  const ids = championshipCards(report, {}).map((c) => c.id);
+  assert.equal(ids[0], 'practice-round-29');
+  assert.match(ids[1], /^championship-result/);
+});

@@ -139,6 +139,10 @@ export function computeChampionshipData(state) {
           // pricing.teeInterval to playField), which makes it the week's
           // pace lever -- and nothing on the sheet said so.
           teeInterval: state.resort.pricing?.teeInterval ?? null,
+          // The officials' practice round as the day stored it, or null
+          // before it (and for good on a late booking). Read, never
+          // recomputed: the sheet must say what the card said.
+          practice: status.week.practice ?? null,
         }
       : null,
     dial: {
@@ -326,6 +330,22 @@ export function dialNote(dial, band) {
 }
 
 /**
+ * The practice round's forecast in one line, for the rest of the run-up.
+ *
+ * Null before it has been played and once the week is under way, when the
+ * leader's real pace replaces it. One line because the sheet is read on a
+ * phone, and labelled with the day and the setup it assumed so a player
+ * who has moved the target since can see it is an older reading. The
+ * setup is rounded like "Course is set to" above it.
+ */
+export function practiceNote(booked) {
+  const p = booked?.practice;
+  if (!p || booked.inWeek) return null;
+  return `Practice round (day ${p.day}): on pace for about ${toParText(p.median)} `
+    + `(${toParText(p.low)} to ${toParText(p.high)}) at setup ${Math.round(p.setupAtRoundOne)}.`;
+}
+
+/**
  * The dial. Only drawn while something is booked, because setting a target
  * with nothing to prepare for is a slider that does nothing.
  *
@@ -357,6 +377,14 @@ function dialSection(data, state, commit) {
   wrap.appendChild(line('Course difficulty', `${data.difficulty} (at least ${b.minDifficulty})`,
     b.difficultyMet ? 'champ-ok' : 'champ-off'));
   wrap.appendChild(line('Preparing costs', `$${b.prepPerDay.toLocaleString()}/day`));
+
+  const practice = practiceNote(b);
+  if (practice) {
+    const el = document.createElement('div');
+    el.className = 'champ-detail';
+    el.textContent = practice;
+    wrap.appendChild(el);
+  }
 
   const dial = document.createElement('div');
   dial.className = 'champ-dial';

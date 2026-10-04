@@ -105,6 +105,48 @@ function ordinalHole(n) {
 }
 
 /**
+ * The officials' practice round (run-up spec 2026-10-04 §2), told from
+ * `report.practiceRound` and nothing else.
+ *
+ * Kept short for a phone: the setup it assumed, the forecast and its
+ * range, the target, the difficulty against the floor, and one clause
+ * saying which way the forecast misses -- the decision the card exists to
+ * prompt, with ten days left to act on it. "On the course as it stands"
+ * and "a projection" because it is: a redesign, a new target or a
+ * different crew changes the real week, and the weather and the field's
+ * luck are not in it.
+ *
+ * The setup is rounded like the sheet's "Course is set to"; the
+ * difficulty is floored to a tenth like the result card, so 64.96 against
+ * a floor of 65 does not print as "65.0".
+ */
+function practiceCard(report) {
+  const p = report.practiceRound;
+  if (!p) return null;
+  const forecast = `a field would win at about ${toParText(p.median)}, most likely `
+    + `${toParText(p.low)} to ${toParText(p.high)}.`;
+  const wanted = p.target
+    ? ` They want ${toParText(p.target.low)} to ${toParText(p.target.high)}`
+      + (p.median < p.target.low ? ' — on these numbers, too easy.'
+        : p.median > p.target.high ? ' — on these numbers, too hard.'
+          : '.')
+    : '';
+  const measured = typeof p.difficulty === 'number' && p.minDifficulty != null
+    ? ` The course measures ${(Math.floor(p.difficulty * 10) / 10).toFixed(1)} against `
+      + `their minimum of ${p.minDifficulty}.`
+    : '';
+  return {
+    id: `practice-round-${report.day ?? ''}`,
+    kicker: 'THE PRACTICE ROUND',
+    speaker: 'The governing body',
+    prompt: 'The officials played it today. On the course as it stands, with the greens '
+      + `where your crew should have them by the first morning (${Math.round(p.setupAtRoundOne)}), `
+      + `${forecast}${wanted}${measured} A projection, not a promise.`,
+    choices: acknowledge('Noted'),
+  };
+}
+
+/**
  * The cards this evening earns, in the order they should be shown.
  *
  * Returns an array so an evening that both invites you and reports a
@@ -129,6 +171,14 @@ export function championshipCards(report, state) {
       choices: acknowledge('Read it twice'),
     });
   }
+
+  // --- The practice round ---------------------------------------------
+  //
+  // Before any result card: it is about a week still to come. (The two
+  // cannot share an evening today -- the practice is eleven days before
+  // round 1 -- but the order is the one the spec asks for if they ever do.)
+  const practice = practiceCard(report);
+  if (practice) cards.push(practice);
 
   // --- The week -------------------------------------------------------
   const t = report.tournament;

@@ -273,3 +273,14 @@ test('a save that missed its National under the old rule gets the National back'
   won.tournamentBars = { national: 50 };
   assert.deepEqual(deserialize(serialize(won)).tournamentsHosted, ['countyOpen', 'regional', 'national']);
 });
+
+// --- The practice round (run-up spec 2026-10-04 §2) -------------------
+
+test('a new week has had no practice round, and an old booking has not either', () => {
+  assert.equal(newWeek('national', 40).practice, null);
+  // A save from before the practice round existed carries no key at all.
+  assert.equal(normaliseWeek({ rung: 'national', day: 40, resolved: false }).practice, null);
+  // And one that has had it keeps it.
+  const practice = { day: 29, setupAtRoundOne: 86, difficulty: 66.2, median: 11, low: 8, high: 14, samples: 16 };
+  assert.deepEqual(normaliseWeek({ ...newWeek('national', 40), practice }).practice, practice);
+});

@@ -1,12 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, serialize, deserialize } from '../src/sim/state.js';
+import { newGame, serialize, deserialize, playableHoles } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import {
   RUNGS, RUN_UP_DAYS, TURF_EXPECTED, BAR_DAYS, conditioningCostPerDay, bidFor, nextRungFor,
 } from '../src/sim/tournaments.js';
 import { newWeek, withPins } from '../src/sim/championshipWeek.js';
+import {
+  PRACTICE_DAYS_BEFORE, projectSetup, practiceForecast, practiceSeed,
+} from '../src/sim/practiceRound.js';
+import { championshipCards } from '../src/ui/championshipCard.js';
+import { computeChampionshipData, practiceNote } from '../src/ui/championship.js';
+import { toParText } from '../src/ui/toPar.js';
 import { narrowToDifficulty } from '../tools/championshipPolicy.js';
 import { CONDITIONS } from '../src/sim/weather.js';
 
@@ -993,4 +999,136 @@ test('heavy rain and storms soften a held course on the real day', () => {
     assert.equal(after.resort.setup, 86 - soften,
       `${key}: a course held at 86 read ${after.resort.setup} that evening`);
   }
+});
+
+// --- The officials' practice round (run-up spec 2026-10-04 §2) ---------
+
+/** A National booked today, with the crew asked for the middle of its band. */
+function nationalRunUp(seed, runUp = RUN_UP_DAYS) {
+  const state = atMinimum(nationalReady(seed), 'national');
+  state.resort.setup = 30;
+  state.resort.setupTarget = 86;
+  state.tournament = newWeek('national', state.day + runUp);
+  return state;
+}
+
+test('the officials play the course once, eleven days before the first round', () => {
+  let state = nationalRunUp(61);
+  // Three keepers, who will not have the course at 86 by round 1, so the
+  // projection has something to say and an off-by-one in its day count
+  // shows (a crew that arrives early holds at the target either way).
+  state.resort.staff = state.resort.staff.filter((m) => m.role !== 'groundskeeper');
+  for (let i = 0; i < 3; i++) state.resort.staff.push({ role: 'groundskeeper' });
+  const roundOne = state.tournament.day;
+  const practiceDay = roundOne - PRACTICE_DAYS_BEFORE;
+  // The run-up's middle evening: on a 21-day run-up booked today, the
+  // evening of day + 10, with ten days left to act on it.
+  assert.equal(practiceDay, state.day + 10);
+  let seen = 0;
+  let practiced = null;
+  for (let i = 0; state.day < roundOne; i++) {
+    const before = state;
+    const { state: after, report } = runDay(state, 6100 + i);
+    if (report.day === practiceDay) {
+      seen += report.practiceRound ? 1 : 0;
+      practiced = { before, after, report };
+    } else {
+      assert.equal(report.practiceRound, undefined, `no practice round on day ${report.day}`);
+      if (report.day < practiceDay) assert.equal(after.tournament.practice, null);
+    }
+    state = after;
+  }
+  assert.equal(seen, 1, 'exactly one practice round');
+  assert.equal(state.tournament.day, roundOne, 'sanity: the run-up ended on the eve of round 1');
+
+  const { after, report } = practiced;
+  const p = report.practiceRound;
+  assert.equal(p.rung, 'national');
+  assert.deepEqual(p.target, RUNGS.national.target);
+  assert.equal(p.minDifficulty, RUNGS.national.minDifficulty);
+  // Stored on the week, as the report has it, and carried to round 1.
+  const { rung, target, minDifficulty, ...forecast } = p;
+  assert.deepEqual(after.tournament.practice, { day: practiceDay, ...forecast });
+  assert.deepEqual(state.tournament.practice, after.tournament.practice,
+    'the forecast is kept, not recomputed, for the rest of the run-up');
+  // Survives a save.
+  assert.deepEqual(deserialize(serialize(after)).tournament.practice, after.tournament.practice);
+
+  // The setup it assumed is this evening's course taken forward to the
+  // round-1 morning: eleven more updates (the mornings of d+1 through
+  // round 1). Off by one either way and the card quotes the wrong figure.
+  const keepers = after.resort.staff.filter((m) => m.role === 'groundskeeper').length;
+  assert.equal(p.setupAtRoundOne, projectSetup({
+    setup: after.resort.setup, target: after.resort.setupTarget, keepers, days: PRACTICE_DAYS_BEFORE,
+  }));
+  assert.ok(p.setupAtRoundOne > after.resort.setup, 'sanity: the crew is still climbing');
+  assert.ok(p.setupAtRoundOne < 86, `sanity: and will fall short (${p.setupAtRoundOne})`);
+  // The course as it stands that evening, the one the sheet measures.
+  assert.equal(p.difficulty, courseDifficultyOf(playableHoles(after)));
+  // And the whole forecast is the documented call on the evening's state:
+  // the course projected to the evening before round 1 (ten more updates),
+  // the crew and target as they stand, and a seed from the save and the
+  // day rather than from the day's rng.
+  assert.deepEqual(forecast, practiceForecast(playableHoles(after), {
+    rungId: 'national',
+    setup: projectSetup({
+      setup: after.resort.setup, target: after.resort.setupTarget, keepers,
+      days: PRACTICE_DAYS_BEFORE - 1,
+    }),
+    keepers,
+    target: after.resort.setupTarget,
+    turfQuality: after.turfQuality,
+    teeInterval: after.resort.pricing.teeInterval,
+    seed: practiceSeed(after.seed, practiceDay),
+  }));
+  assert.ok(p.low <= p.median && p.median <= p.high);
+
+  // The card prints the report's numbers, and the sheet the stored ones.
+  const card = championshipCards(report, after).find((c) => c.id === `practice-round-${practiceDay}`);
+  assert.ok(card, 'the practice round has a card');
+  assert.ok(card.prompt.includes(`about ${toParText(p.median)}`), card.prompt);
+  assert.ok(card.prompt.includes(`${toParText(p.low)} to ${toParText(p.high)}`), card.prompt);
+  const sheet = computeChampionshipData(after).booked;
+  assert.deepEqual(sheet.practice, after.tournament.practice);
+  assert.ok(practiceNote(sheet).includes(`about ${toParText(p.median)}`));
+});
+
+test('a booking made five days before round 1 never gets a practice round', () => {
+  let state = nationalRunUp(62, 5);
+  const roundOne = state.tournament.day;
+  for (let i = 0; state.day < roundOne; i++) {
+    const { state: after, report } = runDay(state, 6200 + i);
+    assert.equal(report.practiceRound, undefined, `day ${report.day}`);
+    assert.equal(after.tournament.practice, null);
+    state = after;
+  }
+});
+
+test('the practice round changes no other number in the day', () => {
+  // The same practice evening run twice: once as it is, and once with the
+  // practice already recorded so the day skips it. The forecast runs on a
+  // seed of its own, so the day's rng -- and everything drawn from it --
+  // must not notice.
+  let state = nationalRunUp(63);
+  const practiceDay = state.tournament.day - PRACTICE_DAYS_BEFORE;
+  for (let i = 0; state.day < practiceDay; i++) state = runDay(state, 6300 + i).state;
+  const skipped = structuredClone(state);
+  skipped.tournament.practice = { day: practiceDay, setupAtRoundOne: 0, difficulty: 0, median: 0, low: 0, high: 0, samples: 0 };
+
+  const held = runDay(state, 6399);
+  const notHeld = runDay(skipped, 6399);
+  assert.ok(held.report.practiceRound, 'sanity: the first run holds the practice round');
+  assert.equal(notHeld.report.practiceRound, undefined, 'and a week that has had one is never given another');
+  assert.deepEqual(notHeld.state.tournament.practice, skipped.tournament.practice);
+
+  assert.equal(held.report.revenue.total, notHeld.report.revenue.total);
+  const { practiceRound, ...heldReport } = held.report;
+  assert.deepEqual(heldReport, notHeld.report);
+  const strip = (s) => ({ ...s, tournament: { ...s.tournament, practice: null }, history: s.history.slice(0, -1) });
+  assert.deepEqual(strip(held.state), strip(notHeld.state));
+  // And the day after, with the forecast on the week, plays the same too.
+  assert.deepEqual(
+    runDay(held.state, 6400).report.revenue,
+    runDay(notHeld.state, 6400).report.revenue,
+  );
 });
