@@ -462,11 +462,23 @@ all 18 cases (median -$342k, -$818k to -$11k); 12 of them hit every rung on a
 retry, and still lost $11k to $451k (median -$265k) to the repeated run-up and
 the barred days. Tables above `playActThree` in `tools/operator.js`.
 
-The National's crowd bonus is out of reach for a sensible resort. Its 12,000
-gallery needs the short course on top of every other building; the short
-course costs about $1.1M over 240 days in golfers it takes off the main course,
-against a bonus of $92,560. Every all-hit ladder above went without it. Wider
-Act III money pressure belongs to the run-up spec.
+The National's crowd bonus was out of reach for a sensible resort: its gallery
+was 12,000, the four championship buildings and everything else a resort builds
+held 11,600, and the last 400 needed the short course, which costs about $1.1M
+over 240 days in golfers it takes off the main course against a bonus of
+$92,560. Decided 2026-10-04: the gallery is **11,000**, so the buildings the
+rung requires (10,000 with the clubhouse and verges) are still short and three
+of the hotel's brew pub (500), function room (400), conference suite (400) and
+pool (300) close the gap; the short course (1,200) still counts and is no
+longer the only way.
+
+Re-measured the same day, with the full-course rule (§5) and the operator's
+floor margin cut from +3 to +1: the 18 ladders that hit all three targets
+first time finished at a median of +$99k against never bidding (quartiles +$78k
+to +$157k, range -$120k to +$236k), and the National's crowd was earned in all 36
+National weeks. Inside the +-$100k rescale line by $0.7k, so the purses were
+left at 1.6x (the break-even multiplier reads x0.924); the rise is mostly the
+bonus itself. Wider Act III money pressure belongs to the run-up spec.
 
 ## 10. Cards
 

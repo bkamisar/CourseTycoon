@@ -903,14 +903,88 @@ function buildFor(state, rungId) {
  * against never bidding" is a claim about the twenty-one days as much as
  * about the day.
  *
- * RE-MEASURED 2026-10-04, after the championship run-up work (weather on
+ * RE-MEASURED 2026-10-04 (second run), after two changes to the game: a
+ * championship is always played over every open hole (a decision event's
+ * closure no longer shortens it, so FLOOR_MARGIN fell from +3 to +1), and
+ * the National's gallery fell from 12,000 to 11,000 so its crowd bonus can
+ * be earned without the short course (championshipBuildings.js). Only the
+ * hosted and never-bid phases were re-run, `node tools/actThree.js --seeds 8
+ * --samples 4 --force=hosted`, on the same settled resorts (the fingerprint
+ * warned and they were reused); purses still 1.6x. The two changes are
+ * measured together, not separately. H = hit, m = missed the target but met
+ * the floor, F = floor failed (none did); worth is hosted money less
+ * never-bid money:
+ *
+ *   ladder  weeks played                             paid          worth
+ *    1.1  C +2 H, R +7 H, N +22 m, N +14 H               $1,361,600    -$305,031
+ *    1.2  C -1 H, R +11 m, R +12 m                         $256,000    -$722,845
+ *    1.3  C +2 H, R +6 H, N +15 H                        $1,273,600     +$99,727
+ *    1.4  C +1 H, R +5 H, N +19 H                        $1,273,600    +$205,579
+ *    2.1  C -1 H, R +10 m, R +7 H, N +17 H               $1,388,000     -$64,011
+ *    2.2  C -2 H, R +7 H, N +7 m, N +19 H                $1,428,000    -$222,068
+ *    2.3  C -1 H, R +7 H, N +21 m, N +20 H               $1,428,000    -$104,164
+ *    2.4  C 0 H, R +6 H, N +17 H                         $1,340,000     +$87,086
+ *    3.1  C +3 H, R +5 H, N +16 H                        $1,340,000    +$155,703
+ *    3.2  C -2 H, R +9 m, R +11 m                          $256,000    -$789,660
+ *    3.3  C +2 H, R +8 H, N +19 H                        $1,340,000     +$82,373
+ *    3.4  C +2 H, R +6 H, N +18 H                        $1,340,000    +$165,431
+ *    4.1  C -1 H, R +6 H, N +21 m, N +20 H               $1,338,360    -$251,286
+ *    4.2  C +2 H, R +4 H, N +19 H                        $1,340,000     +$98,901
+ *    4.3  C +2 H, R +7 H, N +17 H                        $1,340,000     +$78,045
+ *    4.4  C +2 H, R +13 m, R +5 H, N +13 m                 $676,000    -$849,019
+ *    5.1  C -1 H, R +3 H, N +20 H                        $1,081,360    -$119,936
+ *    5.2  C +2 H, R +8 H, N +17 H                        $1,273,600    +$157,405
+ *    5.3  C +4 m, C -2 H, R +5 H, N +15 H                $1,369,000     +$35,819
+ *    5.4  C 0 H, R +4 H, N +18 H                         $1,273,600    +$139,572
+ *    6.1  C -1 H, R +7 H, N +18 H                        $1,340,000    +$235,859
+ *    6.2  C +3 H, R +6 H, N +22 m, N +17 H               $1,428,000    -$222,952
+ *    6.3  C -2 H, R +5 H, N +20 H                        $1,340,000    +$130,714
+ *    6.4  C +2 H, R +3 H, N +18 H                        $1,340,000     +$91,023
+ *    7.1  C +1 H, R +8 H, N +25 m, N +22 m                 $716,000    -$932,681
+ *    7.2  C -1 H, R +8 H, N +21 m, N +17 H               $1,285,600    -$329,857
+ *    7.3  C +1 H, R +7 H, N +20 H                        $1,340,000    +$167,096
+ *    7.4  C -1 H, R +9 m, R +8 H, N +18 H                $1,245,600    -$259,070
+ *    8.1  C -1 H, R +7 H, N +19 H                        $1,197,600     +$15,824
+ *    8.2  C +2 H, R +3 H, N +18 H                        $1,197,600     +$39,448
+ *    8.3  C -3 H, R +6 H, N +16 H                        $1,197,600     +$18,354
+ *    8.4  C -1 H, R +11 m, R +10 m                         $256,000    -$633,517
+ *
+ *   All three hit first time (18): median +$99k, quartiles +$78k .. +$157k,
+ *                        range -$120k .. +$236k, 1 of 18 below zero.
+ *   A week missed (14):  median -$282k, quartiles -$723k .. -$222k, range
+ *                        -$933k .. +$36k, 13 of 14 lose. Of these, 9 missed a
+ *                        rung and then hit every rung on the retry (median
+ *                        -$223k, -$330k .. +$36k) and 5 never finished the
+ *                        ladder in 240 days (median -$790k, -$933k .. -$634k).
+ *   Every sample (32):   median +$27k, quartiles -$259k .. +$100k.
+ *
+ *   The all-hit median moved from -$17k to +$99k, and the break-even
+ *   multiplier on today's purses reads x0.924. The crowd bonus is most of
+ *   it: the National's crowd was earned in all 36 National weeks (it was
+ *   never earned before, 0 of 34), which is $92,560 at the current purse
+ *   on each ladder that reached it; the smaller floor margin may add a
+ *   little, by making the week's course easier on the locals. +$99k is inside the +-$100k
+ *   past which the purse is rescaled, by $0.7k, so the purses are LEFT at
+ *   1.6x. A rescale to x0.924 would be the next move if the all-hit median
+ *   drifts further up.
+ *
+ *   First attempts per rung (a retry is not counted): target County 31 of
+ *   32, Regional 26 of 32, National 21 of the 29 that got that far (before:
+ *   30 / 22 / 20 of 28). Turf 31 / 31 / 27 and pace 32 / 25 / 22 of those
+ *   same attempts; floor 32 / 32 / 29 (every one), crowd 32 / 32 / 29 (the
+ *   National's was 0). Over every week played, retries included: target
+ *   32 / 29 / 27 of 33 / 38 / 36, crowd 33 / 38 / 36. Profit per day,
+ *   medians: run-up $17.8k (was $17.9k), round days -$1.6k, ordinary
+ *   $25.8k, never bidding $26.5k. The Regional still overshoots when it
+ *   misses (see docs/known-issues.md).
+ *
+ * BEFORE THAT, the same day's measurement after the run-up work (weather on
  * the setup climb, the practice round, and the championship's own events,
- * answered by championshipChoiceScore). Same command, levers and settled
- * resorts (the run-up work does not touch Acts I-II; the cache's fingerprint
- * warned and the states were reused), purses unchanged at 1.6x. Retries
- * exist now, so a missed rung is bid for again after its bar and appears
- * twice. H = hit, m = missed the target but met the floor, F = floor failed
- * (none did); worth is hosted money less never-bid money:
+ * answered by championshipChoiceScore) and before the two changes above;
+ * FLOOR_MARGIN was +3 and the National's crowd was never earned. Same
+ * command, levers and settled resorts (the run-up work does not touch
+ * Acts I-II), purses unchanged at 1.6x. Retries exist now, so a missed rung
+ * is bid for again after its bar and appears twice. Same columns:
  *
  *   ladder  weeks played                             paid          worth
  *    1.1  C +1 H, R +7 H, N +19 H                  $1,181,040    +$34,902
@@ -1041,9 +1115,9 @@ function buildFor(state, rungId) {
  * course under its floor; it cannot now);
  * turf 27 / 32 / 27; pace 32 / 27 / 28 (with FIELD_TEE_INTERVAL; the
  * National's was missed on every seed at the public interval); crowd
- * 32 / 32 / 0 (the National's cannot be had profitably, see
- * tournaments.js). Profit per day, medians: run-up $17.7k (range
- * $16.8-18.3k), round days -$1.6k (the course is closed), ordinary
+ * 32 / 32 / 0 (the National's needed the short course then; since
+ * 2026-10-04 it does not, see the second run above). Profit per day,
+ * medians: run-up $17.7k (range $16.8-18.3k), round days -$1.6k (the course is closed), ordinary
  * $25.9k, never bidding $26.5k.
  *
  * Earlier runs of this measurement, now superseded: narrowing from the

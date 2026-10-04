@@ -85,8 +85,9 @@ export const CHAMPIONSHIP_HOLES = 18;
  * seeds = 32 ladders; the table is above `playActThree` in
  * tools/operator.js), with the operator playing as a competent player
  * would: narrowing the night before the first round and widening after,
- * a margin over the floor for hole closures, the field spaced out on
- * round mornings. The 13 ladders that hit all three targets finished at
+ * a margin over the floor (+3, for hole closures, when this was measured;
+ * +1 now that championships ignore them), the field spaced out on round
+ * mornings. The 13 ladders that hit all three targets finished at
  * a median of +$21k against never bidding (quartiles -$42k to +$101k,
  * range -$121k to +$189k); all 19 with a miss lost, $144k to $999k
  * (median -$635k). Measured before a missed rung could be retried after
@@ -116,16 +117,27 @@ export const CHAMPIONSHIP_HOLES = 18;
  * on, the crowd stands bought on top of the requirements). Weighting
  * toward it would make the National a money-maker and the County a loss.
  *
- * The National's crowd bonus ($92,560 here) is not reachable by a
- * sensible resort. The National's gallery is 12,000; every championship
- * building plus the rest of a built-out property holds 11,600, and the
- * last 400 need the short course (`galleryFor`). Built on a settled
- * resort, the short course cost $0.99M-$1.25M over 240 days (median
- * $1.13M, 8 seeds) in golfers it takes off the main course -- ordinary
- * profit fell from about $26.6k to $22.0k a day -- so it would cost ten
- * times the bonus it unlocks. The all-hit ladders above earned target,
- * turf and usually pace at the National; none earned the crowd, and none
- * should. See docs/known-issues.md.
+ * The National's crowd bonus ($92,560 here) is earned by a sensible resort,
+ * without the short course. It was not until 2026-10-04: the gallery was
+ * 12,000 and every championship building plus the rest of a built-out
+ * property holds 11,600, so the last 400 needed the short course
+ * (`galleryFor`), which cost $0.99M-$1.25M over 240 days (median $1.13M, 8
+ * seeds) in golfers it takes off the main course -- ordinary profit fell
+ * from about $26.6k to $22.0k a day -- ten times the bonus it unlocked. The
+ * gallery is 11,000 now (championshipBuildings.js): the buildings the rung
+ * requires are still 1,000 short, and three of the hotel's brew pub,
+ * function room, conference suite and pool close it.
+ *
+ * Re-measured the same day with that and the full-course rule (week spec
+ * §5; the operator's floor margin fell from +3 to +1): the 18 ladders that
+ * hit all three targets first time finished at a median of +$99k against
+ * never bidding (quartiles +$78k to +$157k, range -$120k to +$236k), the
+ * National's crowd earned in all 36 National weeks. That is inside the
+ * +-$100k that would trigger a rescale, by $0.7k, so the purses were LEFT
+ * at 1.6x; the break-even multiplier on them reads x0.924. The rise from
+ * -$17k is mostly the bonus itself, and any further drift upward is the
+ * point to rescale (derive the factor from the hosted checkpoints; the
+ * purse moves nothing but money). Tables above `playActThree` in tools/operator.js.
  *
  * Base stays the same share of the ceiling (18%, 12.6%, 11%), so a
  * missed target still pays well under half.

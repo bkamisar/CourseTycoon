@@ -75,11 +75,22 @@ export const CHAMPIONSHIP_BUILDING_IDS = Object.freeze(LIST.map((b) => b.id));
  * their own. If the required pair covered a regional's gallery, the crowd
  * bonus would be free the moment the rung became biddable — which is the
  * same fault the band gate was added to fix, arriving by another door.
+ *
+ * The National's was 12,000 until 2026-10-04. The four buildings hold
+ * 10,000 with the clubhouse and verges, and everything else a sensible
+ * resort builds lends 1,600 (brew pub 500, function room 400, conference
+ * suite 400, pool 300), 11,600 in all -- so 12,000 was reachable only by
+ * the short course (1,200), which diverts 18% of the public's golfers and
+ * cost about $1.1M over 240 days against a crowd bonus of $92,560. At
+ * 11,000 the required buildings are still 1,000 short, and the cheap
+ * borrowed capacity (any three of the hotel's four, or all of them) closes
+ * the gap with amenities that are each worth building for their own sake.
+ * The short course still counts; it is no longer the only way.
  */
 const GALLERY = Object.freeze({
   countyOpen: 1200,
   regional: 7500,
-  national: 12000,
+  national: 11000,
 });
 
 /** How many people a rung brings through the gate. 0 for an unknown rung. */

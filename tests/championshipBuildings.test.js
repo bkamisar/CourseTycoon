@@ -54,8 +54,17 @@ test('a county open needs no buildings, and a national needs the whole property'
   assert.ok(!crowdHandledFor(all, 'national'),
     'even all four must not cover a national on their own');
   assert.ok(crowdHandledFor([...all,
-    { type: 'shortCourse' }, { type: 'brewPub' }, { type: 'functionRoom' }], 'national'),
+    { type: 'brewPub' }, { type: 'functionRoom' }, { type: 'conferenceSuite' }], 'national'),
     'a national should need the rest of the property pitching in');
+  // And it must not need the one building that costs more than the bonus it
+  // unlocks. The short course diverts a fifth of the public's golfers
+  // (about $1.1M over 240 days against a $92,560 bonus), so the gallery was
+  // lowered to 11,000 on 2026-10-04 to be reachable with the hotel's own
+  // amenities, each worth having for its own sake.
+  const hotel = ['brewPub', 'functionRoom', 'conferenceSuite', 'pool'].map((type) => ({ type }));
+  assert.ok(crowdHandledFor([...all, ...hotel], 'national'),
+    'the four buildings and the hotel amenities handle a national without the short course');
+  assert.ok(!hotel.some((b) => b.type === 'shortCourse'));
 });
 
 test('gallery capacity rises with what is built, and starts above zero', () => {

@@ -63,22 +63,6 @@ damaging its greens, recovers, and draws them back. It is realistic and
 it works against "hard to dig out of". Left deliberately; revisit if a
 collapse ever feels too easy to recover from.
 
-### The National's crowd bonus costs ten times what it pays
-
-**Found:** 2026-10-03, measuring the championship ladder (`tools/actThree.js`).
-Seen by the operator, not yet by a player.
-
-The National's contract lists "Crowd handled without complaint" as a bonus
-($92,560 at the current purse). With the media centre, the pavilion, the
-grandstands, the overflow parking, the brew pub, the function room, the
-conference suite and the pool all built, the property holds 11,600 of the
-12,000 the National draws, so the bonus stays unpaid. The one building that
-closes the gap is the short course, and a player who builds it watches their
-ordinary takings fall: about $4,600 a day of profit, $0.99M-$1.25M over 240
-days on eight measured resorts. So the bonus is on the contract, visibly
-missed every time, and the only way to earn it loses ten times what it pays.
-A player will reasonably read that as a bonus the game will not let them have.
-
 ### Regional championships overshoot their target more often since the run-up work
 
 **Found:** 2026-10-04, re-measuring the ladder.
