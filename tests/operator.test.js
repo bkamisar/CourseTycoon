@@ -7,7 +7,9 @@ import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { RUNGS } from '../src/sim/tournaments.js';
 import { newWeek, recordRound } from '../src/sim/championshipWeek.js';
-import { spendTheTournamentMorning } from '../tools/operator.js';
+import {
+  spendTheMorning, spendTheTournamentMorning, playActThree, FIELD_TEE_INTERVAL, FLOOR_MARGIN,
+} from '../tools/operator.js';
 
 const operatorSource = readFileSync(new URL('../tools/operator.js', import.meta.url), 'utf8');
 
@@ -73,12 +75,74 @@ function actThreeCourse(seed) {
   return state;
 }
 
-test('during the run-up the operator redesigns the course up to the rung\'s floor', () => {
+const openDifficulty = (state) => courseDifficultyOf(state.resort.courses[0].holes.filter((h) => h.open));
+
+test('the operator narrows the course the night before the first round, not three weeks early', () => {
+  // The floor is a planning hurdle, not a running cost: the locals pay for
+  // a hard course on every day it stands, so a competent host keeps their
+  // course until the last run-up morning and narrows then.
+  const early = actThreeCourse(3);
+  const before = openDifficulty(early);
+  early.tournament = newWeek('regional', early.day + 10);
+  spendTheTournamentMorning(early, { holesOpen: 18 });
+  assert.equal(openDifficulty(early), before, 'ten days out, the course is left alone');
+
+  const eve = actThreeCourse(3);
+  eve.tournament = newWeek('regional', eve.day + 1);
+  spendTheTournamentMorning(eve, { holesOpen: 18 });
+  assert.ok(openDifficulty(eve) >= RUNGS.regional.minDifficulty + FLOOR_MARGIN,
+    `the night before, it is narrowed to the floor and the margin (${openDifficulty(eve).toFixed(1)})`);
+});
+
+test('the bid morning of an ordinary three-week run-up leaves the course alone', () => {
   const state = actThreeCourse(3);
-  state.tournament = newWeek('regional', state.day + 10);
+  const before = openDifficulty(state);
+  assert.equal(spendTheTournamentMorning(state, { holesOpen: 18 }), true);
+  assert.equal(openDifficulty(state), before);
+});
+
+test('the margin over the floor survives the worst hole closure an event can make', () => {
+  // Decision events close at most two holes at a time, and closures take
+  // the last holes first (playableHoles). Four of 24 measured weeks fell
+  // under the floor that way when the operator narrowed to it exactly.
+  for (const rung of ['countyOpen', 'regional', 'national']) {
+    const state = actThreeCourse(7);
+    state.tournament = newWeek(rung, state.day + 1);
+    spendTheTournamentMorning(state, { holesOpen: 18 });
+    const open = state.resort.courses[0].holes.filter((h) => h.open);
+    const sixteen = courseDifficultyOf(open.slice(0, open.length - 2));
+    assert.ok(sixteen >= RUNGS[rung].minDifficulty,
+      `${rung}: two holes closed leaves ${sixteen.toFixed(1)} against a floor of ${RUNGS[rung].minDifficulty}`);
+  }
+});
+
+test('on a round morning the operator spaces the field out, and the next ordinary morning puts it back', () => {
+  const state = actThreeCourse(8);
+  state.tournament = newWeek('national', state.day);
+  spendTheMorning(state, { greenFee: 80, teeInterval: 14 });
   spendTheTournamentMorning(state, { holesOpen: 18 });
-  const holes = state.resort.courses[0].holes.filter((h) => h.open);
-  assert.ok(courseDifficultyOf(holes) >= RUNGS.regional.minDifficulty);
+  assert.equal(state.resort.pricing.teeInterval, FIELD_TEE_INTERVAL);
+  state.tournament = null;
+  spendTheMorning(state, { greenFee: 80, teeInterval: 14 });
+  assert.equal(state.resort.pricing.teeInterval, 14);
+});
+
+test('a stub narrowed past and built later is not widened back to nothing', () => {
+  const state = actThreeCourse(9);
+  const holes = state.resort.courses[0].holes;
+  const last = holes.length - 1;
+  holes[last] = { id: holes[last].id, open: false, corridor: [], corridorWidth: 0,
+    greenPreset: null, features: [], teePos: null };
+  const widths = new Map();
+  state.tournament = newWeek('countyOpen', state.day + 1);
+  spendTheTournamentMorning(state, { holesOpen: 17, widths });
+  // Built after the narrowing, at its template width.
+  holes[last] = { ...makeHole(TEMPLATE_NAMES[last % TEMPLATE_NAMES.length], holes[last].id), open: true };
+  const built = holes[last].corridorWidth;
+  state.tournament = null;
+  state.tournamentsHosted = ['countyOpen', 'regional', 'national'];
+  spendTheTournamentMorning(state, { holesOpen: 18, widths });
+  assert.equal(holes[last].corridorWidth, built);
 });
 
 test('during the week the operator sets the pins from the leader', () => {
@@ -112,12 +176,52 @@ test('once nothing is booked the operator widens the fairways it narrowed back t
   const state = actThreeCourse(6);
   const before = state.resort.courses[0].holes.map((h) => h.corridorWidth);
   const widths = new Map();
-  state.tournament = newWeek('national', state.day + 10);
+  state.tournament = newWeek('national', state.day + 1);
   spendTheTournamentMorning(state, { holesOpen: 18, widths });
   assert.notDeepEqual(state.resort.courses[0].holes.map((h) => h.corridorWidth), before);
 
   state.tournament = null;
   state.tournamentsHosted = ['countyOpen', 'regional', 'national'];
   spendTheTournamentMorning(state, { holesOpen: 18, widths });
+  assert.deepEqual(state.resort.courses[0].holes.map((h) => h.corridorWidth), before);
+});
+
+// --- playActThree's bookkeeping ------------------------------------------
+
+const LEVERS = { greenFee: 80, teeInterval: 14, roomRate: 300 };
+
+test('the never-bid baseline never bids, on a resort that could', () => {
+  const hosted = playActThree(actThreeCourse(11), { ...LEVERS, days: 2, seed: 11 });
+  assert.ok(hosted.bids >= 1, 'sanity: this resort is eligible for the County Open');
+  const baseline = playActThree(actThreeCourse(11), { ...LEVERS, days: 2, seed: 11, host: false });
+  assert.equal(baseline.bids, 0);
+  assert.equal(baseline.tournaments.length, 0);
+  assert.equal(baseline.runUpDays, 0);
+});
+
+test('round days are counted as the week, not as ordinary days', () => {
+  // A County Open whose first round is today: two closed days, then two
+  // ordinary ones. Folding the closed days into "ordinary" would drag the
+  // ordinary figure down and hide what the week cost.
+  const state = actThreeCourse(12);
+  state.tournament = newWeek('countyOpen', state.day);
+  const r = playActThree(state, { ...LEVERS, days: 4, seed: 12, host: false });
+  assert.equal(r.weekDays, 2);
+  assert.equal(r.ordinaryDays, 2);
+  assert.equal(r.tournaments.length, 1, 'sanity: the week was played and judged');
+});
+
+test('the course is widened on the morning after a week even when the next rung is bid for at once', () => {
+  // The next rung's run-up is three weeks of ordinary trade; it should be
+  // played on the resort's own course, not the last week's narrowed one.
+  const state = actThreeCourse(13);
+  const before = state.resort.courses[0].holes.map((h) => h.corridorWidth);
+  const widths = new Map();
+  state.tournament = newWeek('countyOpen', state.day + 1);
+  spendTheTournamentMorning(state, { holesOpen: 18, widths });
+  state.tournament = null;
+  state.tournamentsHosted = ['countyOpen'];
+  assert.equal(spendTheTournamentMorning(state, { holesOpen: 18, widths }), true,
+    'sanity: the Regional is bid for straight away');
   assert.deepEqual(state.resort.courses[0].holes.map((h) => h.corridorWidth), before);
 });

@@ -113,7 +113,9 @@ export const LEVERS_NOT_PULLED = [
   + 'from templates in order, so course rating and difficulty fit are '
   + 'whatever that happens to produce.',
   'Changing price or tee interval as the resort grows. Both are fixed for '
-  + 'a whole run, where a real player would adjust as prestige rises.',
+  + 'a whole run, where a real player would adjust as prestige rises. (The '
+  + 'one exception is a championship round, which the field plays at '
+  + 'FIELD_TEE_INTERVAL; the public interval is back the next morning.)',
   'Removing an amenity that turns out not to help. It only ever buys.',
   'Choosing events by anything but a fixed stance preference.',
   'Act II: setting a menu at the dining room, the brew pub or the bar. '
@@ -135,6 +137,14 @@ export const LEVERS_NOT_PULLED = [
   'Act III: redesigning a hole for a championship any way but narrowing '
   + 'its fairway. It only narrows, so nothing here says whether bunkers, '
   + 'water or a re-routed hole are a better way to reach the floor.',
+  'Act III: reading the event log before narrowing. It narrows the night '
+  + 'before the first round to the floor plus a fixed FLOOR_MARGIN, sized '
+  + 'for the worst closure an event can make, whether or not a hole is '
+  + 'actually closed; a host who checked would play some weeks easier.',
+  'Act III: a field interval other than FIELD_TEE_INTERVAL, or one that '
+  + 'changes with the weather or the rung. It is one value chosen where '
+  + 'the pace failures stop falling, so nothing here says what a tighter '
+  + 'interval on a calm County week would cost.',
   'Act III: setting the pins by anything but the reacting policy in '
   + 'championshipPolicy.js. The same one the calibration measured, so the '
   + 'two agree; a host who reads the field differently is not measured.',
@@ -548,20 +558,76 @@ function crewUpFor(state) {
 }
 
 /**
- * Narrows the course to a rung's floor, remembering each fairway's width
- * the first time it is touched (keyed by hole id, in a map the caller
- * owns) so `widenBack` can undo it.
+ * How far above the rung's floor the operator narrows.
+ *
+ * The floor is measured on the first round's morning over the holes
+ * playing that day, and a decision event can have closed up to two of
+ * them (the drain and the storm-damage events close two; closures take
+ * the last holes first, `playableHoles`). Narrowed to the floor exactly,
+ * 4 of 24 measured weeks fell under it that way (2026-10-03, one Regional
+ * at 53.4, three Nationals at 62.6). Measured on the template course,
+ * difficulty with the last one / two holes closed:
+ *
+ *              floor +0        +2              +3
+ *   County     44.8 / 44.1     46.6 / 45.7     47.4 / 46.6
+ *   Regional   54.2 / 53.1     56.1 / 54.9     57.1 / 55.9
+ *   National   63.7 / 62.1     65.6 / 64.0     66.6 / 65.1
+ *
+ * +2 covers one closed hole at every rung and two at the County only; +3
+ * is the smallest margin that covers two everywhere. The National cannot
+ * go much further: every fairway at its narrowest reaches about 68.1.
+ * The cost is a slightly harder week than the targets were calibrated on
+ * (the calibration narrows to the floor exactly).
+ */
+export const FLOOR_MARGIN = 3;
+
+/**
+ * The tee interval the field is sent off at on a round morning.
+ *
+ * The public interval (14 in every measurement here) packs twenty
+ * threeballs onto a championship course and the field backs up past the
+ * pace target (16 minutes a hole). Measured 2026-10-03 on the template
+ * course at each floor + FLOOR_MARGIN, setup at the band's middle, turf
+ * 85, 60 seeds each with its own weather; rounds over the target out of
+ * 60, fair / brutal pins:
+ *
+ *              14       16       18       20      22      24+
+ *   County     11 / 17   5 / 9    3 / 3    1 / 2   1 / 1   1 / 1
+ *   Regional   18 / 22   9 / 12   3 / 9    3 / 3   1 / 2   1 / 2
+ *   National   22 / 37  13 / 19   9 / 11   4 / 9   3 / 3   3 / 3
+ *
+ * 22 is where every rung reaches its floor of failures; what remains is
+ * the weather (a storm's pace factor is 1.28, and no interval fixes it).
+ * The course is closed to the public on a round day, so a wider interval
+ * costs nothing. A reviewer measured 0/60 at 18 with fair pins at the
+ * National in fair weather; with each seed's own weather, 18 still lets
+ * one round in seven run slow.
+ */
+export const FIELD_TEE_INTERVAL = 22;
+
+/**
+ * Narrows the course to a rung's floor plus FLOOR_MARGIN, remembering each
+ * fairway's width the first time it is touched (keyed by hole id, in a map
+ * the caller owns) so `widenBack` can undo it.
  */
 function narrowFor(state, rungId, widths) {
   const holes = state.resort.courses[0].holes;
   if (widths) {
-    // Only built holes: a stub has no width to go back to, and restoring
-    // `undefined` onto it after the operator builds it would break it.
+    // Only built holes. A stub carries `corridorWidth: 0` (newGame), and
+    // remembering that 0 would put a hole the operator builds during the
+    // week back to a zero-width fairway when the course is widened.
     for (const h of holes) {
-      if (!widths.has(h.id) && typeof h.corridorWidth === 'number') widths.set(h.id, h.corridorWidth);
+      if (!widths.has(h.id) && h.corridorWidth > 0) widths.set(h.id, h.corridorWidth);
     }
   }
-  narrowToDifficulty(holes, RUNGS[rungId].minDifficulty);
+  narrowToDifficulty(holes, RUNGS[rungId].minDifficulty + FLOOR_MARGIN);
+}
+
+/** True on the last run-up morning (the night before the first round),
+ * or later if that morning was somehow missed, but never once the week
+ * is under way: the editor locks then. */
+function lastRunUpMorning(state, week) {
+  return state.day >= week.day - 1 && state.day < week.day;
 }
 
 /**
@@ -609,17 +675,24 @@ function widenBack(state, widths) {
  *
  *   - Hires the crew the week needs (CHAMPIONSHIP_CREW, above), because
  *     the ordinary morning's rule does not see the run-up or the field.
- *   - In the run-up, narrows fairways until the course meets the rung's
- *     minimum difficulty -- the cheapest redesign there is. Also done the
- *     morning the bid is won. The editor locks once the week starts, so
- *     this has to be finished before the first round, and it is: one
- *     morning's narrowing reaches any floor the corridors can reach.
+ *   - On the last run-up morning, the night before the first round,
+ *     narrows fairways until the course is FLOOR_MARGIN above the rung's
+ *     minimum difficulty -- the cheapest redesign there is. Not earlier:
+ *     the author's ruling (2026-10-03) is that the floor is a planning
+ *     hurdle, not a running cost, and a narrowed course takes thousands a
+ *     day off ordinary trade (about $7,000 at the National's floor, seed
+ *     1), so a competent host keeps their course until the last moment
+ *     the editor allows. One morning's narrowing reaches any floor the
+ *     corridors can reach, and the editor locks once the week starts.
  *   - Each round's morning, sets the pins from the leader against the
- *     target and today's sky (`reactivePins`), the call a player makes.
+ *     target and today's sky (`reactivePins`), the call a player makes,
+ *     and sends the field off FIELD_TEE_INTERVAL apart. The ordinary
+ *     morning (`spendTheMorning`) puts the public interval back the day
+ *     after the week.
  *
- * And with nothing booked and no bid won that morning, it widens the
- * fairways back to where they were before the first narrowing (see
- * `widenBack`). That needs a memory across mornings, so the caller passes
+ * And on any morning with nothing booked it widens the fairways back to
+ * where they were before the last narrowing (see `widenBack`), before it
+ * bids for the next rung. That needs a memory across mornings, so the caller passes
  * a `widths` map and keeps it (playActThree does); without one the
  * course stays narrowed.
  *
@@ -634,18 +707,20 @@ export function spendTheTournamentMorning(state, { holesOpen, widths = null }) {
       const week = normaliseWeek(booked);
       const sky = effectsOf(weatherOn(state.weatherSeed ?? 1, state.day));
       state.tournament = withPins(week, reactivePins({ week, spread: sky.spread }));
-    } else {
-      // The run-up: bring the course up to the floor before the first
-      // morning, by the cheapest redesign there is -- narrower fairways.
+      state.resort.pricing.teeInterval = FIELD_TEE_INTERVAL;
+    } else if (lastRunUpMorning(state, booked)) {
+      // The night before: bring the course up to the floor, by the
+      // cheapest redesign there is -- narrower fairways.
       narrowFor(state, booked.rung, widths);
     }
     return false;
   }
+  // Nothing booked: the course goes back to being a course, before any
+  // bid. The next rung's own night-before narrows it again, three weeks
+  // on; until then the locals get the course they came for.
+  widenBack(state, widths);
   const next = nextRungFor(state.tournamentsHosted ?? []);
-  if (!next) {
-    widenBack(state, widths);
-    return false;
-  }
+  if (!next) return false;
 
   // Put up whatever the rung insists on, if it can be afforded. Until
   // this existed the operator stopped at the County Open for ever --
@@ -655,17 +730,14 @@ export function spendTheTournamentMorning(state, { holesOpen, widths = null }) {
   buildFor(state, next);
 
   const booking = bidFor(state, next, { holesOpen });
-  if (!booking) {
-    // Barred, or not yet eligible: the course goes back to being a course
-    // until there is a week to narrow it for.
-    widenBack(state, widths);
-    return false;
-  }
+  if (!booking) return false;
   state.tournament = booking;
   const band = RUNGS[next].band;
   state.resort.setupTarget = Math.round((band.low + band.high) / 2);
   crewUpFor(state);
-  narrowFor(state, next, widths);
+  // Only if this morning is already the last run-up morning, which a
+  // three-week run-up never makes it; otherwise the night before does it.
+  if (lastRunUpMorning(state, booking)) narrowFor(state, next, widths);
   return true;
 }
 
@@ -723,45 +795,66 @@ function buildFor(state, rungId) {
  * against never bidding" is a claim about the twenty-one days as much as
  * about the day.
  *
- * Measured 2026-10-03, `node tools/actThree.js --seeds 8` (green fee 80,
- * interval 14, room rate 300; Acts I and II played by this operator, then
- * 240 days hosted against the same resort never bidding). Every seed
- * climbed the whole ladder. Winning total against target, H = hit; paid
- * and worth at the purses doubled the same day (see the rung list in
- * tournaments.js), with the original purses' worth beside it:
+ * Measured 2026-10-03, `node tools/actThree.js --seeds 8 --samples 4`:
+ * green fee 80, interval 14, room rate 300; Acts I and II played by this
+ * operator, then 240 days of Act III, hosted against the same resort
+ * never bidding, four Act III seeds per settled resort (32 ladders).
+ * Purses at 1.6x the originals (see the rung list in tournaments.js).
+ * Every ladder climbed all three rungs. Winning total, H = hit, F = the
+ * floor failed; worth is hosted money less never-bid money:
  *
- *   seed  County    Regional    National       paid       worth    (old purse)
- *     1   +2 H      +9  miss    +19 H          $933,500    -$427,915   (-$894,665)
- *     2   +3 H      +3  H       +22 miss       $673,200    -$624,405   (-$961,005)
- *     3   +2 H *    +1  miss    +21 miss ^*    $292,920  -$1,135,933 (-$1,282,393)
- *     4   +3 H      +12 miss ^  +14 H          $933,500    -$423,835   (-$890,585)
- *     5    0 H      +7  H       +21 miss ^     $673,200    -$600,119   (-$936,719)
- *     6    0 H      +7  H       +18 H        $1,386,300      -$5,204   (-$698,354)
- *     7   -2 H      +6  H       +23 miss ^     $673,200    -$698,776 (-$1,035,376)
- *     8   +2 H      +6  H       +15 H        $1,302,300     +$26,188   (-$624,962)
+ *   ladder  County  Regional  National   paid        worth
+ *    1.1    +5      +7  H     +19 H     $1,050,040    -$144,014
+ *    1.2    -1 H    +13       +14 H       $915,440    -$373,689
+ *    1.3    +3 H    +6  H     +18 H     $1,181,040     -$29,639
+ *    1.4    -1 H    +6  H     +23         $561,600    -$721,754
+ *    2.1    -1 H    +3  H     +19 H     $1,055,200    -$119,393
+ *    2.2    +2 H    +8  H     +18 H     $1,247,440     -$42,067
+ *    2.3    +1 H    +6  H     +17 H     $1,247,440    +$188,625
+ *    2.4     0 H    -1        +19 H       $915,440    -$522,232
+ *    3.1    +1 H    +9        +21         $296,000    -$998,999
+ *    3.2    -1 H    +4  H     +13         $592,630    -$722,873
+ *    3.3    +2 H    +5  H     +16 H     $1,247,440     +$21,165
+ *    3.4    +1 H    +6  H     +18 H     $1,247,440    +$117,122
+ *    4.1    -1 H    +8  H     +19 H     $1,247,440     +$41,867
+ *    4.2    +2 H    +1        +11         $296,000    -$952,325
+ *    4.3    +3 H    +6  H     +17 H     $1,247,440    +$100,491
+ *    4.4    +1 H    +7  H     +15 H     $1,247,440     +$98,772
+ *    5.1    -2 H    +8  H     +21         $526,230    -$745,877
+ *    5.2    +2 H    +9        +12         $296,000    -$911,422
+ *    5.3    +4      +11       +16 H       $784,440    -$417,514
+ *    5.4    +2 H    +3  H     +21         $628,000    -$698,122
+ *    6.1    -1 H    +8  H     +13         $628,000    -$417,642
+ *    6.2    -1 H    +6  H     +26         $592,630    -$704,874
+ *    6.3     0 H    +5  H     +15 H     $1,247,440      -$5,420
+ *    6.4    +4      +8  H     +17 H     $1,116,440    -$172,645
+ *    7.1    +1 H    +5  H     +23         $628,000    -$635,369
+ *    7.2    +2 H    +6  H     +21         $628,000    -$695,941
+ *    7.3    +5      +8  H     +24         $497,000    -$632,373
+ *    7.4    -3 H    +8  H     +24         $628,000    -$634,703
+ *    8.1    +1 H    +7  H     +17 H     $1,105,040    -$121,167
+ *    8.2    -2 H    +2  H     +20 H     $1,247,440    +$109,146
+ *    8.3    -2 H    +5  H     +19 H     $1,105,040     -$42,631
+ *    8.4    -2 H    +11       +20 H       $773,040    -$472,392
  *
- *   ^ under the floor: a decision event closed two holes on the first
- *     round's morning, and the operator narrows to the floor exactly, so
- *     the playable sixteen measured 53.4 (Regional) or 62.6 (National).
- *     See docs/known-issues.md.
- *   * turf lost (77 and 74 against 78); every other week held it with
- *     the eight-keeper crew (79-95).
+ *   All three hit (13):  median +$21k, quartiles -$42k .. +$101k,
+ *                        range -$121k .. +$189k, 6 of 13 below zero.
+ *   A week missed (19):  median -$635k, range -$999k .. -$144k, all lose.
  *
- * The purse moved nothing but money: every week's score, pins and turf,
- * and every per-day profit figure, came out identical at both purses. Profit per day, all
- * eight seeds within a few hundred dollars: run-up $14.5-15.9k, round
- * days -$0.6k to -$1.7k (the course is closed), and ordinary $25.4-26.1k
- * against $26.0-26.6k never bidding. The 63 run-up days cost about
- * $0.64-0.75M against ordinary trade (a narrowed course takes ~$7k a day
- * off it, measured on seed 1, plus the prep bill and the extra keepers),
- * the nine round days about $0.25M, and the remaining $0.27-0.36M (by
- * difference, not itemised) is the championship buildings and their
- * upkeep, mostly. Before the week existed hosting won by $61k-$167k.
+ * Per rung, out of 32: target County 28, Regional 25, National 19; floor
+ * 32 / 32 / 32 (with FLOOR_MARGIN; 4 of 24 weeks failed it without);
+ * turf 27 / 32 / 27; pace 32 / 27 / 28 (with FIELD_TEE_INTERVAL; the
+ * National's was missed on every seed at the public interval); crowd
+ * 32 / 32 / 0 (the National's cannot be had profitably, see
+ * tournaments.js). Profit per day, medians: run-up $17.7k (range
+ * $16.8-18.3k), round days -$1.6k (the course is closed), ordinary
+ * $25.9k, never bidding $26.5k.
  *
- * The first run of this measurement, before `widenBack`, left the course
- * narrowed to the National's floor for the rest of the run and reported
- * hosting $1.78M-$2.32M worse than never bidding at the old purses --
- * the operator's omission, not the game's.
+ * Earlier runs of this measurement, now superseded: narrowing from the
+ * bid morning and never widening reported hosting $1.78M-$2.32M worse
+ * than never bidding (8 seeds, original purses); widening between weeks
+ * but still narrowing through every run-up, $0.62M-$1.28M worse. Both
+ * were the operator's play, not the game's.
  */
 export function playActThree(startState, {
   greenFee, teeInterval, roomRate, suiteShare = 0.3, days = 200, seed = 1,
