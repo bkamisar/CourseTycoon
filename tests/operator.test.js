@@ -7,8 +7,11 @@ import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { RUNGS } from '../src/sim/tournaments.js';
 import { newWeek, recordRound } from '../src/sim/championshipWeek.js';
+import { CHAMPIONSHIP_EVENTS } from '../src/sim/championshipEvents.js';
+import { applyEventChoice } from '../src/sim/day.js';
 import {
   spendTheMorning, spendTheTournamentMorning, playActThree, FIELD_TEE_INTERVAL, FLOOR_MARGIN,
+  championshipChoiceIndex, championshipChoiceScore,
 } from '../tools/operator.js';
 
 const operatorSource = readFileSync(new URL('../tools/operator.js', import.meta.url), 'utf8');
@@ -242,4 +245,55 @@ test('the course is widened on the morning after a week even when the next rung 
   assert.equal(spendTheTournamentMorning(state, { holesOpen: 18, widths }), true,
     'sanity: the Regional is bid for straight away');
   assert.deepEqual(state.resort.courses[0].holes.map((h) => h.corridorWidth), before);
+});
+
+// --- Championship events ---------------------------------------------------
+
+test('the operator answers every championship event, at every rung, and the answer applies', () => {
+  for (const rung of Object.keys(RUNGS)) {
+    for (const event of CHAMPIONSHIP_EVENTS) {
+      for (const fieldInterval of [14, 22]) {
+        const index = championshipChoiceIndex(event, rung, { fieldInterval });
+        assert.ok(Number.isInteger(index) && index >= 0 && index < event.choices.length,
+          `${event.id} at ${rung}: a real choice`);
+      }
+      const state = actThreeCourse(21);
+      state.tournament = newWeek(rung, state.day + 1);
+      const index = championshipChoiceIndex(event, rung);
+      const after = applyEventChoice(state, event.id, index);
+      assert.ok(Number.isFinite(after.money), `${event.id} at ${rung}: money stays a number`);
+    }
+  }
+});
+
+test('the operator takes a money-positive choice with no risk over a costly one', () => {
+  const event = {
+    choices: [
+      { stance: 'thorough', label: 'a', cost: '{money}', effects: { moneyDays: -2 } },
+      { stance: 'thrifty', label: 'b', cost: '{money}', effects: { moneyDays: 3 } },
+      { stance: 'pragmatic', label: 'c', cost: '{money}', effects: { moneyDays: 1, turf: -4 } },
+    ],
+  };
+  assert.equal(championshipChoiceIndex(event, 'regional'), 1);
+});
+
+test('a pace-selling choice is taken on a wide field interval and refused on a tight one', () => {
+  // champ-tv-tee-times: 5 prep days for 5% slower. Free money at 22 in
+  // the operator's terms; at 14 it puts the pace bonus at risk, and the
+  // operator takes the turn-down (index 2) instead.
+  const event = CHAMPIONSHIP_EVENTS.find((e) => e.id === 'champ-tv-tee-times');
+  assert.equal(championshipChoiceIndex(event, 'regional', { fieldInterval: 22 }), 0);
+  assert.equal(championshipChoiceIndex(event, 'regional', { fieldInterval: 14 }), 2);
+  assert.ok(championshipChoiceScore(event.choices[0], 'regional', { fieldInterval: 22 })
+    > championshipChoiceScore(event.choices[2], 'regional', { fieldInterval: 22 }));
+});
+
+test('playActThree answers a pending championship event and the game goes on', () => {
+  // A booked county week with a run-up long enough to draw its events: the
+  // days must run without throwing and the plan must have been used.
+  const state = actThreeCourse(22);
+  state.tournament = newWeek('countyOpen', state.day + 6);
+  const r = playActThree(state, { ...LEVERS, days: 12, seed: 22, host: false });
+  assert.equal(r.days, 12);
+  assert.ok(Number.isFinite(r.state.money));
 });

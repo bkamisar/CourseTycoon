@@ -48,7 +48,7 @@ import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { AMENITIES, BUILD_COSTS } from '../src/sim/economy.js';
 import { GATE_THRESHOLDS } from '../src/sim/acts.js';
 import { EVENTS } from '../src/sim/events.js';
-import { CHAMPIONSHIP_EVENTS } from '../src/sim/championshipEvents.js';
+import { CHAMPIONSHIP_EVENTS, resolveChoice } from '../src/sim/championshipEvents.js';
 import { menuPrep } from '../src/sim/menu.js';
 import { kitchenCapacity, kitchenLoad } from '../src/sim/kitchen.js';
 import { shopCapacity } from '../src/sim/shop.js';
@@ -71,14 +71,82 @@ import { narrowToDifficulty, reactivePins } from './championshipPolicy.js';
 /**
  * A pending card's event, from either library: since the championship's
  * own events (run-up spec 2026-10-04 §4) a booked evening can show one.
- * Answered by the same rule as an ordinary card for now -- the pragmatic
- * choice, which all but two championship events have; those two take
- * their first, since their money is in `moneyDays` and the fallback's
- * `money` reads 0 on every choice -- until the operator is given a
- * championship policy of its own (plan Task 6).
+ * An ordinary card is answered by the pragmatic stance; a championship one
+ * by `championshipChoiceIndex` below.
  */
 function eventById(id) {
   return EVENTS.find((e) => e.id === id) ?? CHAMPIONSHIP_EVENTS.find((e) => e.id === id);
+}
+
+/**
+ * What the operator thinks a prestige point, a turf point and a setup point
+ * are worth, in dollars. Stated, not tuned: prestige is the thing the
+ * ladder pays for over the long run (a point is roughly a day's extra
+ * demand across a season) and turf is the bonus' own gate (the contract's
+ * turf bonus is $35k-$192k on 78), so $2,000 and $500 are round figures in
+ * that neighbourhood, not fits to the measurement. A setup point is a few
+ * hundred dollars of crew time (one keeper climbs 0.8 a day at $60-odd a
+ * day, and a short climb is what the pace and target bonuses ride on).
+ */
+export const CHAMPIONSHIP_VALUE = Object.freeze({ prestige: 2000, turf: 500, setup: 250 });
+
+/** Share of the booked rung's pace bonus put at risk per 1% of slowdown. */
+const PACE_RISK_PER_PERCENT = 0.08;
+
+/**
+ * The operator's rule for a championship choice, from its RESOLVED effects
+ * (`resolveChoice`: the card's `moneyDays` are dollars at the booked rung):
+ *
+ *   + money at face value
+ *   + prestige at CHAMPIONSHIP_VALUE.prestige a point
+ *   + turf at CHAMPIONSHIP_VALUE.turf a point
+ *   + setup at CHAMPIONSHIP_VALUE.setup a point
+ *   - a slower next round (`nextRound.pace` > 1) as a cost ONLY when the
+ *     field's tee interval is 18 or tighter, where the field backs up
+ *     behind it and the pace bonus is at risk (championshipEvents.js, PACE,
+ *     MEASURED). At the operator's own FIELD_TEE_INTERVAL of 22 a few
+ *     percent never failed a round in the dry, so it is free. When it does
+ *     count it is priced at PACE_RISK_PER_PERCENT of the booked rung's pace
+ *     bonus per 1% of slowdown: 8%, so +5% puts 40% of the bonus at risk,
+ *     about what the measured table shows at 14-18 minutes (+5% failed
+ *     8-17 of 20 rounds). Crude on purpose: it does not read the forecast.
+ *   0 a harder or easier next round (`nextRound.handicap`): it helps a week
+ *     heading under its target and hurts one heading over, and the operator
+ *     does not read which it is heading for.
+ *   0 goodwill: nothing downstream of the operator reads it.
+ */
+export function championshipChoiceScore(choice, rungId, { fieldInterval = FIELD_TEE_INTERVAL } = {}) {
+  const e = resolveChoice(choice, rungId).effects;
+  let score = e.money ?? 0;
+  score += (e.prestige ?? 0) * CHAMPIONSHIP_VALUE.prestige;
+  score += (e.turf ?? 0) * CHAMPIONSHIP_VALUE.turf;
+  score += (e.setup ?? 0) * CHAMPIONSHIP_VALUE.setup;
+  const pace = e.nextRound?.pace ?? 1;
+  if (pace > 1 && fieldInterval <= 18) {
+    const bonus = contractFor(rungId ?? 'countyOpen')?.bonuses.find((b) => b.id === 'pace')?.amount ?? 0;
+    score -= (pace - 1) * 100 * PACE_RISK_PER_PERCENT * bonus;
+  }
+  return score;
+}
+
+/** The index of the choice with the best score; the first of any tie. */
+export function championshipChoiceIndex(event, rungId, opts) {
+  return event.choices.reduce((best, c, i, all) => (
+    championshipChoiceScore(c, rungId, opts) > championshipChoiceScore(all[best], rungId, opts) ? i : best
+  ), 0);
+}
+
+/** The index to answer a pending card with, whichever library it is from. */
+function answerFor(state, id) {
+  const event = eventById(id);
+  if (CHAMPIONSHIP_EVENTS.includes(event)) {
+    return championshipChoiceIndex(event, state.tournament?.rung);
+  }
+  const middle = event.choices.findIndex((c) => c.stance === 'pragmatic');
+  return middle >= 0 ? middle
+    : event.choices.reduce(
+      (best, c, i, all) => ((c.effects?.money ?? 0) > (all[best].effects?.money ?? 0) ? i : best), 0
+    );
 }
 
 /**
@@ -132,6 +200,16 @@ export const LEVERS_NOT_PULLED = [
   + 'FIELD_TEE_INTERVAL; the public interval is back the next morning.)',
   'Removing an amenity that turns out not to help. It only ever buys.',
   'Choosing events by anything but a fixed stance preference.',
+  'Act III: championship events (run-up and week) are answered by a flat '
+  + 'score of the choice\'s resolved effects (championshipChoiceScore: '
+  + 'money at face, prestige $2,000, turf $500, setup $250 a point, a '
+  + 'slower next round a cost only at a field interval of 18 or less, '
+  + 'harder/easier next round and goodwill worth nothing). It never reads '
+  + 'the forecast, the turf margin or whether the week is heading under '
+  + 'or over its target, which are exactly the things the cards are '
+  + 'written to make a player weigh; so nothing here says whether the '
+  + 'events are well-pitched, only that a plain operator comes out ahead '
+  + 'or behind by them.',
   'Act II: setting a menu at the dining room, the brew pub or the bar. '
   + 'All three open on their defaults, so nothing here says whether those '
   + 'boards are worth tuning.',
@@ -938,13 +1016,9 @@ export function playActThree(startState, {
 
     const pending = result.report.pendingEvent;
     if (pending) {
-      const event = eventById(pending.id);
-      const middle = event.choices.findIndex((c) => c.stance === 'pragmatic');
-      const index = middle >= 0 ? middle
-        : event.choices.reduce(
-          (best, c, i, all) => ((c.effects?.money ?? 0) > (all[best].effects?.money ?? 0) ? i : best), 0
-        );
-      state = applyEventChoice(state, pending.id, index);
+      // Ordinary events: the pragmatic stance. Championship events: the
+      // best-scoring choice (championshipChoiceScore).
+      state = applyEventChoice(state, pending.id, answerFor(state, pending.id));
     }
 
     // The contract's own money is excluded from both figures. Counting it
