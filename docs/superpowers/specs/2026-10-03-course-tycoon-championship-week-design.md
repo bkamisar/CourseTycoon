@@ -1,6 +1,8 @@
 # Course Tycoon — Act III: The Championship Week
 
-**Status:** design agreed, not yet planned or built.
+**Status:** built (2026-10-03). Where this document and the code disagree, the
+code is right and this document is the drift; the final review's fixes are
+folded in below.
 **Amends:** `2026-09-25-course-tycoon-act-three-design.md` — the championship
 itself. The ladder, the setup dial, the run-up, the buildings and the contract's
 money are unchanged unless this document says otherwise.
@@ -67,22 +69,28 @@ rung declares its round count:
 
 ```js
 {
-  rung, day, resolved,      // as today; `day` is the first round
+  rung, day, resolved,      // as before; `day` is the first round
   rounds,                   // 2 / 3 / 4, copied from the rung at booking
   roundsPlayed,             // 0 until the first evening
-  roundSettings: {          // tomorrow's calls; later levers become new keys here
+  roundSettings: {          // the next round's calls; later levers become new keys here
     pins,                   // 'fair' | 'easy' | 'tough' | 'brutal'
   },
-  field: {
+  field: {                  // null until the first round
     handicaps: [...60],     // drawn once, on the first round, from that day's rng
     totals:    [...60],     // strokes to par, summed across rounds played
   },
   roundLog: [               // one entry per round played, for the report and the card
-    { round, weather, pins, leaderToPar, averageToPar, hardestHole,
-      averageRoundMinutes, paceOnTarget, turfAfter },
+    { round, weather, pins, setup, leaderToPar, averageToPar, hardestHole,
+      underPar, averageRoundMinutes, paceOnTarget, turfAfter },
   ],
+  difficulty,               // the course measured on the first morning (null before)
+  difficultyMet,            // difficulty >= the rung's minimum, settled with it
 }
 ```
+
+`setup` is the course's setup that round, rounded; `underPar` is how many of
+the sixty finished the round under par; `turfAfter` is the turf at the end of
+the round, floored so a 77.6 never prints as the 78 a championship expects.
 
 The field is the **same sixty players every round**, so totals add up. They stay
 nameless (Act III spec §11): an index and a handicap, nothing else.
@@ -113,10 +121,15 @@ of 24 seeds and the Regional and National in none.
 
 **The rule that keeps the free ride closed:** the whole span of the pins (easy
 to brutal) must be smaller than the difference between an unconditioned course
-and the rung's band. A test asserts it directly: an unconditioned course with
-brutal pins on every round **cannot** put the winner in range, and a course set
-well past the band with easy pins on every round cannot either. Pins fine-tune;
-the three-week setup decides.
+and the rung's band. It holds as rates, not absolutes (§8, 120 held-out
+seeds): an unconditioned course with brutal pins on every round puts the winner
+in range 8% of the time at the County and never at the Regional or National; a
+course at setup 100 with easy pins on every round does so 30% of the time at
+the County, 24% at the Regional and 62% at the National, where the band leaves
+no room to overcook (not judged). `tests/championshipCalibration.test.js`
+asserts the criteria. Pins fine-tune; the three-week setup mostly decides —
+though a half-conditioned County or Regional course can be rescued by brutal
+pins about half the time (§8).
 
 Stored as `roundSettings.pins` inside the tournament so a later lever (green
 speed, tee placement) is a new key rather than a new code path. Only pins ship.
@@ -150,7 +163,8 @@ the run-up redesigning, which gives those three weeks a second job beside
 waiting for the setup to climb. A course still under the minimum on the first
 morning has not staged a championship: the week is played, but it is judged as
 a miss — base fee only, minus the full prestige swing, and the bar — exactly
-as a winner out of range is.
+as a winner out of range is. Like any miss, the rung is not hosted and can be
+bid for again once the bar lifts (§8).
 
 So nobody walks into that blind, the course's difficulty against the rung's
 minimum is shown on the HUD's tournament readout and on the championship sheet
@@ -230,11 +244,19 @@ the round log rather than recomputed:
 - pace: the round time against the target
 - the turf after the round
 
-The HUD reads **"Regional · Round 2 of 3"** during the week.
+The HUD reads **"Regional R2/3 · leads +3 · on pace +5 (target +2…+8)"**
+during the week: the rung's short name, the round about to be played, the
+leader's total and its whole-week projection once a round has been played, and
+the target. In the run-up it reads **"Regional 12d · setup 70 (62–78) · course
+57/55"**, coloured as a warning only when the course is under the difficulty
+floor — the band is shown as information, not as a gate.
 
 The championship sheet, during the week, shows the pin picker, the target range,
-the leader's total so far and tomorrow's forecast together — everything the call
-needs in one place.
+the leader's total so far and today's weather for the round about to be played
+(the pins are set that morning) together — everything the call needs in one
+place — and a line saying the field tees off at the player's own tee interval,
+so a wider interval keeps the rounds on pace (22 minutes holds a National, as
+measured by the operator).
 
 ## 8. Judging
 
@@ -249,6 +271,12 @@ band did:
   the full swing),
 - it gates the bar (out of range: the rung goes to somebody else for
   `BAR_DAYS`),
+- it gates the ladder: only a week that met the target is recorded in
+  `tournamentsHosted` and opens the next rung. A missed rung is not hosted;
+  it stays the next rung, barred for `BAR_DAYS`, and can be bid for again once
+  the bar lifts — the sheet shows it as given to somebody else until that day.
+  (Until the final review a miss counted as hosted, so the bar never mattered
+  and a missed National ended the ladder with the act unpassable.)
 - and a National in range is Act III's pass (`actThreePassed`).
 
 A course under the rung's minimum difficulty on the first round fails the gate
