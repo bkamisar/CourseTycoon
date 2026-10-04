@@ -31,13 +31,22 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-10-03a';
+export const BUILD = '2026-10-04a';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-10-04a',
+    notes: [
+      'Eleven days before the first round, the officials play your course and send a report: where the winner is likely to finish, as a range, on the course as it will be laid out that morning with the greens where your crew should have them. It is a forecast, not a promise, and it tells you in time to do something about it. The Championship sheet keeps it for the rest of the run-up.',
+      'Weather now matters to the crew. Drizzle slows the climb to a firm course, heavy rain slows it a great deal and softens a course that is already there, and a storm stops the work altogether. The three-day forecast is worth reading before you decide how many groundskeepers a championship needs.',
+      'Championships have their own events now, in the run-up and during the week: a mower that dies, a sponsor who wants the 18th tee, a green under water, a complaint about a pin, television wanting later tee times. Each one costs what it says it costs, and the ones in the week change how the next round plays. Every championship gets at least one, and the bigger the championship the more there are.',
+      'Cash from those events is now measured in days of your championship bill, so a County Open and a National Open ask for sensibly different money. The sheet tells you what an unplayed call will do to the next round before you set the pins.',
+    ],
+  },
   {
     version: '2026-10-03a',
     notes: [

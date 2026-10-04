@@ -139,3 +139,14 @@ report's narration can still say something like the starter "had two groups ask
 if there were forward tees". There were no groups: the only golfers on the
 course were the championship field.
 
+### Regional championships overshoot their target more often since the run-up work
+
+**Found:** 2026-10-04, re-measuring the ladder.
+
+In 32 simulated ladders, the Regional hit its target first time in 22, down from 25
+before weather slowed the crew and championships got their own events. All 14 misses
+finished too high (the winner at +9 to +14 against a range of +2 to +8), none too low.
+The cause has not been diagnosed: it may be weather on the setup climb, the practice
+round, an event effect, or noise at this sample size. The measuring operator never reads
+the practice round's forecast, so it cannot correct course the way a player can.
+
