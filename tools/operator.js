@@ -720,6 +720,11 @@ export function spendTheTournamentMorning(state, { holesOpen, widths = null }) {
   widenBack(state, widths);
   const next = nextRungFor(state.tournamentsHosted ?? []);
   if (!next) return false;
+  // A missed rung stays the next rung and is barred for BAR_DAYS (see
+  // day.js). Nothing to build or bid for until the bar lifts; buying the
+  // rung's buildings on the first barred morning would carry their upkeep
+  // for four months of a ladder that cannot move.
+  if (state.day <= (state.tournamentBars?.[next] ?? 0)) return false;
 
   // Put up whatever the rung insists on, if it can be afforded. Until
   // this existed the operator stopped at the County Open for ever --
@@ -787,8 +792,10 @@ function buildFor(state, rungId) {
  * measures Act II comfortably cannot fit even one championship.
  *
  * Returns the Act II shape plus the thing Act III is actually for: one
- * record per championship, naming the rung, the setup the course arrived
- * at, which of the four conditions were met, what the contract paid, and
+ * record per championship week played -- a missed rung is retried once
+ * its bar lifts, so the same rung can appear twice -- naming the rung,
+ * the setup the course arrived at, which of the four conditions were
+ * met, what the contract paid, and
  * what the field shot and how long it took them. The per-rung run-up
  * takings are in there too, because "the base fee alone loses money
  * against never bidding" is a claim about the twenty-one days as much as
@@ -799,7 +806,16 @@ function buildFor(state, rungId) {
  * operator, then 240 days of Act III, hosted against the same resort
  * never bidding, four Act III seeds per settled resort (32 ladders).
  * Purses at 1.6x the originals (see the rung list in tournaments.js).
- * Every ladder climbed all three rungs. Winning total, H = hit, F = the
+ *
+ * Measured BEFORE retries existed (noted 2026-10-03). A missed rung then
+ * counted as hosted, so every ladder below attempted each rung exactly
+ * once and moved on; a miss now bars the rung for BAR_DAYS and the
+ * operator bids for it again afterwards. The thirteen all-hit ladders,
+ * which set the purse, play out identically under either rule. The
+ * nineteen with a miss would now spend 120 days barred and then retry,
+ * so their rows and the per-rung rates are the old rule's, not re-run.
+ *
+ * Every ladder attempted all three rungs. Winning total, H = hit, F = the
  * floor failed; worth is hosted money less never-bid money:
  *
  *   ladder  County  Regional  National   paid        worth
@@ -950,40 +966,42 @@ export function playActThree(startState, {
       ordinaryDays += 1;
     }
 
-    const hosted = result.report.tournament;
-    if (hosted) {
-      const contract = contractFor(hosted.rung);
+    // A week played, hit or missed. Not "hosted": only a week that met
+    // its target is recorded in tournamentsHosted (see day.js).
+    const played = result.report.tournament;
+    if (played) {
+      const contract = contractFor(played.rung);
       tournaments.push({
-        rung: hosted.rung,
+        rung: played.rung,
         // The first round's day: the week ends on the day after the last.
-        day: state.day - hosted.week.rounds,
+        day: state.day - played.week.rounds,
         // The setup the course was held at. Guidance now, not the judge
         // (the winning total is), recorded because it is what the field
         // played on and the calibration was measured at the band's middle.
         setup: Math.round((state.resort.setup ?? 0) * 10) / 10,
-        band: RUNGS[hosted.rung].band,
-        inTarget: hosted.met.includes('target'),
-        winningTotal: hosted.week.winningTotal,
-        target: hosted.week.target,
-        rounds: hosted.week.rounds,
-        pins: hosted.week.roundLog.map((r) => r.pins),
-        difficulty: hosted.difficulty,
-        difficultyMet: hosted.difficultyMet,
-        turfMet: hosted.met.includes('turf'),
+        band: RUNGS[played.rung].band,
+        inTarget: played.met.includes('target'),
+        winningTotal: played.week.winningTotal,
+        target: played.week.target,
+        rounds: played.week.rounds,
+        pins: played.week.roundLog.map((r) => r.pins),
+        difficulty: played.difficulty,
+        difficultyMet: played.difficultyMet,
+        turfMet: played.met.includes('turf'),
         keepers: countRole(state, 'groundskeeper'),
-        met: hosted.met,
-        missed: hosted.missed,
-        paid: hosted.paid,
+        met: played.met,
+        missed: played.missed,
+        paid: played.paid,
         baseFee: contract.baseFee,
         ceiling: contract.ceiling,
-        shareOfCeiling: Number((hosted.paid / contract.ceiling).toFixed(3)),
-        prestige: hosted.prestige,
-        barDays: hosted.barDays,
+        shareOfCeiling: Number((played.paid / contract.ceiling).toFixed(3)),
+        prestige: played.prestige,
+        barDays: played.barDays,
         turf: Math.round(state.turfQuality),
-        toPar: hosted.field.averageToPar,
-        underPar: hosted.field.underPar,
-        roundMinutes: hosted.field.averageRoundMinutes,
-        slowestRoundMinutes: hosted.field.slowestRoundMinutes,
+        toPar: played.field.averageToPar,
+        underPar: played.field.underPar,
+        roundMinutes: played.field.averageRoundMinutes,
+        slowestRoundMinutes: played.field.slowestRoundMinutes,
         // What the three weeks before the day cost, so the contract can
         // be read against it rather than on its own.
         runUpDays: pendingRunUpDays,
@@ -1004,6 +1022,8 @@ export function playActThree(startState, {
     bankrupt,
     bids,
     tournaments,
+    // The rungs whose target was met. A missed rung is not in here; its
+    // bar is in `barred`, and the week itself in `tournaments`.
     hosted: state.tournamentsHosted ?? [],
     // Which rungs are still shut, and why — a stalled ladder is the act
     // failing quietly rather than loudly.

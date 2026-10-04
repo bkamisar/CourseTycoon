@@ -822,7 +822,15 @@ export function runDay(state, seed) {
       });
       next.money += result.paid;
       next.prestige = clamp(next.prestige + result.prestige, 0, 100);
-      next.tournamentsHosted = [...(next.tournamentsHosted ?? []), result.rung];
+      // Only a week that met the target was hosted. A missed rung is given
+      // to somebody else for BAR_DAYS and can be bid for again afterwards
+      // -- which is what the result card promises. Recording a miss as
+      // hosted made `nextRungFor` skip past it, so the bar never mattered,
+      // and a missed National left "The ladder is climbed" on the sheet
+      // with `actThreePassed` unreachable for the rest of the save.
+      if (result.met.includes('target')) {
+        next.tournamentsHosted = [...(next.tournamentsHosted ?? []), result.rung];
+      }
       if (result.barDays > 0) {
         next.tournamentBars = {
           ...(next.tournamentBars ?? {}),

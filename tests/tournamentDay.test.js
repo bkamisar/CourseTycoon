@@ -4,7 +4,7 @@ import { newGame, serialize, deserialize } from '../src/sim/state.js';
 import { runDay } from '../src/sim/day.js';
 import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import {
-  RUNGS, RUN_UP_DAYS, TURF_EXPECTED, conditioningCostPerDay,
+  RUNGS, RUN_UP_DAYS, TURF_EXPECTED, BAR_DAYS, conditioningCostPerDay, bidFor, nextRungFor,
 } from '../src/sim/tournaments.js';
 import { newWeek, withPins } from '../src/sim/championshipWeek.js';
 import { narrowToDifficulty } from '../tools/championshipPolicy.js';
@@ -346,13 +346,94 @@ test('the championship resolves, pays, and does not happen twice', () => {
   assert.ok(first.report.tournament, 'the report has to carry the result');
   assert.ok(state.money > before, 'and the contract has to pay');
   assert.equal(state.tournament, null, 'the booking is spent');
-  assert.ok((state.tournamentsHosted ?? []).includes('countyOpen'),
-    'and it is recorded as hosted, so the next rung opens');
+  // Not hosted: this is the three-hole stub, far under the County's
+  // difficulty floor, so the week missed. This line used to assert the
+  // opposite, because a miss counted as hosted -- which skipped the rung
+  // past its own bar and could dead-end the ladder at a missed National.
+  // The hit and miss cases are tested directly below.
+  assert.equal(first.report.tournament.difficultyMet, false, 'sanity: three holes are under the floor');
+  assert.ok(!(state.tournamentsHosted ?? []).includes('countyOpen'),
+    'a missed week is not recorded as hosted');
 
   const second = runDay(state, 3510);
   assert.equal(second.report.tournament ?? null, null,
     'a championship must not resolve twice');
   assert.equal(second.report.tournamentDay, false, 'and the course reopens');
+});
+
+// --- Hosting, missing and coming back ---------------------------------
+
+test('a missed County is not hosted, and can be bid for again once the bar lifts', () => {
+  // The template course is under the County's floor, so this week misses
+  // whatever the field shoots -- a miss that does not depend on the dice.
+  const state = openFullCourse(actThreeResort(81));
+  state.tournament = newWeek('countyOpen', state.day);
+  const { state: after, report } = playWeek(state, 8300);
+  assert.ok(!report.tournament.met.includes('target'), 'sanity: the week missed');
+
+  assert.deepEqual(after.tournamentsHosted, [], 'a missed rung is not hosted');
+  assert.equal(nextRungFor(after.tournamentsHosted), 'countyOpen',
+    'so the County is still the next rung, not the Regional');
+  const barredUntil = after.tournamentBars.countyOpen;
+  assert.equal(barredUntil, after.day - 1 + BAR_DAYS, 'and it is barred for BAR_DAYS from the last round');
+
+  // The miss cost prestige; put it back so the bar is the only thing
+  // standing between the resort and the bid.
+  const during = { ...after, prestige: 80, day: barredUntil };
+  assert.equal(bidFor(during, 'countyOpen', { holesOpen: 18 }), null,
+    'on the last day of the bar the County is still given to somebody else');
+  const afterBar = { ...during, day: barredUntil + 1 };
+  const booking = bidFor(afterBar, 'countyOpen', { holesOpen: 18 });
+  assert.ok(booking, 'and the day after, the resort can bid for it again');
+  assert.equal(booking.rung, 'countyOpen');
+});
+
+test('a County that hits its target is hosted and opens the Regional', () => {
+  // Over seeds, because the winner of sixty is noisy: hosted exactly when
+  // the target was met, and at least one week must hit. Measured
+  // 2026-10-03: at the County minimum with setup 52, eleven of these
+  // twelve seeds hit.
+  let hits = 0;
+  for (let seed = 100; seed < 106; seed++) {
+    const state = atMinimum(openFullCourse(actThreeResort(seed)), 'countyOpen');
+    state.resort.setup = 52;
+    state.resort.setupTarget = 52;
+    state.turfQuality = 92;
+    state.tournament = newWeek('countyOpen', state.day);
+    const { state: after, report } = playWeek(state, 9900 + seed);
+    const hit = report.tournament.met.includes('target');
+    assert.deepEqual(after.tournamentsHosted, hit ? ['countyOpen'] : [], `seed ${seed}`);
+    assert.equal(nextRungFor(after.tournamentsHosted), hit ? 'regional' : 'countyOpen', `seed ${seed}`);
+    if (hit) {
+      hits += 1;
+      assert.equal(after.tournamentBars?.countyOpen, undefined, 'a hit is not barred');
+    }
+  }
+  assert.ok(hits > 0, 'a well-set County has to be hostable');
+});
+
+test('a missed National leaves the act open and the National biddable after the bar', () => {
+  // The dead end this replaced: a missed National counted as hosted, the
+  // sheet said "The ladder is climbed", and `actThreePassed` could never
+  // become true for the rest of the save.
+  const state = atMinimum(nationalReady(44), 'national');
+  state.tournamentsHosted = ['countyOpen', 'regional'];
+  state.resort.setup = 5;
+  state.resort.setupTarget = 0;
+  state.tournament = newWeek('national', state.day);
+  const { state: after, report } = playWeek(state, 8400);
+  assert.ok(!report.tournament.met.includes('target'), 'sanity: the botched week missed');
+
+  assert.equal(after.actThreePassed, false, 'missing the National does not pass the act');
+  assert.deepEqual(after.tournamentsHosted, ['countyOpen', 'regional'], 'and does not host it');
+  assert.equal(nextRungFor(after.tournamentsHosted), 'national', 'so the ladder is not climbed');
+
+  const barredUntil = after.tournamentBars.national;
+  const ready = { ...after, prestige: 90 };
+  assert.equal(bidFor({ ...ready, day: barredUntil }, 'national', { holesOpen: 18 }), null,
+    'barred for BAR_DAYS');
+  assert.ok(bidFor({ ...ready, day: barredUntil + 1 }, 'national', { holesOpen: 18 }),
+    'and biddable again afterwards');
 });
 
 /**

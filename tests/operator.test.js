@@ -186,6 +186,24 @@ test('once nothing is booked the operator widens the fairways it narrowed back t
   assert.deepEqual(state.resort.courses[0].holes.map((h) => h.corridorWidth), before);
 });
 
+test('a barred rung is neither built for nor bid for until the bar lifts, then retried', () => {
+  // A missed rung is not hosted (day.js), so it stays the next rung and
+  // the operator comes back to it. Until the bar lifts it must not spend
+  // on the rung's buildings, which would carry upkeep for four months.
+  const state = actThreeCourse(14);
+  state.tournamentsHosted = ['countyOpen'];
+  state.tournamentBars = { regional: state.day + 5 };
+  const money = state.money;
+  assert.equal(spendTheTournamentMorning(state, { holesOpen: 18 }), false, 'barred: no bid');
+  assert.equal(state.tournament, null);
+  assert.equal(state.money, money, 'and nothing built for it');
+
+  state.day += 6;
+  assert.equal(spendTheTournamentMorning(state, { holesOpen: 18 }), true,
+    'the morning after the bar, the Regional is bid for again');
+  assert.equal(state.tournament.rung, 'regional');
+});
+
 // --- playActThree's bookkeeping ------------------------------------------
 
 const LEVERS = { greenFee: 80, teeInterval: 14, roomRate: 300 };

@@ -54,6 +54,28 @@ test('an ineligible rung says which requirement is missing, not just no', () => 
     `expected the buildings named, got ${JSON.stringify(data.next.missing)}`);
 });
 
+test('a missed rung is offered again, but not until its bar lifts', () => {
+  // A miss is not hosted (day.js), so the missed rung is still the next
+  // one. While it is barred the sheet must say so rather than offer an
+  // Apply button that `bidFor` will refuse.
+  const state = championshipResort(9);
+  state.tournamentsHosted = ['countyOpen'];
+  state.resort.amenities.push(
+    { id: 'g', type: 'grandstands', menu: [] }, { id: 'o', type: 'overflowParking', menu: [] },
+  );
+  state.tournamentBars = { regional: state.day + 30 };
+  const during = computeChampionshipData(state);
+  assert.equal(during.next.id, 'regional', 'the missed rung is still the next one');
+  assert.equal(during.next.eligible, false);
+  assert.equal(during.next.barredUntil, state.day + 30);
+
+  state.day += 31;
+  const after = computeChampionshipData(state);
+  assert.equal(after.next.eligible, true, 'and once the bar lifts it can be bid for');
+  assert.equal(after.next.barredUntil, null);
+  assert.equal(after.ladder.find((r) => r.id === 'regional').hosted, false, 'with no tick beside it');
+});
+
 test('the dial reports where it is, where it is going, and whether that is right', () => {
   const state = championshipResort(3);
   state.tournament = { rung: 'countyOpen', day: state.day + 10, resolved: false };

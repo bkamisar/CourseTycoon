@@ -81,6 +81,11 @@ export function computeChampionshipData(state) {
   // week to settle anything, so the live measure of the playable holes.
   const status = championshipStatus(state);
   const rawDifficulty = status ? status.difficulty : courseDifficultyOf(playableHoles(state));
+  // A missed rung stays the next rung and is given to somebody else for a
+  // while (bidFor refuses it until the day after). Without this the sheet
+  // offered an Apply button that did nothing when pressed.
+  const barredUntil = nextId ? (state.tournamentBars?.[nextId] ?? 0) : 0;
+  const barred = state.day <= barredUntil;
 
   return {
     money: state.money,
@@ -98,9 +103,10 @@ export function computeChampionshipData(state) {
           minDifficulty: RUNGS[nextId].minDifficulty,
           difficultyMet: rawDifficulty >= RUNGS[nextId].minDifficulty,
           prepPerDay: RUNGS[nextId].prepPerDay,
-          eligible: eligibleFor(nextId, {
+          eligible: !barred && eligibleFor(nextId, {
             prestige: state.prestige, resort: state.resort, holesOpen,
           }),
+          barredUntil: barred ? barredUntil : null,
           missing: missingFor(state, nextId),
         }
       : null,
@@ -385,7 +391,9 @@ function applySection(data, state, commit) {
   apply.disabled = !n.eligible;
   apply.textContent = n.eligible
     ? `Apply for the ${n.label}`
-    : `Not yet: ${n.missing.join(', ')}`;
+    : n.barredUntil !== null
+      ? `Given to somebody else until day ${n.barredUntil}`
+      : `Not yet: ${n.missing.join(', ')}`;
   apply.addEventListener('click', () => {
     const next = structuredClone(state);
     const booked = bidFor(next, n.id, { holesOpen: openHoles(next).length });
