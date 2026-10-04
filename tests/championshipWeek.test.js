@@ -42,7 +42,7 @@ test('a new week carries everything the rung decides', () => {
   assert.equal(week.resolved, false);
   assert.equal(week.rounds, RUNGS.national.rounds);
   assert.equal(week.roundsPlayed, 0);
-  assert.deepEqual(week.roundSettings, { pins: 'fair' });
+  assert.deepEqual(week.roundSettings, { pins: 'fair', eventHandicap: 0, eventPace: 1 });
   assert.equal(week.field, null);
   assert.deepEqual(week.roundLog, []);
 });
@@ -304,4 +304,13 @@ test('the holes a later day will play keep only the closures still running then'
     s = runDay(s, 30 + i).state;
   }
   assert.equal(playableHoles(s).length, playableHolesOn(state, s.day).length, `day ${s.day}`);
+});
+
+test('a new week carries no event\'s effect on the next round', () => {
+  // Championship events add to these and the round clears them
+  // (championshipEvents.js, day.js). An old save has neither, and is
+  // filled in as "nothing pending".
+  assert.deepEqual(newWeek('regional', 10).roundSettings, { pins: 'fair', eventHandicap: 0, eventPace: 1 });
+  const old = normaliseWeek({ rung: 'regional', day: 10, roundSettings: { pins: 'tough' } });
+  assert.deepEqual(old.roundSettings, { pins: 'tough', eventHandicap: 0, eventPace: 1 });
 });

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   newGame, serialize, deserialize, playableHoles, playableHolesOn, openHoles,
 } from '../src/sim/state.js';
-import { runDay } from '../src/sim/day.js';
+import { runDay, applyEventChoice } from '../src/sim/day.js';
+import { CHAMPIONSHIP_EVENTS } from '../src/sim/championshipEvents.js';
 import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import {
   RUNGS, RUN_UP_DAYS, TURF_EXPECTED, BAR_DAYS, conditioningCostPerDay, bidFor, nextRungFor,
@@ -1159,4 +1160,113 @@ test("the practice round measures the course the field will meet, not tonight's 
   assert.equal(shut, courseDifficultyOf(openHoles(state).slice(0, 15)),
     'a closure still running on round 1 is the course they will play');
   assert.notEqual(shut, whole, 'and the closure has to matter for this to mean anything');
+});
+
+// --- Championship events reach the course and the next round --------------
+
+/** Every championship choice whose effects are exactly `wanted`, as
+ * { id, index }, so these tests follow the library rather than its ids. */
+function choicesWith(wanted) {
+  const found = [];
+  for (const event of CHAMPIONSHIP_EVENTS) {
+    event.choices.forEach((choice, index) => {
+      if (JSON.stringify(choice.effects) === JSON.stringify(wanted)) found.push({ id: event.id, index });
+    });
+  }
+  return found;
+}
+
+/** A regional with round 1 played today, so tonight is a week evening. */
+function regionalAfterRoundOne(seed) {
+  let state = openFullCourse(actThreeResort(seed));
+  state.resort.setup = 70;
+  state.resort.setupTarget = 70;
+  state.tournament = newWeek('regional', state.day);
+  return runDay(state, seed * 100).state;
+}
+
+test('a week event\'s handicap plays the very next round, on the pins\' scale, then clears', () => {
+  // Two events tonight that each ease the next round by half a pin
+  // setting sum to a whole one, and a whole one is easy pins: the round
+  // must be the one easy pins would have played, shot for shot. That is
+  // the proof it reached `playField` at the scale the card promised.
+  const easing = choicesWith({ nextRound: { handicap: -0.375 } });
+  assert.ok(easing.length >= 2, `need two pure half-setting easings, found ${easing.length}`);
+  const tonight = regionalAfterRoundOne(81);
+  let evented = applyEventChoice(tonight, easing[0].id, easing[0].index);
+  evented = applyEventChoice(evented, easing[1].id, easing[1].index);
+  assert.equal(evented.tournament.roundSettings.eventHandicap, -0.75);
+
+  const twin = { ...tonight, tournament: withPins(tonight.tournament, 'easy') };
+  const withEvents = runDay(evented, 8101);
+  const withPinsOnly = runDay(twin, 8101);
+  const strip = ({ pins, eventHandicap, eventPace, ...rest }) => rest;
+  assert.deepEqual(strip(withEvents.report.tournamentRound), strip(withPinsOnly.report.tournamentRound));
+  assert.deepEqual(withEvents.state.tournament.field.totals, withPinsOnly.state.tournament.field.totals);
+  assert.equal(withEvents.report.tournamentRound.eventHandicap, -0.75, 'the round says what it was played with');
+
+  // And only that round.
+  assert.equal(withEvents.state.tournament.roundSettings.eventHandicap, 0);
+  assert.equal(withEvents.state.tournament.roundSettings.eventPace, 1);
+  assert.equal(withEvents.state.tournament.roundSettings.pins, 'fair', 'the player\'s pins are untouched');
+});
+
+test('a week event\'s pace slows the very next round, then clears', () => {
+  const slowing = CHAMPIONSHIP_EVENTS.flatMap((e) => e.choices.map((c, index) => ({ id: e.id, index, c })))
+    .find(({ c }) => Object.keys(c.effects).join() === 'nextRound' && c.effects.nextRound.pace > 1
+      && c.effects.nextRound.handicap === undefined);
+  assert.ok(slowing, 'need a choice that only slows the next round');
+  const tonight = regionalAfterRoundOne(82);
+  // Tee times far enough apart that nothing queues, so the round is the
+  // sum of its holes and the multiplier shows exactly.
+  tonight.resort.pricing.teeInterval = 30;
+  const evented = applyEventChoice(tonight, slowing.id, slowing.index);
+  const slowed = runDay(evented, 8201);
+  const plain = runDay(tonight, 8201);
+  const ratio = slowed.report.tournamentRound.averageRoundMinutes / plain.report.tournamentRound.averageRoundMinutes;
+  assert.ok(Math.abs(ratio - slowing.c.effects.nextRound.pace) < 0.01,
+    `pace ${slowing.c.effects.nextRound.pace} made the round ${ratio.toFixed(3)} times as long`);
+  assert.equal(slowed.report.tournamentRound.averageToPar, plain.report.tournamentRound.averageToPar);
+  assert.equal(slowed.report.tournamentRound.eventPace, slowing.c.effects.nextRound.pace);
+  assert.equal(slowed.state.tournament.roundSettings.eventPace, 1);
+
+  const after = runDay(slowed.state, 8202);
+  assert.equal(after.report.tournamentRound.eventPace, 1, 'the round after is back to normal');
+});
+
+test('a pending next-round effect survives a save', () => {
+  const easing = choicesWith({ nextRound: { handicap: -0.375 } })[0];
+  const evented = applyEventChoice(regionalAfterRoundOne(83), easing.id, easing.index);
+  const reloaded = deserialize(serialize(evented));
+  assert.deepEqual(reloaded.tournament.roundSettings, evented.tournament.roundSettings);
+  assert.deepEqual(runDay(reloaded, 8301).report.tournamentRound, runDay(evented, 8301).report.tournamentRound);
+});
+
+test('a championship event\'s setup lands on the course now, inside 0-100', () => {
+  const event = CHAMPIONSHIP_EVENTS.find((e) => e.choices.some((c) => c.effects.setup > 0));
+  const index = event.choices.findIndex((c) => c.effects.setup > 0);
+  const { setup, money = 0 } = event.choices[index].effects;
+  const state = openFullCourse(actThreeResort(84));
+  state.tournament = newWeek('countyOpen', state.day + 15);
+  state.resort.setup = 40;
+  const after = applyEventChoice(state, event.id, index);
+  assert.equal(after.resort.setup, 40 + setup);
+  assert.equal(after.money, state.money + money, 'and the rest of the choice with it');
+  assert.equal(state.resort.setup, 40, 'without touching the state it was given');
+
+  state.resort.setup = 99;
+  assert.equal(applyEventChoice(state, event.id, index).resort.setup, 100);
+  const softening = CHAMPIONSHIP_EVENTS.find((e) => e.choices.some((c) => c.effects.setup < 0));
+  const soft = softening.choices.findIndex((c) => c.effects.setup < 0);
+  state.resort.setup = 1;
+  assert.equal(applyEventChoice(state, softening.id, soft).resort.setup, 0);
+});
+
+test('a next-round effect answered with nothing booked is dropped, not stored', () => {
+  // Cannot happen in play (week events fire only on week evenings before a
+  // round), but a choice must never throw or invent a booking.
+  const easing = choicesWith({ nextRound: { handicap: -0.375 } })[0];
+  const state = actThreeResort(85);
+  state.tournament = null;
+  assert.equal(applyEventChoice(state, easing.id, easing.index).tournament, null);
 });

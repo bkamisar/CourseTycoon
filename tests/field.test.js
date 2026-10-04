@@ -166,3 +166,31 @@ test('drawing a field gives sixty championship handicaps', () => {
   assert.equal(field.length, FIELD_SIZE);
   assert.ok(field.every((h) => Number.isInteger(h) && h >= 0 && h <= 6));
 });
+
+test('an event\'s handicap is on the pins\' scale, added on top of them', () => {
+  // A championship event can make the next round play harder or easier
+  // (championshipEvents.js). It is the pins' own unit: a round with fair
+  // pins and an event worth -0.75 is the round easy pins would have
+  // played, shot for shot.
+  const handicaps = drawFieldHandicaps(makeRng(50));
+  const easyPins = playField(makeRng(51), course(), { setup: 70, pins: 'easy', handicaps });
+  const easyEvent = playField(makeRng(51), course(), {
+    setup: 70, pins: 'fair', eventHandicap: -0.75, handicaps,
+  });
+  assert.deepEqual(easyEvent, easyPins);
+  const plain = playField(makeRng(51), course(), { setup: 70, pins: 'fair', handicaps });
+  const defaulted = playField(makeRng(51), course(), {
+    setup: 70, pins: 'fair', eventHandicap: 0, eventPace: 1, handicaps,
+  });
+  assert.deepEqual(defaulted, plain, 'and an event that did nothing changes nothing');
+});
+
+test('an event\'s pace stretches the round on top of the weather\'s', () => {
+  // Wide tee times so nothing queues: a round is the sum of its holes, and
+  // the two multipliers compose exactly.
+  const a = playField(makeRng(52), course(), { setup: 60, pace: 1.1, teeInterval: 30 });
+  const b = playField(makeRng(52), course(), { setup: 60, pace: 1.1, eventPace: 1.08, teeInterval: 30 });
+  assert.equal(b.averageToPar, a.averageToPar, 'pace changes the clock, not the scores');
+  assert.ok(Math.abs(b.averageRoundMinutes / a.averageRoundMinutes - 1.08) < 0.01,
+    `an 8% slower event made rounds ${b.averageRoundMinutes / a.averageRoundMinutes} times as long`);
+});

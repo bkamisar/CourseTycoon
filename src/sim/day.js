@@ -18,6 +18,7 @@ import { narrationContext, pickNarration, rememberNarration } from './narration.
 import { SEGMENT_KEYS } from './segments.js';
 import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
 import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEvent } from './events.js';
+import { CHAMPIONSHIP_EVENTS } from './championshipEvents.js';
 import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
 import { weatherOn, forecast, effectsOf } from './weather.js';
 import {
@@ -782,6 +783,10 @@ export function runDay(state, seed) {
       spread: sky.spread,
       pace: sky.pace,
       handicaps,
+      // What last night's championship events did to this round
+      // (championshipEvents.js). Cleared below once the round is in.
+      eventHandicap: week.roundSettings.eventHandicap,
+      eventPace: week.roundSettings.eventPace,
     });
     fieldPlayback = playback;
     // Pace is the existing flow-shop target, pointed at a new audience.
@@ -795,6 +800,10 @@ export function runDay(state, seed) {
       entry: {
         weather: weatherKey,
         pins: week.roundSettings.pins,
+        // Kept with the round so anything that reports it reads what the
+        // round was played with, not tonight's settings.
+        eventHandicap: week.roundSettings.eventHandicap,
+        eventPace: week.roundSettings.eventPace,
         setup: Math.round(next.resort.setup ?? 0),
         averageToPar: field.averageToPar,
         hardestHole: field.hardestHole,
@@ -817,7 +826,11 @@ export function runDay(state, seed) {
     };
 
     if (!weekFinished(played)) {
-      next.tournament = played;
+      // An event's effect is on the next round only: this one has used it.
+      next.tournament = {
+        ...played,
+        roundSettings: { ...played.roundSettings, eventHandicap: 0, eventPace: 1 },
+      };
     } else {
       const result = scoreTournament(played.rung, {
         // The winner's total is the judge; the setup band is guidance on
@@ -1256,7 +1269,10 @@ export function runDay(state, seed) {
  * the wrong numbers.
  */
 export function applyEventChoice(state, eventId, choiceIndex) {
-  const event = EVENTS.find((e) => e.id === eventId);
+  // Either library: the ordinary events, then the championship's own.
+  // Their ids never collide (tests/championshipEvents.test.js).
+  const event = EVENTS.find((e) => e.id === eventId)
+    ?? CHAMPIONSHIP_EVENTS.find((e) => e.id === eventId);
   if (!event) throw new Error(`applyEventChoice: unknown event "${eventId}"`);
   const choice = event.choices[choiceIndex];
   if (!choice) throw new Error(`applyEventChoice: "${eventId}" has no choice at index ${choiceIndex}`);
@@ -1274,6 +1290,30 @@ export function applyEventChoice(state, eventId, choiceIndex) {
   // single instant.
   if (effects.condition) {
     next.conditions = addCondition(next.conditions ?? [], effects.condition);
+  }
+
+  // A championship event's own effects (championshipEvents.js). Setup lands
+  // on the course now; the crew climbs from wherever it is left, and the
+  // next morning's `nextSetup` treats it like any other setup.
+  if (effects.setup) {
+    next.resort.setup = clamp((next.resort.setup ?? 0) + effects.setup, 0, 100);
+  }
+  // The next round's handicap and pace, held on the week until `runDay`
+  // plays that round and clears them. Summed and multiplied, so two events
+  // in one evening (possible only in a save edited by hand, or a test)
+  // both count. With nothing booked there is no next round to hold them
+  // for, and nothing is stored: the rhythm only fires week events on an
+  // evening before a round, so this is a guard rather than a path.
+  if (effects.nextRound && next.tournament) {
+    const week = normaliseWeek(next.tournament);
+    next.tournament = {
+      ...week,
+      roundSettings: {
+        ...week.roundSettings,
+        eventHandicap: week.roundSettings.eventHandicap + (effects.nextRound.handicap ?? 0),
+        eventPace: week.roundSettings.eventPace * (effects.nextRound.pace ?? 1),
+      },
+    };
   }
 
   /**

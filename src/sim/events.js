@@ -1,5 +1,8 @@
 import { SPEAKERS as NARRATION_SPEAKERS, narrationContext } from './narration.js';
 import { SEGMENT_KEYS } from './segments.js';
+// A cycle through state.js, harmless: normaliseWeek is only called inside
+// eventContext, at call time.
+import { normaliseWeek } from './championshipWeek.js';
 
 /**
  * Decision events: tradeoffs with explicit costs and no obviously right
@@ -30,6 +33,13 @@ export const SPEAKERS = {
   realtor: 'Jay, who sells houses',
   weekendGuy: 'A man with a plan',
   security: 'Charles, on security',
+  // The championship's own voices (championshipEvents.js). Nobody here is
+  // a golfer: the field stays nameless.
+  officials: 'The tournament officials',
+  sponsor: 'The title sponsor',
+  broadcaster: 'A television producer',
+  members: 'The members’ committee',
+  lane: 'The houses on the lane',
 };
 
 /**
@@ -116,6 +126,15 @@ export function eventContext({ report, previousReport, state }) {
     money: state.money,
     act: state.act,
     /**
+     * Today's sky, and the championship this evening belongs to (null when
+     * nothing is booked). Read only by championship events
+     * (championshipEvents.js) -- a flooded green wants a wet day -- and no
+     * ordinary event looks at either, so adding them changed nobody's
+     * eligibility.
+     */
+    weather: report.weather?.key ?? null,
+    championship: championshipContext(state),
+    /**
      * What the player has already decided, so an event can be about an
      * earlier one. `chose('some-event', 0, 14)` is "they picked the first
      * option, at least a fortnight ago".
@@ -142,6 +161,29 @@ export function eventContext({ report, previousReport, state }) {
       if (index !== undefined && record.index !== index) return false;
       return (state.day ?? 0) - record.day >= afterDays;
     },
+  };
+}
+
+/**
+ * What a championship event may ask about the booking, or null.
+ *
+ * `phase` is the evening's: the eve of round 1 is a 'week' evening, because
+ * its event is about tomorrow's round (the championship's rhythm, spec §4),
+ * and every evening before it is 'runUp'. `round` is the next round to be
+ * played. `setup` is the course as it stands tonight.
+ */
+function championshipContext(state) {
+  const booked = state.tournament;
+  if (!booked || booked.resolved) return null;
+  const week = normaliseWeek(booked);
+  const today = state.day ?? 0;
+  return {
+    rung: week.rung,
+    phase: today >= week.day - 1 ? 'week' : 'runUp',
+    round: week.roundsPlayed + 1,
+    rounds: week.rounds,
+    daysToRoundOne: week.day - today,
+    setup: state.resort?.setup ?? 0,
   };
 }
 

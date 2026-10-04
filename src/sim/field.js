@@ -120,10 +120,17 @@ export function drawFieldHandicaps(rng) {
  * field (sixty of them, from `drawFieldHandicaps`; omitted, a field is drawn
  * from the rng). The rng carries everything else, so the same seed replays
  * identically.
+ *
+ * `eventHandicap` and `eventPace` are what tonight's championship events
+ * did to this one round (championshipEvents.js, held on the week's
+ * `roundSettings` and cleared once the round is recorded): handicap points
+ * on the pins' own scale, added on top of them, and a multiplier on the
+ * round's time on top of the weather's. Both default to nothing.
  */
 export function playField(rng, holes, {
   setup = 0, turfQuality = 100, teeInterval = DEFAULT_TEE_INTERVAL,
   pins = 'fair', spread: skySpread = 1, pace = 1, handicaps = null,
+  eventHandicap = 0, eventPace = 1,
 } = {}) {
   // The wind as the field's scores feel it; pace stays whole. See
   // FIELD_WEATHER_EFFECT.
@@ -151,7 +158,9 @@ export function playField(rng, holes, {
   //
   // Pins sit on the same scale, added on top: see PINS in
   // championshipWeek.js for why they are a third of what was first tried.
-  const handicapAdjust = setupDifficultyBonus(setup) / 3 + pinHandicap(pins);
+  // A championship event's effect on this round sits on the pins' scale
+  // too, so "half a pin setting easier" on its card is exactly that.
+  const handicapAdjust = setupDifficultyBonus(setup) / 3 + pinHandicap(pins) + eventHandicap;
   // Worn greens putt less true. Honestly small: measured across the whole
   // turf range this moves the field 0.2 strokes, so it is texture rather
   // than a lever. Turf is judged as its own contract condition instead.
@@ -222,8 +231,11 @@ export function playField(rng, holes, {
   // ordinary tee sheet.
   //
   // `pace` is the weather's: rain and wind slow a round, and nothing on a
-  // championship day used to read it.
-  const averageHoleMinutes = holeMinutesTotal.map((total) => (total / FIELD_GROUPS) * pace);
+  // championship day used to read it. `eventPace` is tonight's events'
+  // (a broken scoreboard, a gallery to be walked round), after it.
+  const averageHoleMinutes = holeMinutesTotal.map(
+    (total) => (total / FIELD_GROUPS) * pace * eventPace
+  );
   // scheduleRounds' default day (07:00-18:00) matches day.js's DAY_START and
   // DAY_END; the field relies on that so the playback clock shows it.
   const schedule = scheduleRounds({

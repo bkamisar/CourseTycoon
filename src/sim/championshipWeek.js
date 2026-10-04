@@ -64,7 +64,14 @@ export function newWeek(rungId, day) {
     roundsPlayed: 0,
     // Tomorrow's calls. A later lever -- green speed, tee placement -- is a
     // new key here rather than a new code path.
-    roundSettings: { pins: 'fair' },
+    //
+    // `eventHandicap` and `eventPace` are not the player's calls but what
+    // tonight's championship events did to the next round
+    // (championshipEvents.js): handicap points summed on the pins' scale,
+    // and a multiplier on the round's time. `applyEventChoice` adds to
+    // them, `runDay` plays the round with them and sets them back to
+    // nothing once it is recorded, so they last exactly one round.
+    roundSettings: { pins: 'fair', eventHandicap: 0, eventPace: 1 },
     // Drawn on the first round, from that day's rng, then carried.
     field: null,
     roundLog: [],
