@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scheduleRounds } from '../src/sim/schedule.js';
+import { scheduleRounds, playbackEndMinute } from '../src/sim/schedule.js';
 
 /** Nine holes that each take a fixed time, for arithmetic we can check by hand. */
 const flat = (minutes) => Array.from({ length: 9 }, () => minutes);
@@ -71,4 +71,16 @@ test('per-hole waits are recorded so complaints can name a hole', () => {
   const lastGroup = r.rounds[r.rounds.length - 1];
   assert.equal(lastGroup.waitByHole.length, 9);
   assert.ok(lastGroup.waitByHole[6] > 0);
+});
+
+test('a playing day ends at six, unless a round runs past it', () => {
+  // The championship's last threeball can finish after 18:00 on a wide tee
+  // sheet; the playback has to run to its last event or it cuts the group
+  // off mid-round. Everything that ends in time keeps the ordinary day.
+  assert.equal(playbackEndMinute([]), 1080);
+  assert.equal(playbackEndMinute([{ minute: 420 }, { minute: 900.5 }]), 1080);
+  assert.equal(playbackEndMinute([{ minute: 1079 }]), 1084, 'a few minutes of grace after the last event');
+  assert.equal(playbackEndMinute([{ minute: 1000 }, { minute: 1106.5 }, { minute: 1090 }]), 1112,
+    'the last event wherever it sits in the list, rounded up, plus the grace');
+  assert.equal(playbackEndMinute([{ minute: 1106.5 }], { dayEnd: 1200 }), 1200, 'against whatever the day end is');
 });

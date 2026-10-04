@@ -66,6 +66,26 @@ export function scheduleRounds({
   };
 }
 
+/**
+ * The minute a day's playback should run to: six o'clock, or a few minutes
+ * past the last thing the timeline shows if that comes later.
+ *
+ * The playback clock ends at `dayEnd`, and an event stamped after it is
+ * never reached -- the group is cut off mid-hole and vanishes. That never
+ * mattered to the resort's own tee sheet (a group that cannot finish by
+ * closing is the day's overrun, and cutting it off is the point), but a
+ * championship's field is sixty players the player came to watch finish,
+ * and a wide tee interval sends the last threeball off late enough that
+ * its round ends after six. `tail` is the beat after the last putt drops.
+ *
+ * Pure: the caller decides which days to ask it of.
+ */
+export function playbackEndMinute(timeline, { dayEnd = 1080, tail = 5 } = {}) {
+  let last = -Infinity;
+  for (const event of timeline) if (event.minute > last) last = event.minute;
+  return Math.max(dayEnd, Math.ceil(last) + tail);
+}
+
 /** How many groups fit in a playing day at a given interval. */
 export function maxGroupsForDay(teeInterval, dayStart = 420, dayEnd = 1080) {
   return Math.max(1, Math.floor((dayEnd - dayStart) / teeInterval));

@@ -654,7 +654,9 @@ function openDay() {
   sheets.dismissAll();
   const seed = state.seed * 1000 + state.day;
   dayResult = runDay(state, seed);
-  clock = createClock({ speed: 1 });
+  // `endMinute` is six o'clock, or later on a championship round day whose
+  // last threeball finishes after it (runDay), so the whole round is shown.
+  clock = createClock({ speed: 1, dayEnd: dayResult.endMinute });
   clock.play();
   router.go('playback');
   updatePlaybackToolbar();

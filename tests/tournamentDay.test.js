@@ -846,6 +846,30 @@ test('the playback shows the field', () => {
   assert.ok(timeline.some((e) => e.type === 'shot'));
 });
 
+test('the playback runs to the last group holing out, even past six', () => {
+  // A 22-minute interval sends the twentieth threeball off at 13:58, and a
+  // slow round puts its finish after 18:00 -- where the playback clock
+  // used to stop and the group vanished mid-hole. The day carries the end
+  // the playback should run to; an ordinary day carries the usual six.
+  const state = openFullCourse(actThreeResort(71));
+  state.resort.pricing.teeInterval = 22;
+  state.tournament = newWeek('countyOpen', state.day);
+  state.tournament.roundSettings.eventPace = 1.1;
+  const out = runDay(state, 7571);
+  const last = out.timeline.at(-1).minute;
+  assert.ok(last > 1080, `sanity: the last event is at ${last}, after six`);
+  assert.ok(out.endMinute >= last, `the playback ends at ${out.endMinute}, before the last event at ${last}`);
+  assert.ok(out.endMinute <= last + 6, 'and not long after it');
+
+  const early = openFullCourse(actThreeResort(74));
+  early.tournament = newWeek('countyOpen', early.day);
+  const quick = runDay(early, 7574);
+  assert.equal(quick.endMinute, 1080, 'a round that finishes in time keeps the ordinary day');
+
+  const ordinary = runDay(actThreeResort(76), 7576);
+  assert.equal(ordinary.endMinute, 1080, 'and so does an ordinary day');
+});
+
 test('nothing the playback needs is saved into the report history', () => {
   const state = openFullCourse(actThreeResort(75));
   state.tournament = newWeek('countyOpen', state.day);

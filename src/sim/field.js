@@ -237,7 +237,9 @@ export function playField(rng, holes, {
     (total) => (total / FIELD_GROUPS) * pace * eventPace
   );
   // scheduleRounds' default day (07:00-18:00) matches day.js's DAY_START and
-  // DAY_END; the field relies on that so the playback clock shows it.
+  // DAY_END; the field relies on that so the playback clock shows it. A round
+  // that runs past DAY_END is shown too: `runDay` carries the timeline's end
+  // out as `endMinute`, and the playback clock runs to it.
   const schedule = scheduleRounds({
     groupCount: FIELD_GROUPS,
     teeInterval,

@@ -108,3 +108,23 @@ test('default speeds are the documented 1x / 4x / 16x set', () => {
   const clock = createClock({ dayStart: 420, dayEnd: 1080 });
   assert.deepEqual(clock.speeds, [1, 4, 16]);
 });
+
+test('a clock given a later day end plays past six and finishes there', () => {
+  // A championship round that runs long carries its own end
+  // (`playbackEndMinute`), so the last group is seen holing out.
+  const clock = createClock({ dayStart: 420, dayEnd: 1112, minutesPerSecond: 6 });
+  clock.play();
+  clock.advance(110_000); // 660 minutes: 18:00 on the ordinary clock
+  assert.equal(clock.minute, 1080);
+  assert.equal(clock.finished, false);
+  assert.equal(clock.playing, true);
+  clock.advance(60_000);
+  assert.equal(clock.minute, 1112);
+  assert.equal(clock.finished, true);
+});
+
+test('a clock with no day end given still ends at six', () => {
+  const clock = createClock({ dayEnd: undefined, minutesPerSecond: 6 });
+  clock.skip();
+  assert.equal(clock.minute, 1080);
+});

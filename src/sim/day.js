@@ -2,7 +2,7 @@ import { makeRng } from './rng.js';
 import { holeStats, clamp, courseDifficultyOf } from './hole.js';
 import { makeGroup, resetGuestIds } from './golfer.js';
 import { playHole } from './round.js';
-import { scheduleRounds, TARGET_MINUTES_PER_HOLE } from './schedule.js';
+import { scheduleRounds, playbackEndMinute, TARGET_MINUTES_PER_HOLE } from './schedule.js';
 import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, menuRevenue } from './economy.js';
 import { guestSatisfaction, buildComplaints } from './satisfaction.js';
 import { courseRating, nextPrestige } from './ratings.js';
@@ -1286,14 +1286,23 @@ export function runDay(state, seed) {
     }
   }
 
+  const timeline = fieldPlayback
+    // The field, on a round day. The same shape the resort's own day
+    // produces, so the playback screen needs no second path.
+    ? buildTimeline(fieldPlayback.schedule, fieldPlayback.rawEvents, fieldPlayback.holeMinutes)
+    : buildTimeline(schedule, rawEvents, pacedHoleMinutes);
+
   return {
     state: next,
     report,
-    timeline: fieldPlayback
-      // The field, on a round day. The same shape the resort's own day
-      // produces, so the playback screen needs no second path.
-      ? buildTimeline(fieldPlayback.schedule, fieldPlayback.rawEvents, fieldPlayback.holeMinutes)
-      : buildTimeline(schedule, rawEvents, pacedHoleMinutes),
+    timeline,
+    // The minute the playback clock should run to. Six o'clock, always,
+    // except on a championship round day: the field plays to the last
+    // putt, and at a wide tee interval the last threeball finishes after
+    // six, which the playback used to cut off mid-hole. An ordinary day
+    // keeps its six even when a group is still out -- that overrun is the
+    // day's, not something to sit and watch.
+    endMinute: fieldPlayback ? playbackEndMinute(timeline, { dayEnd: DAY_END }) : DAY_END,
   };
 }
 
