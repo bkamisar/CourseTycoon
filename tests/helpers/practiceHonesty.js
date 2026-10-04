@@ -24,8 +24,18 @@ export function course(difficulty) {
 }
 
 /**
+ * The smallest crew that brings a bare course to the band midpoint in
+ * RUN_UP_DAYS of neutral weather (Task 1's calibration, weather.js): the
+ * thinnest crew a host would actually run, so the one that climbs back
+ * slowest after a soft round morning.
+ */
+export const CREW = { countyOpen: 4, regional: 5, national: 6 };
+
+/**
  * How many of `seeds` see the real week land inside the forecast's range,
- * on a course at the rung's minimum + 3 set up at the band midpoint. The
+ * on a course at the rung's minimum + 3, held at the band midpoint the
+ * evening before round 1 by CREW's keepers. Both the forecast and the real
+ * week take each round morning's setup step in their own weather. The
  * real week gets its own field and weather (seed + 500009, from day 200),
  * so it shares nothing with the forecast's samples.
  */
@@ -33,12 +43,13 @@ export function honestyHits(rungId, seeds) {
   const rung = RUNGS[rungId];
   const holes = course(rung.minDifficulty + 3);
   const setup = Math.round((rung.band.low + rung.band.high) / 2);
+  const crew = { keepers: CREW[rungId], target: setup };
   let hits = 0;
   for (const seed of seeds) {
-    const { low, high } = practiceForecast(holes, { rungId, setup, seed });
+    const { low, high } = practiceForecast(holes, { rungId, setup, ...crew, seed });
     const realSeed = seed + 500009;
     const real = simulateWeek(holes, {
-      rungId, setup, seed: realSeed, weatherSeed: realSeed, firstDay: 200,
+      rungId, setup, crew, seed: realSeed, weatherSeed: realSeed, firstDay: 200,
     });
     if (real >= low && real <= high) hits++;
   }
