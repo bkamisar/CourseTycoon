@@ -33,8 +33,8 @@ On the run-up's middle evening — **eleven days before the first round** —
 the governing body's officials walk the course and play it. That evening a
 card arrives with what they found:
 
-> The officials' report. On the course as it stands, set up the way your crew
-> will have it by the first morning (86), a field would win at about **+11**,
+> The officials' report. On the course as it will be laid out on the first
+> morning, set up the way your crew will have it (86), a field would win at about **+11**,
 > most likely between **+8 and +14**. They want **+14 to +20**. The course
 > measures 66.2 against their minimum of 65.
 
@@ -43,8 +43,9 @@ card arrives with what they found:
 - **The setup at round 1:** the current setup carried forward day by day with
   `nextSetup` to the first round, using today's crew, today's target and the
   hold rule, in neutral weather. The report says it is a projection.
-- **The course as it stands:** today's playable holes. A last-minute redesign
-  will change the real outcome; the card says "on the course as it stands".
+- **The course as it will be laid out on the first morning:** today's playable
+  holes. A last-minute redesign will change the real outcome; the card says
+  "as it will be laid out on the first morning".
 - **The forecast:** **16 simulated weeks** of the rung's rounds through the
   real `playField`, with fair pins, the week's real fixed-field mechanics, and
   weather drawn deterministically from the weather table (not the real days
@@ -128,8 +129,11 @@ either library):
 
 ### The rhythm
 
-Drawn once, on the first booked day, from that day's rng, and stored on the
-week (`week.eventPlan`) so it is deterministic and survives a save:
+Drawn once, on the first booked day, and stored on the week
+(`week.eventPlan`) so it is deterministic and survives a save. It is drawn
+from its own seed (`eventPlanSeed`: the save's seed and the first round's
+day) rather than the day's rng, so drawing it moves no other number in the
+day it is drawn on (the same reasoning as the practice round's seed):
 
 - **Run-up:** one event on a day drawn from the run-up's evenings (not the
   practice-round evening, not the eve of round 1); a 50% chance of a second on
@@ -201,6 +205,11 @@ Listed so they can be reviewed in the morning:
 - Pool sizes 7 and 9; the three new effect kinds; how the rhythm is drawn.
 - Ordinary events suppressed on round days, the practice evening and
   championship-event evenings.
-- The operator's event-answering policy for the measurement (the middle,
-  "pragmatic" choice where there is one, as it already does for ordinary
-  events).
+- The operator's event-answering policy for the measurement. Ordinary events
+  keep their rule (the middle, "pragmatic" choice where there is one).
+  Championship events are scored (`championshipChoiceScore`, picked by
+  `answerFor` in `tools/operator.js`): money at face value, prestige and turf
+  at a fixed dollar value a point, a slower next round as a cost only when
+  the tee sheet is tight enough (18 minutes or less) for the pace bonus to
+  be at risk; setup, the next round's handicap and goodwill count for
+  nothing, because the operator cannot read which way they would help.

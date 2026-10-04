@@ -11,8 +11,8 @@
  * crew -- the same round-morning `nextSetup` step `runDay` takes, with
  * that morning's weather. What it cannot know is the real weather, the
  * field's luck, and anything the player changes after it is read (the
- * crew, the target, the holes, the pins); the card says it is "on the
- * course as it stands" with fair pins.
+ * crew, the target, the holes, the pins); the card says it is "as it
+ * will be laid out on the first morning" with fair pins.
  *
  * Pure. Nothing here computes with a DOM or a clock.
  */
@@ -155,9 +155,9 @@ function percentile(sorted, p) {
 /**
  * What the officials' practice round reports.
  *
- * `holes` are today's playable holes -- "the course as it stands"; a
- * redesign before the first round changes the real week and the card says
- * so.
+ * `holes` are today's playable holes -- the course "as it will be laid out
+ * on the first morning", as the card says; a redesign before the first
+ * round changes the real week and the card says so.
  *
  * With `keepers` and `target` (the crew and the target as they stand
  * today), `setup` is the course projected to the EVENING BEFORE round 1

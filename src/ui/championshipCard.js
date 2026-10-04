@@ -1,7 +1,7 @@
 /**
  * The championship, on the decision card.
  *
- * Three moments in Act III deserve more than a grey line on the evening
+ * Four moments in Act III deserve more than a grey line on the evening
  * report, for the same reason the investors got cards in Act II: the act
  * is about being judged by people outside the resort, and being judged in
  * a footnote reads like a bank statement.
@@ -9,8 +9,13 @@
  *   - **the invitation** — a governing body writes. An announcement; the
  *     ladder is the act and one you could decline is one half the players
  *     never meet.
+ *   - **the practice round** — mid-run-up, the officials play the course
+ *     as it will be laid out on the first morning and say what a field
+ *     would shoot on it. Information, with nothing to decide.
  *   - **the result** — the week: the winning score against the target
  *     they set, how the leader's total moved, then each condition by name.
+ *   - **the act passed** — the governing body's last, short letter once the
+ *     ladder is climbed.
  *
  * Everything on these cards is read off the report the day actually
  * produced. Nothing is recomputed, so a card cannot describe a

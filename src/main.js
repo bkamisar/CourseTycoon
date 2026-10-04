@@ -765,10 +765,9 @@ function onReportContinue() {
  * else the evening had planned.
  *
  * Named for the evening rather than the investors because Act III's
- * championship cards queue through here too. The only card with a real
- * choice is still the investors' settlement.
+ * championship cards queue through here too.
  *
- * The only card with a real choice is the settlement, and its "pay now"
+ * The only card with a real choice is the investors' settlement, and its "pay now"
  * button goes through the same `payBuyout` the hotel sheet uses -- which
  * refuses rather than overdrawing, so a state that comes back unchanged
  * means it was not paid and nothing is committed as though it were.
