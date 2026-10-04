@@ -31,13 +31,24 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-09-26a';
+export const BUILD = '2026-10-03a';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-10-03a',
+    notes: [
+      'A championship is now a week, not a day. The County Open is two rounds, the Regional three and the National four, and the course is shut to the public for every one of them.',
+      'Each morning of the week you set the pins on the Championship sheet — easy, fair, tough or brutal — with the leader, the score the winner is on pace for, and the day's weather beside them. Then watch the field play your course: they are on the playback now, instead of an empty course.',
+      'The week is judged on the winning score. Each rung wants the winner inside a range, and too low is as bad as too high: the field took the course apart, or nobody could score. The setup band is still there, as the governing body's advice on where to start.',
+      'Every rung also has a minimum course difficulty, checked on the first morning. Narrower fairways will get you there. You can redesign any time before the first round; once it starts, the course is locked until the week is over.',
+      'Wind and rain reach the field, and a hard week on firm greens wears the turf: a crew that only just held it through the run-up can lose it by the last round. A championship wants about eight groundskeepers.',
+      'Keeping the course firm is billed for the whole run-up now, not just while the crew is climbing to the target, and the course holds steady at the target instead of sagging every other day. The purses are bigger to match: a ladder hosted well roughly pays for itself, and a missed week does not.',
+    ],
+  },
   {
     version: '2026-09-26a',
     notes: [
