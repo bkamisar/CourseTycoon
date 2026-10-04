@@ -74,35 +74,59 @@ export const CHAMPIONSHIP_HOLES = 18;
  * reaches 64.4. So each rung asks for some redesign and none asks for a
  * rebuild.
  *
- * `baseFee` and `purseCeiling` were doubled on 2026-10-03, every rung by
- * the same factor: County $18k / $100k -> $36k / $200k, Regional $30k /
- * $240k -> $60k / $480k, National $55k / $500k -> $110k / $1M. The
- * author's rule: a ladder played near-perfectly should roughly break
- * even against never bidding, and a sloppy one should lose. Measured by
- * `node tools/actThree.js --seeds 8` (the table is above `playActThree`
- * in tools/operator.js): at the old purses hosting lost on all eight
- * seeds, by $625k-$1.28M, and the two near-perfect seeds lost $698k (6)
- * and $625k (8) on $693k and $651k of contracts -- so the money needed
- * to be about twice what it was. After: seed 6 -$5k, seed 8 +$26k, and
- * every seed that missed a week still loses, by $424k-$1.14M.
+ * `baseFee` and `purseCeiling` are the original purses times 1.6, every
+ * rung by the same factor, rounded (2026-10-03): County $18k / $100k ->
+ * $29k / $160k, Regional $30k / $240k -> $48k / $380k, National $55k /
+ * $500k -> $88k / $800k. The author's rule: a ladder that hits all three
+ * targets should roughly break even against never bidding, and one with
+ * a miss should lose.
  *
- * One factor rather than weighting toward the National, because the cost
- * of each rung against what a near-perfect week of it actually collected
- * was nearly flat. Cost is the run-up against never-bid ordinary profit
- * (mean of 8 seeds), plus round days at ~$27.6k each, plus required
- * buildings: County $115k + $55k = $170k against $100k paid (1.7x);
- * Regional $258k + $83k + $103k = $444k against $240k (1.85x); National
- * $317k + $110k + $200k = $627k against the $353k the best weeks took
- * (1.8x). The National's full ceiling would be only 1.25x, but no seed
- * reached it: pace was missed there on every seed, and the crowd was
- * never met because the operator never builds the short course, without
- * which its property holds 11,600 of the National's 12,000 gallery
- * (`galleryFor`). Weighting toward the National would have paid for
- * bonuses nobody measured being earned.
+ * Measured by `node tools/actThree.js` (8 settled resorts x 4 Act III
+ * seeds = 32 ladders; the table is above `playActThree` in
+ * tools/operator.js), with the operator playing as a competent player
+ * would: narrowing the night before the first round and widening after,
+ * a margin over the floor for hole closures, the field spaced out on
+ * round mornings. The 13 ladders that hit all three targets finished at
+ * a median of +$21k against never bidding (quartiles -$42k to +$101k,
+ * range -$121k to +$189k); all 19 with a miss lost, $144k to $999k
+ * (median -$635k).
  *
- * Base stays the same share of the ceiling (18%, 12.5%, 11%), so a missed
- * target still pays well under half -- and still loses: a miss pays $36k
- * to $110k against the same run-up and closed days.
+ * The factor was picked from the same samples at the purses before it
+ * (twice the originals, briefly): there the all-hit median was +$338k,
+ * and since the purse moves nothing but money (every score, pin and
+ * per-day profit came out identical when it doubled) the factor that
+ * zeroes that median is 2 x 0.784 = 1.57. Rounded to 1.6. An earlier
+ * measurement with the operator narrowing from the bid morning and never
+ * widening had asked for 2; that was the operator's play, not the game.
+ *
+ * One factor rather than weighting toward the National, because at 1.6
+ * each rung nearly pays its own way already. Median per hosted week
+ * across the 32 ladders: run-up cost against never-bid ordinary profit,
+ * plus closed round days, plus required buildings, against what an
+ * all-hit week was paid --
+ *
+ *   County     $108k + $56k            = $164k  against $160k
+ *   Regional   $196k + $84k + $103k    = $383k  against $380k
+ *   National   $253k + $113k + $200k   = $566k  against $707k
+ *
+ * The National's surplus on a hit is about what the ladder costs that
+ * no single week carries (the buildings' upkeep, the extra keepers kept
+ * on, the crowd stands bought on top of the requirements). Weighting
+ * toward it would make the National a money-maker and the County a loss.
+ *
+ * The National's crowd bonus ($92,560 here) is not reachable by a
+ * sensible resort. The National's gallery is 12,000; every championship
+ * building plus the rest of a built-out property holds 11,600, and the
+ * last 400 need the short course (`galleryFor`). Built on a settled
+ * resort, the short course cost $0.99M-$1.25M over 240 days (median
+ * $1.13M, 8 seeds) in golfers it takes off the main course -- ordinary
+ * profit fell from about $26.6k to $22.0k a day -- so it would cost ten
+ * times the bonus it unlocks. The all-hit ladders above earned target,
+ * turf and usually pace at the National; none earned the crowd, and none
+ * should. See docs/known-issues.md.
+ *
+ * Base stays the same share of the ceiling (18%, 12.6%, 11%), so a
+ * missed target still pays well under half.
  */
 const LIST = [
   {
@@ -116,8 +140,8 @@ const LIST = [
     rounds: 2,
     minDifficulty: 45,
     target: { low: -3, high: 3 },
-    baseFee: 36000,
-    purseCeiling: 200000,
+    baseFee: 29000,
+    purseCeiling: 160000,
     prepPerDay: 1600,
   },
   {
@@ -131,8 +155,8 @@ const LIST = [
     rounds: 3,
     minDifficulty: 55,
     target: { low: 2, high: 8 },
-    baseFee: 60000,
-    purseCeiling: 480000,
+    baseFee: 48000,
+    purseCeiling: 380000,
     prepPerDay: 3200,
   },
   {
@@ -146,8 +170,8 @@ const LIST = [
     rounds: 4,
     minDifficulty: 65,
     target: { low: 14, high: 20 },
-    baseFee: 110000,
-    purseCeiling: 1000000,
+    baseFee: 88000,
+    purseCeiling: 800000,
     prepPerDay: 5400,
   },
 ];

@@ -380,26 +380,39 @@ bid, and reports it.
 
 The target was: hosting a rung and landing the winner in range still beats
 never bidding, but by noticeably less than it did (+$61k to +$167k across the
-ladder). Measured 2026-10-03 (`node tools/actThree.js --seeds 8`, the table
-above `playActThree` in `tools/operator.js`), it overshot: at the old purses
-hosting the whole ladder lost to never bidding on all eight seeds, by $625k to
-$1.28M, the near-perfect ladders included. The run-up on a course narrowed to
-the floor, the closed round days and the buildings cost about $1.3M; the whole
-ladder's ceiling was $840k.
+ladder). Measured 2026-10-03, it overshot: hosting the whole ladder lost to
+never bidding on every seed, near-perfect ladders included.
 
-**The author's decision:** a ladder played near-perfectly should roughly break
-even against never bidding, and a sloppy one should lose. So the purse was
-retuned, not the closure: every rung's base fee and ceiling doubled (County
-$36k / $200k, Regional $60k / $480k, National $110k / $1M), one factor because
-each rung's cost against what a near-perfect week of it collected was nearly
-flat (1.7x, 1.85x, 1.8x; the reasoning is above the rung list in
-`tournaments.js`).
+**The author's decision:** a ladder that hits all three targets should roughly
+break even against never bidding, and a ladder with a miss should lose. And
+the difficulty minimum is a planning hurdle, not a running cost: narrowing the
+fairways at the last minute is allowed, so the measurement's host narrows the
+night before the first round (to the floor plus a margin for hole closures),
+widens back after the week, and spaces the field out on round mornings. Two
+earlier measurements had the host narrowing for the whole run-up, and charged
+the ladder for a course the locals avoid on every one of those days.
 
-Measured after: the two seeds that hit every week finished at -$5k and +$26k
-against never bidding; the six that missed a week lost $424k to $1.14M. So Act
-III is no longer a money-maker: a championship pays for itself only when it is
-done well, and its reward is prestige and the act. Wider Act III money pressure
-belongs to the run-up spec.
+So the purse was retuned, not the closure: every rung's base fee and ceiling
+is the original times 1.6 (County $29k / $160k, Regional $48k / $380k,
+National $88k / $800k). One factor, because at 1.6 each rung's own cost and
+what a week that hits its target is paid nearly match (County $164k against
+$160k, Regional $383k against $380k, National $566k against $707k, the
+National's surplus covering costs no single week carries); the reasoning is
+above the rung list in `tournaments.js`.
+
+Measured after (`node tools/actThree.js --seeds 8 --samples 4`, 32 ladders,
+the table above `playActThree` in `tools/operator.js`): the 13 ladders that
+hit all three targets finished at a median of +$21k against never bidding
+(quartiles -$42k to +$101k, range -$121k to +$189k); all 19 with a miss lost,
+by $144k to $999k (median -$635k). So Act III is no longer a money-maker: a
+championship pays for itself only when it is done well, and its reward is
+prestige and the act.
+
+The National's crowd bonus is out of reach for a sensible resort. Its 12,000
+gallery needs the short course on top of every other building; the short
+course costs about $1.1M over 240 days in golfers it takes off the main course,
+against a bonus of $92,560. Every all-hit ladder above went without it. Wider
+Act III money pressure belongs to the run-up spec.
 
 ## 10. Cards
 
