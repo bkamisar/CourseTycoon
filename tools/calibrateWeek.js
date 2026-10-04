@@ -34,13 +34,10 @@
  *
  *   node tools/calibrateWeek.js
  */
-import { makeRng } from '../src/sim/rng.js';
 import { makeHole } from '../src/sim/hole.js';
 import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { RUNG_IDS, RUNGS, withinTarget } from '../src/sim/tournaments.js';
-import { playField, drawFieldHandicaps } from '../src/sim/field.js';
-import { weatherOn, effectsOf } from '../src/sim/weather.js';
-import { newWeek, recordRound, winningTotal, withPins } from '../src/sim/championshipWeek.js';
+import { simulateWeek } from '../src/sim/practiceRound.js';
 import { pathToFileURL } from 'node:url';
 import { narrowToDifficulty, reactivePins } from './championshipPolicy.js';
 
@@ -78,24 +75,12 @@ export const POLICIES = {
   easy: () => 'easy',
 };
 
-/** One week, start to finish. Returns the winning total. */
-export function simulateWeek(holes, {
-  rungId, setup, policy, seed, turfQuality = 90, teeInterval = 14,
-}) {
-  const rng = makeRng(seed);
-  const handicaps = drawFieldHandicaps(rng);
-  let week = newWeek(rungId, 100);
-  for (let r = 0; r < week.rounds; r++) {
-    const sky = effectsOf(weatherOn(seed, 100 + r));
-    week = withPins(week, policy({ week, spread: sky.spread }));
-    const { playerToPar } = playField(rng, holes, {
-      setup, turfQuality, teeInterval, handicaps,
-      pins: week.roundSettings.pins, spread: sky.spread, pace: sky.pace,
-    });
-    week = recordRound(week, { handicaps, playerToPar, entry: { pins: week.roundSettings.pins } });
-  }
-  return winningTotal(week);
-}
+/** One week, start to finish. Returns the winning total. Lives in
+ * src/sim/practiceRound.js since 2026-10-04, so the officials' practice
+ * round and this calibration play the same week; re-exported here so the
+ * tool's surface is unchanged. Its defaults (weather seed = seed, first
+ * day 100, turf 90, interval 14) are what this tool always measured. */
+export { simulateWeek };
 
 /** Share of seeds whose winner lands in the rung's target. */
 export function hitRate(rungId, { setup, policy, seeds = SEEDS, holes = courseFor(rungId) }) {
