@@ -791,7 +791,10 @@ export function runDay(state, seed) {
         underPar: field.underPar,
         averageRoundMinutes: field.averageRoundMinutes,
         paceOnTarget,
-        turfAfter: Math.round(next.turfQuality),
+        // Floored, not rounded: the judge compares the unrounded figure
+        // against TURF_EXPECTED (78), so 77.6 is a miss -- and rounding
+        // printed it as "78" beside a failed turf condition.
+        turfAfter: Math.floor(next.turfQuality),
       },
     });
     // Every round day gets one, the last included, so the evening report
@@ -849,7 +852,8 @@ export function runDay(state, seed) {
         field,
         setup: Math.round(next.resort.setup ?? 0),
         band: rung.band,
-        turfQuality: Math.round(next.turfQuality),
+        // Floored like the round log's `turfAfter`: 77.6 is a miss.
+        turfQuality: Math.floor(next.turfQuality),
         // Floored to a tenth, not rounded: 44.96 against a floor of 45 is
         // a miss, and rounding it to 45.0 printed "measured 45, asked for
         // at least 45" beside a verdict that said otherwise.

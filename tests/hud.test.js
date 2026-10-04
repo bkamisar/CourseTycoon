@@ -54,6 +54,16 @@ test('the countdown warns on the difficulty floor, not on the band', () => {
   }
 });
 
+test('the HUD turf figure never reads over the line it sits under', () => {
+  // Every turf threshold is "at least", the championship's 78 among them;
+  // rounding showed 77.6 as 78 through a week being judged on it.
+  const state = newGame(7);
+  state.turfQuality = 77.6;
+  assert.equal(computeHudData(state).turfQuality, 77);
+  state.turfQuality = 78;
+  assert.equal(computeHudData(state).turfQuality, 78);
+});
+
 test('the countdown says when the championship is today', () => {
   const state = newGame(3);
   state.day = 61;

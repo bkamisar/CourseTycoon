@@ -89,7 +89,10 @@ export function computeHudData(state) {
     day: state.day,
     courseRating: Math.round(rating),
     prestige: Math.round(state.prestige),
-    turfQuality: Math.round(state.turfQuality),
+    // Floored, not rounded: every turf threshold is "at least" -- the
+    // championship's 78 among them -- so 77.6 must not read as 78 on the
+    // HUD while a week is being judged on it.
+    turfQuality: Math.floor(state.turfQuality),
     satisfaction: lastReport ? Math.round(lastReport.averageSatisfaction) : null,
     crowd: crowdBars(lastReport),
     // Act III. Null when nothing is booked, so the HUD simply does not

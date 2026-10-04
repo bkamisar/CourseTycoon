@@ -592,7 +592,14 @@ test('the report records what the week was judged on, not only the verdict', () 
     t.difficultyMet && t.week.winningTotal >= t.week.target.low && t.week.winningTotal <= t.week.target.high,
     'the verdict and the numbers printed beside it have to agree');
 
-  assert.equal(t.turfQuality, Math.round(after.turfQuality), 'and what they left the turf at');
+  // Floored, not rounded (it was rounded until 2026-10-03): the turf
+  // condition is judged on the unrounded figure, so a 77.6 printed as 78
+  // sat beside a failed turf condition.
+  assert.equal(t.turfQuality, Math.floor(after.turfQuality), 'and what they left the turf at');
+  assert.equal(t.met.includes('turf'), t.turfQuality >= TURF_EXPECTED,
+    'and the turf printed agrees with the turf verdict');
+  assert.equal(t.week.roundLog.at(-1).turfAfter, Math.floor(after.turfQuality),
+    'the last round line prints the same floored figure');
   assert.deepEqual(t.band, RUNGS.countyOpen.band, 'and what was being asked for');
   assert.ok(t.field, 'and what they shot');
 });

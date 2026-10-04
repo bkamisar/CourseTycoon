@@ -327,7 +327,9 @@ function tournamentSection(report) {
     difficultyText: typeof t.difficulty === 'number' ? t.difficulty.toFixed(1) : '',
     minDifficulty: t.minDifficulty,
     difficultyMet: t.difficultyMet !== false,
-    turfQuality: t.turfQuality,
+    // Floored, for weeks recorded before day.js floored it: the turf
+    // condition is judged unrounded, and 77.6 must not read as 78.
+    turfQuality: typeof t.turfQuality === 'number' ? Math.floor(t.turfQuality) : t.turfQuality,
     field: t.field,
     conditions: (contract?.bonuses ?? []).map((b) => ({
       id: b.id,
@@ -373,8 +375,17 @@ function roundSection(report) {
     underPar: r.underPar ?? null,
     hardestHole: r.hardestHole,
     averageRoundMinutes: r.averageRoundMinutes,
+    // Rounded UP for the line, because the judge compares the unrounded
+    // minutes against a whole-minute target (18 x 16 = 288): 288.4 is over,
+    // and rounding printed "288 minutes, which is over the pace target".
+    // Ceiling can never do the reverse -- a round at or under a whole
+    // target ceils to at most that target -- and a decimal on a phone line
+    // already this long is noise.
+    roundMinutes: Math.ceil(r.averageRoundMinutes),
     paceOnTarget: r.paceOnTarget,
-    turfAfter: r.turfAfter,
+    // Floored as day.js stores it, and again here for rounds logged before
+    // it did: 77.6 is under the turf a championship expects (78).
+    turfAfter: Math.floor(r.turfAfter),
     weatherLabel: effectsOf(r.weather).label,
     pinsLabel: PINS[r.pins]?.label ?? r.pins,
     tracking: trackingFor(r.leaderToPar, r.round, r.rounds, r.target),
@@ -389,7 +400,11 @@ export function computeReportData(state, report) {
   const ratings = RATING_SPECS.map(({ key, label }) => ({
     key,
     label,
-    value: Math.round(report[key]),
+    // Turf floored rather than rounded: every turf threshold in the game is
+    // "at least" (the championship's 78 among them), and on a verdict
+    // evening a 77.6 printed as 78 sits on the same screen as a missed turf
+    // condition. The other ratings carry no such line.
+    value: key === 'turfQuality' ? Math.floor(report[key]) : Math.round(report[key]),
     delta: previous ? report[key] - previous[key] : null,
   }));
 
@@ -1041,7 +1056,7 @@ export function mountReport(root, { state, report, onContinue } = {}) {
           : ` ${r.underPar} players broke par.`;
     story.textContent = `${r.weatherLabel}, ${r.pinsLabel.toLowerCase()} pins. `
       + `${standing}${heading} The field averaged ${r.averageText} and the ${ordinal(r.hardestHole)} `
-      + `played hardest.${broke} Rounds took ${Math.round(r.averageRoundMinutes)} minutes`
+      + `played hardest.${broke} Rounds took ${r.roundMinutes} minutes`
       + `${r.paceOnTarget ? '' : ', which is over the pace target'}; the turf is at ${r.turfAfter}.`;
     round.appendChild(story);
     screen.appendChild(round);

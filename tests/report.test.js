@@ -297,6 +297,30 @@ test('a round day carries a round section, read off the round log', () => {
   assert.equal(r.tracking, 'on', 'leading +7 after two of four projects to +14, inside 12 to 18');
 });
 
+test('the round line cannot print a figure on the wrong side of its verdict', () => {
+  // The judge compares unrounded turf and pace. Rounded, a turf of 77.6
+  // printed "78" beside a failed turf condition (78 expected), and a round
+  // of 288.4 minutes printed "288 ..., which is over the pace target".
+  const { state, report } = runDay(newGame(77), 77);
+  report.tournamentRound = {
+    rung: 'regional', rounds: 3, round: 2, target: { low: 2, high: 8 },
+    weather: 'fair', pins: 'fair', leaderToPar: 3, averageToPar: 5, hardestHole: 4,
+    averageRoundMinutes: 288.4, paceOnTarget: false, turfAfter: 77.6,
+  };
+  const r = computeReportData(state, report).tournamentRound;
+  assert.equal(r.turfAfter, 77, '77.6 is under 78 and must not print as 78');
+  assert.equal(r.roundMinutes, 289, '288.4 is over 288 and must not print as 288');
+
+  // And the other way: a round on the target exactly prints the target.
+  report.tournamentRound = { ...report.tournamentRound, averageRoundMinutes: 288, paceOnTarget: true };
+  assert.equal(computeReportData(state, report).tournamentRound.roundMinutes, 288);
+
+  // The evening's turf rating sits on the same screen as the verdict.
+  report.turfQuality = 77.6;
+  const turf = computeReportData(state, report).ratings.find((x) => x.key === 'turfQuality');
+  assert.equal(turf.value, 77);
+});
+
 test('tracking says which way the winner is heading', () => {
   const { state, report } = runDay(newGame(75), 75);
   const base = {
