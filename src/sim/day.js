@@ -841,8 +841,10 @@ export function runDay(state, seed) {
         };
       }
       next.tournament = null;
-      // The conditions the week was judged ON, not only the verdict. The
-      // evening report wants to say "you set it to 53 and they wanted 45-60"
+      // The conditions the week was played and judged on, not only the
+      // verdict. The judge is the winning total and the floor; setup and
+      // band ride along as what the course was set to against what was
+      // suggested. The evening report wants to say "the winner finished +1"
       // and "the turf finished at 91", and by the time it renders, state has
       // moved on -- setup starts decaying the next morning. Recorded here,
       // where the day settled them, so the report reads rather than

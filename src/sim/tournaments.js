@@ -333,8 +333,9 @@ export function setupClimb(keepers = 0) {
  * a big crew slammed past the band and fell back through it, and the
  * course sat in a saw-tooth instead of at a level. Measured on a national
  * (band 80-92, target 86), nine groundskeepers left the course outside
- * the band on six days in twenty: a thirty per cent chance of losing the
- * largest bonus in the game on nothing but which day the event fell.
+ * the band on six days in twenty: while the band was the gate, a thirty
+ * per cent chance of losing the largest bonus in the game on nothing but
+ * which day the event fell.
  *
  * Capping the climb at the target was only half of it. Arrival switched
  * `conditioning` off, so the next morning decayed the course a full day
@@ -630,12 +631,13 @@ export function scoreTournament(rungId, {
     // Carried so the report can say WHY a winner inside the target still
     // missed: the course was under the rung's minimum.
     difficultyMet,
-    // Nothing below half the conditions is a week anybody wants repeated.
-    // And they give the rung to somebody else. Same rule as the money and
-    // the reputation: the target is whether a championship happened at
-    // all, so missing it is what "a poor tournament" means. A week that hit
-    // the target but fumbled the rest is a venue having a bad day, which is
-    // not the same thing and is not barred for it.
+    // A missed target -- the winner out of range, or the course under the
+    // floor -- gives the rung to somebody else for BAR_DAYS. Same rule as
+    // the money and the reputation: the target is whether a championship
+    // happened at all. A week that hit the target but fumbled the turf,
+    // pace or crowd is a venue having a bad day, and is not barred for it.
+    // A barred rung is not hosted (day.js), so it can be bid for again once
+    // the bar lifts.
     barDays: targetMet ? 0 : BAR_DAYS,
   };
 }

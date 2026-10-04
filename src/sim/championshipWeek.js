@@ -16,6 +16,8 @@
  */
 import { RUNGS } from './tournaments.js';
 import { courseDifficultyOf } from './hole.js';
+// A cycle with state.js, harmless: each side only uses the other's
+// exports inside functions, at call time (see the note in state.js).
 import { playableHoles } from './state.js';
 
 /**

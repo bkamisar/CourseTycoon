@@ -1,5 +1,8 @@
 import { makeHole } from './hole.js';
 import { emptyGoodwill } from './goodwill.js';
+// A cycle with championshipWeek.js, harmless: each side only uses the
+// other's exports inside functions (normaliseWeek in deserialize,
+// playableHoles in championshipStatus), at call time.
 import { normaliseWeek } from './championshipWeek.js';
 import { conditionEffects } from './conditions.js';
 import {
