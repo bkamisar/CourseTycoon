@@ -48,6 +48,7 @@ import { TEMPLATE_NAMES } from '../src/sim/templates.js';
 import { AMENITIES, BUILD_COSTS } from '../src/sim/economy.js';
 import { GATE_THRESHOLDS } from '../src/sim/acts.js';
 import { EVENTS } from '../src/sim/events.js';
+import { CHAMPIONSHIP_EVENTS } from '../src/sim/championshipEvents.js';
 import { menuPrep } from '../src/sim/menu.js';
 import { kitchenCapacity, kitchenLoad } from '../src/sim/kitchen.js';
 import { shopCapacity } from '../src/sim/shop.js';
@@ -66,6 +67,19 @@ import {
 import { normaliseWeek, weekUnderWay, withPins } from '../src/sim/championshipWeek.js';
 import { weatherOn, effectsOf } from '../src/sim/weather.js';
 import { narrowToDifficulty, reactivePins } from './championshipPolicy.js';
+
+/**
+ * A pending card's event, from either library: since the championship's
+ * own events (run-up spec 2026-10-04 §4) a booked evening can show one.
+ * Answered by the same rule as an ordinary card for now -- the pragmatic
+ * choice, which all but two championship events have; those two take
+ * their first, since their money is in `moneyDays` and the fallback's
+ * `money` reads 0 on every choice -- until the operator is given a
+ * championship policy of its own (plan Task 6).
+ */
+function eventById(id) {
+  return EVENTS.find((e) => e.id === id) ?? CHAMPIONSHIP_EVENTS.find((e) => e.id === id);
+}
 
 /**
  * Cash kept in hand at all times. Without a buffer the operator spends
@@ -299,7 +313,7 @@ export function play(startState, { greenFee, teeInterval, days = 150, seed = 1 }
     //    this at least picks consistently.
     const pending = result.report.pendingEvent;
     if (pending) {
-      const event = EVENTS.find((e) => e.id === pending.id);
+      const event = eventById(pending.id);
       const middle = event.choices.findIndex((c) => c.stance === 'pragmatic');
       const index = middle >= 0 ? middle
         : event.choices.reduce(
@@ -465,7 +479,7 @@ export function playActTwo(startState, {
 
     const pending = result.report.pendingEvent;
     if (pending) {
-      const event = EVENTS.find((e) => e.id === pending.id);
+      const event = eventById(pending.id);
       const middle = event.choices.findIndex((c) => c.stance === 'pragmatic');
       const index = middle >= 0 ? middle
         : event.choices.reduce(
@@ -924,7 +938,7 @@ export function playActThree(startState, {
 
     const pending = result.report.pendingEvent;
     if (pending) {
-      const event = EVENTS.find((e) => e.id === pending.id);
+      const event = eventById(pending.id);
       const middle = event.choices.findIndex((c) => c.stance === 'pragmatic');
       const index = middle >= 0 ? middle
         : event.choices.reduce(
