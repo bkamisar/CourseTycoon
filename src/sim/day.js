@@ -18,7 +18,10 @@ import { narrationContext, pickNarration, rememberNarration } from './narration.
 import { SEGMENT_KEYS } from './segments.js';
 import { emptyGoodwill, applyGoodwill, decayGoodwill } from './goodwill.js';
 import { EVENTS, SPEAKERS as EVENT_SPEAKERS, eventContext, pickEvent, rememberEvent } from './events.js';
-import { CHAMPIONSHIP_EVENTS, resolveChoice } from './championshipEvents.js';
+import {
+  CHAMPIONSHIP_EVENTS, resolveChoice, drawEventPlan, eventPlanSeed, plannedPhase,
+  pickChampionshipEvent, rememberChampionshipEvent,
+} from './championshipEvents.js';
 import { shopCapacity, shopServiceFactor, hasShopCounter } from './shop.js';
 import { weatherOn, forecast, effectsOf } from './weather.js';
 import {
@@ -945,9 +948,60 @@ export function runDay(state, seed) {
   // A decision event must never be dismissable with a default — the choice
   // sits in report.pendingEvent until the player answers it; nothing here
   // applies it automatically.
+  //
+  // Act III adds the championship's own events, on a rhythm (run-up spec
+  // §4): one or two evenings of the run-up, and at least one evening of the
+  // week, drawn once per booking (`drawEventPlan`). One card an evening, so
+  // an ordinary event does not roll on an evening the championship has a
+  // card, on a round day (the course is closed and the evening is the
+  // championship's), or on the practice-round evening (it has its own
+  // card). The final round's evening gets nothing: by now the booking is
+  // resolved and null, and with no round left a week event has nothing to
+  // move.
+  //
+  // The ordinary roll is drawn every day, first, exactly where it always
+  // was, so an ordinary day's draws -- the roll, then `pickEvent` -- are
+  // unchanged; only an evening that has stopped being ordinary uses what
+  // comes after it differently.
   const seenEvents = next.eventsSeen ?? [];
+  const ordinaryRoll = rng.chance(EVENT_CHANCE_PER_DAY);
+  const bookedTonight = next.tournament && !next.tournament.resolved
+    ? normaliseWeek(next.tournament) : null;
+  if (bookedTonight && !bookedTonight.eventPlan) {
+    // On a seed of its own (`eventPlanSeed`), not the day's rng, so the
+    // evening it is drawn on is otherwise the evening it would have been.
+    // Tonight is the booked day: bookings are made in the morning
+    // (`bidFor`), and this is the first evening to see one.
+    next.tournament = {
+      ...next.tournament,
+      eventPlan: drawEventPlan(makeRng(eventPlanSeed(next.seed, bookedTonight.day)), {
+        bookedDay: next.day,
+        firstRoundDay: bookedTonight.day,
+        rounds: bookedTonight.rounds,
+      }),
+    };
+  }
+  const championshipEvening = bookedTonight
+    ? plannedPhase(next.tournament.eventPlan, next.day) : null;
+  // Keyed on the day, not on whether the forecast has been taken yet, so
+  // the evening is the practice round's whether or not it is held.
+  const practiceEvening = Boolean(bookedTonight)
+    && next.day === bookedTonight.day - PRACTICE_DAYS_BEFORE;
   let pendingEvent = null;
-  if (rng.chance(EVENT_CHANCE_PER_DAY)) {
+  let championshipEvent = null;
+  if (championshipEvening) {
+    const seenChampionship = next.championshipEventsSeen ?? [];
+    championshipEvent = pickChampionshipEvent(
+      eventContext({ report, previousReport: next.history.at(-1), state: next }),
+      rng,
+      seenChampionship
+    );
+    if (championshipEvent) {
+      pendingEvent = pendingEventFor(championshipEvent, next);
+      next.championshipEventsSeen = rememberChampionshipEvent(seenChampionship, championshipEvent.id);
+    }
+  }
+  if (!pendingEvent && ordinaryRoll && !championshipToday && !practiceEvening) {
     const picked = pickEvent(
       eventContext({ report, previousReport: next.history.at(-1), state: next }),
       rng,
@@ -956,7 +1010,8 @@ export function runDay(state, seed) {
     if (picked) pendingEvent = pendingEventFor(picked, next);
   }
   report.pendingEvent = pendingEvent;
-  next.eventsSeen = rememberEvent(seenEvents, pendingEvent?.id);
+  // The ordinary memory is for ordinary events only.
+  next.eventsSeen = rememberEvent(seenEvents, championshipEvent ? null : pendingEvent?.id);
 
   // The investors. Nothing here touches confidence except a review, and
   // the target assessed is the object the player was shown a fortnight

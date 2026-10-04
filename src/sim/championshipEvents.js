@@ -1,6 +1,7 @@
 import { effectAxes } from './events.js';
 import { PINS } from './championshipWeek.js';
 import { RUNGS } from './tournaments.js';
+import { PRACTICE_DAYS_BEFORE } from './practiceRound.js';
 
 /**
  * The championship's own decision events (spec 2026-10-04 §4).
@@ -675,8 +676,131 @@ export function pacePhrase(pace) {
  */
 export function pendingEffectNote({ eventHandicap = 0, eventPace = 1 } = {}) {
   const parts = [];
-  if (eventHandicap) parts.push(`this round plays ${pinSettingPhrase(eventHandicap)}`);
+  if (eventHandicap) parts.push(`it plays ${pinSettingPhrase(eventHandicap)}`);
   if (eventPace !== 1) parts.push(pacePhrase(eventPace));
   if (parts.length === 0) return null;
-  return `Last night’s call: ${parts.join(', and ')}.`;
+  // Said without a when: the sheet shows it the evening the card was
+  // answered and again the next morning, and "last night" was wrong for
+  // the first of those.
+  return `Called for this round: ${parts.join(', and ')}.`;
+}
+
+// --- The rhythm (spec §4 "The rhythm") ------------------------------------
+
+/**
+ * The seed a booking's event plan is drawn from: the save's seed and the
+ * first round's day, which no two bookings share (a barred rung retried is
+ * a new first round). Its own seed rather than the day's rng, so drawing
+ * the plan moves no other number in the day it is drawn on (the same
+ * reasoning as `practiceSeed`, practiceRound.js). The multipliers are
+ * swapped from `practiceSeed`'s and the offset differs, so the two never
+ * land on one seed for a booking's practice evening (tested).
+ */
+export function eventPlanSeed(stateSeed, firstRoundDay) {
+  return ((stateSeed ?? 1) * 104729 + firstRoundDay * 7919 + 31) >>> 0;
+}
+
+/**
+ * Which evenings of a booking get a championship card.
+ *
+ * The run-up: one evening drawn evenly from the booked day to two days
+ * before round 1, less the practice evening (it has its own card), and a
+ * 50% chance of a second on a different evening. So one or two in three
+ * weeks, the rest of the run-up left to ordinary events.
+ *
+ * The week: the eve of round 1 and each round's evening but the last's --
+ * every evening with a round still to come, which is what a week event is
+ * about (its `nextRound` is tomorrow's). Each kept at 50%, and if none is,
+ * one of them is chosen, so every week has at least one. The last round's
+ * evening is never one: the verdict is in and the booking gone by then.
+ *
+ * Evenings before `bookedDay` are not offered, so a booking made late (or
+ * a save from before plans, picked up mid-week) only draws from the
+ * evenings it still has. Returns `{ runUp: [day...], week: [day...] }`,
+ * each in day order.
+ */
+export function drawEventPlan(rng, { bookedDay, firstRoundDay, rounds }) {
+  const practiceEvening = firstRoundDay - PRACTICE_DAYS_BEFORE;
+  const runUpEvenings = [];
+  for (let d = bookedDay; d <= firstRoundDay - 2; d++) {
+    if (d !== practiceEvening) runUpEvenings.push(d);
+  }
+  const runUp = [];
+  if (runUpEvenings.length > 0) {
+    const first = runUpEvenings[rng.int(runUpEvenings.length)];
+    runUp.push(first);
+    if (rng.chance(0.5) && runUpEvenings.length > 1) {
+      const rest = runUpEvenings.filter((d) => d !== first);
+      runUp.push(rest[rng.int(rest.length)]);
+    }
+  }
+
+  const weekEvenings = [];
+  for (let d = Math.max(bookedDay, firstRoundDay - 1); d <= firstRoundDay + rounds - 2; d++) {
+    weekEvenings.push(d);
+  }
+  const week = weekEvenings.filter(() => rng.chance(0.5));
+  if (week.length === 0 && weekEvenings.length > 0) {
+    week.push(weekEvenings[rng.int(weekEvenings.length)]);
+  }
+
+  return { runUp: runUp.sort((a, b) => a - b), week };
+}
+
+/** 'runUp', 'week', or null: whether an evening has a card in the plan. */
+export function plannedPhase(plan, day) {
+  if (plan?.runUp?.includes(day)) return 'runUp';
+  if (plan?.week?.includes(day)) return 'week';
+  return null;
+}
+
+/**
+ * Tonight's championship event, mirroring `pickEvent` (events.js): the
+ * evening's phase's pool (`context.championship.phase`: the eve of round 1
+ * on is the week), eligible by `when`, unseen first, and only once every
+ * eligible one has been shown is one repeated. Null with nothing booked.
+ *
+ * The phase comes from the context, not the plan, and the two agree by
+ * construction: a plan's run-up evenings all fall before the eve of round
+ * 1 and its week evenings on or after it. That is what keeps a week
+ * event's `nextRound` from being offered three weeks before a round.
+ */
+export function pickChampionshipEvent(context, rng, seen = []) {
+  const phase = context?.championship?.phase;
+  if (!phase) return null;
+  const eligible = CHAMPIONSHIP_EVENTS.filter((event) => {
+    if (event.phase !== phase) return false;
+    try {
+      return event.when(context);
+    } catch {
+      return false;
+    }
+  });
+  if (eligible.length === 0) return null;
+  const recent = new Set(seen);
+  const unseen = eligible.filter((event) => !recent.has(event.id));
+  const pool = unseen.length > 0 ? unseen : eligible;
+  return pool[rng.int(pool.length)];
+}
+
+/**
+ * The save's championship memory (`state.championshipEventsSeen`) after
+ * showing `id`.
+ *
+ * Kept for the whole ladder, not per booking, so a Regional does not open
+ * with the County's mower. Once every event in a phase's pool has been
+ * shown, that phase starts over with only the one just shown remembered,
+ * so the cycle begins again without it coming straight back. Unlike
+ * `rememberEvent` there is no fixed length: the pools are seven and nine,
+ * and the cycle is what bounds it.
+ */
+export function rememberChampionshipEvent(seen = [], id) {
+  const event = CHAMPIONSHIP_EVENTS.find((e) => e.id === id);
+  if (!event || seen.includes(id)) return seen;
+  const next = [...seen, id];
+  const pool = CHAMPIONSHIP_EVENTS.filter((e) => e.phase === event.phase).map((e) => e.id);
+  if (pool.every((poolId) => next.includes(poolId))) {
+    return [...next.filter((x) => !pool.includes(x)), id];
+  }
+  return next;
 }

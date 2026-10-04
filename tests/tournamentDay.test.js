@@ -4,7 +4,8 @@ import {
   newGame, serialize, deserialize, playableHoles, playableHolesOn, openHoles,
 } from '../src/sim/state.js';
 import { runDay, applyEventChoice } from '../src/sim/day.js';
-import { CHAMPIONSHIP_EVENTS } from '../src/sim/championshipEvents.js';
+import { CHAMPIONSHIP_EVENTS, drawEventPlan, eventPlanSeed } from '../src/sim/championshipEvents.js';
+import { makeRng } from '../src/sim/rng.js';
 import { makeHole, courseDifficultyOf } from '../src/sim/hole.js';
 import {
   RUNGS, RUN_UP_DAYS, TURF_EXPECTED, BAR_DAYS, conditioningCostPerDay, bidFor, nextRungFor,
@@ -1291,10 +1292,246 @@ test('the sheet shows a pending next-round effect beside the pins', () => {
   const pending = computeChampionshipData(evented).booked;
   assert.equal(pending.eventHandicap, -0.375);
   assert.equal(pending.eventPace, slowing.c.effects.nextRound.pace);
-  assert.equal(pending.pendingEffect, `Last night’s call: this round plays half a pin setting easier, `
+  assert.equal(pending.pendingEffect, `Called for this round: it plays half a pin setting easier, `
     + `and every hole plays ${Math.round((slowing.c.effects.nextRound.pace - 1) * 100)}% slower.`);
 
   // And gone once the round has used it.
   const played = runDay(evented, 8601).state;
   assert.equal(computeChampionshipData(played).booked.pendingEffect, null);
+});
+
+// --- The championship's rhythm (run-up spec 2026-10-04 §4) ----------------
+
+const CHAMPIONSHIP_BY_ID = new Map(CHAMPIONSHIP_EVENTS.map((e) => [e.id, e]));
+const RHYTHM_SEEDS = 30;
+
+/**
+ * A booking at `rungId` made this morning, three weeks out, played from
+ * the booked day to the verdict. Every championship card is answered, with
+ * a choice that moves the next round where the event has one (so a test
+ * can follow it there); ordinary cards are left, as a player who ignores
+ * them would leave them. Each evening keeps the state the day ended on,
+ * before any answer.
+ *
+ * `practice: false` books the week with its practice round already on it,
+ * so the evening skips the forecast -- half the cost of a run-up in this
+ * test -- while still being the practice evening: what keeps ordinary
+ * events off it is the day, not whether the forecast has been taken.
+ */
+function playRhythm(rungId, seed, { practice = true } = {}) {
+  let state = atMinimum(nationalReady(seed), rungId);
+  state.resort.setup = 40;
+  state.resort.setupTarget = Math.round((RUNGS[rungId].band.low + RUNGS[rungId].band.high) / 2);
+  state.tournament = newWeek(rungId, state.day + RUN_UP_DAYS);
+  if (!practice) {
+    state.tournament.practice = { day: 0, setupAtRoundOne: 0, difficulty: 0, median: 0, low: 0, high: 0, samples: 0 };
+  }
+  const booking = { bookedDay: state.day, firstRoundDay: state.tournament.day, rounds: state.tournament.rounds };
+  let plan = null;
+  const evenings = [];
+  for (let i = 0; state.tournament && i < 40; i++) {
+    const { state: after, report } = runDay(state, seed * 1000 + i);
+    plan = plan ?? after.tournament?.eventPlan ?? null;
+    const pending = report.pendingEvent;
+    const event = pending ? CHAMPIONSHIP_BY_ID.get(pending.id) : null;
+    let next = after;
+    let champ = null;
+    if (event) {
+      const moving = event.choices.findIndex((c) => c.effects.nextRound);
+      const index = moving >= 0 ? moving : 0;
+      next = applyEventChoice(after, pending.id, index);
+      champ = { id: event.id, phase: event.phase, index, nextRound: event.choices[index].effects.nextRound ?? null };
+    }
+    evenings.push({ day: report.day, report, after, champ, ordinary: Boolean(pending && !event) });
+    state = next;
+  }
+  return { ...booking, seed, practice, plan, evenings, final: state };
+}
+
+/** Every rung, played over RHYTHM_SEEDS seeds; computed once and shared.
+ * The first five per rung hold the real practice round. */
+let rhythmRuns = null;
+function rhythm() {
+  if (!rhythmRuns) {
+    rhythmRuns = [];
+    for (const rungId of ['countyOpen', 'regional', 'national']) {
+      for (let seed = 1; seed <= RHYTHM_SEEDS; seed++) {
+        rhythmRuns.push({ rungId, ...playRhythm(rungId, 700 + seed, { practice: seed <= 5 }) });
+      }
+    }
+  }
+  return rhythmRuns;
+}
+
+test('every championship gets its events, on the rhythm the plan drew', () => {
+  const tally = {};
+  for (const run of rhythm()) {
+    const { rungId, bookedDay, firstRoundDay, rounds, plan, evenings, seed } = run;
+    const where = `${rungId} seed ${seed}`;
+    const lastRound = firstRoundDay + rounds - 1;
+    assert.equal(evenings.at(-1).day, lastRound, `${where}: sanity, played to the verdict`);
+    assert.ok(evenings.at(-1).report.tournament, `${where}: sanity, and judged`);
+
+    // The plan is the documented draw, on a seed of its own.
+    assert.deepEqual(plan, drawEventPlan(makeRng(eventPlanSeed(seed, firstRoundDay)),
+      { bookedDay, firstRoundDay, rounds }), where);
+
+    const champDays = evenings.filter((e) => e.champ).map((e) => e.day);
+    assert.deepEqual(champDays, [...plan.runUp, ...plan.week], `${where}: a card on every planned evening, and only then`);
+    const runUp = evenings.filter((e) => e.champ?.phase === 'runUp');
+    const week = evenings.filter((e) => e.champ?.phase === 'week');
+    assert.ok(runUp.length === 1 || runUp.length === 2, `${where}: ${runUp.length} run-up events`);
+    assert.ok(week.length >= 1, `${where}: a week with no event`);
+
+    for (const e of evenings) {
+      const isRound = e.day >= firstRoundDay;
+      // A run-up evening shows a run-up event and a week evening a week
+      // one, so a next-round effect can never wait three weeks for round 1.
+      if (e.champ) {
+        assert.equal(e.champ.phase, e.day <= firstRoundDay - 2 ? 'runUp' : 'week', `${where}, day ${e.day}`);
+      }
+      // No ordinary event on a round day, the practice evening, or any
+      // evening the championship had a card (one slot, so one card).
+      if (e.ordinary) {
+        assert.ok(!isRound, `${where}: an ordinary event on round day ${e.day}`);
+        assert.notEqual(e.day, firstRoundDay - PRACTICE_DAYS_BEFORE, `${where}: on the practice evening`);
+      }
+      if (run.practice && e.day === firstRoundDay - PRACTICE_DAYS_BEFORE) {
+        assert.ok(e.report.practiceRound, `${where}: sanity, practice held`);
+      }
+      // Nothing on the final round's evening: there is no round left to
+      // affect, and the booking has already gone.
+      if (e.day === lastRound) assert.equal(e.report.pendingEvent, null, `${where}: a card after the verdict`);
+    }
+
+    // A week event's next-round effect lands on the very next round.
+    for (const e of evenings.filter((x) => x.champ?.nextRound)) {
+      const tomorrow = evenings.find((x) => x.day === e.day + 1);
+      assert.ok(tomorrow?.report.tournamentRound, `${where}: no round the day after ${e.day}`);
+      assert.equal(tomorrow.report.tournamentRound.eventHandicap, e.champ.nextRound.handicap ?? 0, where);
+      assert.equal(tomorrow.report.tournamentRound.eventPace, e.champ.nextRound.pace ?? 1, where);
+    }
+
+    const t = (tally[rungId] ??= { runs: 0, runUp: 0, week: 0, ordinaryRunUp: 0, runUpTwo: 0, nextRound: 0 });
+    t.runs += 1;
+    t.runUp += runUp.length;
+    t.week += week.length;
+    t.runUpTwo += runUp.length === 2 ? 1 : 0;
+    t.ordinaryRunUp += evenings.filter((e) => e.ordinary).length;
+    t.nextRound += evenings.filter((e) => e.champ?.nextRound).length;
+  }
+  // Ordinary run-up days are still ordinary days.
+  for (const [rungId, t] of Object.entries(tally)) {
+    assert.ok(t.ordinaryRunUp > 0, `${rungId}: no ordinary event in any run-up`);
+    assert.ok(t.nextRound > 0, `${rungId}: sanity, a next-round effect was followed`);
+  }
+  if (process.env.RHYTHM_REPORT) console.log(JSON.stringify(tally));
+});
+
+test('no championship event repeats within a booking, and the save remembers each', () => {
+  for (const run of rhythm()) {
+    const ids = run.evenings.filter((x) => x.champ).map((x) => x.champ.id);
+    assert.equal(new Set(ids).size, ids.length, `${run.rungId} seed ${run.seed}: ${ids}`);
+    assert.deepEqual(run.final.championshipEventsSeen, ids);
+    // The ordinary memory never hears of them.
+    for (const id of ids) assert.ok(!run.final.eventsSeen.includes(id), id);
+  }
+});
+
+test('a ladder\'s second booking draws from what the first left unseen', () => {
+  // The County's events, remembered on the save, are not offered at the
+  // Regional while the Regional has others to show.
+  const county = rhythm().find((r) => r.rungId === 'countyOpen' && r.seed === 702);
+  const shownAtCounty = new Set(county.final.championshipEventsSeen);
+  let state = atMinimum(nationalReady(702), 'regional');
+  state.championshipEventsSeen = [...county.final.championshipEventsSeen];
+  state.tournament = newWeek('regional', state.day + RUN_UP_DAYS);
+  for (let i = 0; state.tournament && i < 40; i++) {
+    const { state: after, report } = runDay(state, 70200 + i);
+    const event = report.pendingEvent && CHAMPIONSHIP_BY_ID.get(report.pendingEvent.id);
+    if (event) assert.ok(!shownAtCounty.has(event.id), `${event.id} again at the Regional`);
+    state = event ? applyEventChoice(after, event.id, 0) : after;
+  }
+});
+
+test('a plan is drawn once, the same every time, and survives a save', () => {
+  const a = playRhythm('regional', 731);
+  const b = playRhythm('regional', 731);
+  assert.deepEqual(a.plan, b.plan);
+  assert.deepEqual(a.evenings.map((e) => e.report.pendingEvent), b.evenings.map((e) => e.report.pendingEvent));
+  // Stored on the booking from the first evening, and never redrawn.
+  for (const e of a.evenings.slice(0, -1)) assert.deepEqual(e.after.tournament.eventPlan, a.plan, `day ${e.day}`);
+
+  // A save on every run-up and week evening reloads and plays on the same.
+  for (const [i, e] of a.evenings.entries()) {
+    if (!e.after.tournament) continue;
+    const reloaded = deserialize(serialize(e.after));
+    assert.deepEqual(reloaded.tournament.eventPlan, a.plan);
+    const seed = 731 * 1000 + i + 1;
+    const fromSave = runDay(reloaded, seed);
+    const straight = runDay(e.after, seed);
+    assert.deepEqual(fromSave.report.pendingEvent, straight.report.pendingEvent, `after day ${e.day}`);
+    assert.deepEqual(fromSave.state.championshipEventsSeen, straight.state.championshipEventsSeen);
+  }
+});
+
+test('a save taken with a championship card unanswered reloads and answers the same', () => {
+  let checked = 0;
+  for (const run of rhythm().filter((r) => r.seed <= 705)) {
+    for (const e of run.evenings.filter((x) => x.champ)) {
+      const reloaded = deserialize(serialize(e.after));
+      const pending = reloaded.history.at(-1).pendingEvent;
+      assert.deepEqual(pending, e.report.pendingEvent, 'the card is still waiting');
+      pending.choices.forEach((choice, index) => {
+        assert.deepEqual(applyEventChoice(reloaded, pending.id, index), applyEventChoice(e.after, pending.id, index),
+          `${pending.id} choice ${index}`);
+      });
+      checked += 1;
+    }
+  }
+  assert.ok(checked >= 20, `sanity: ${checked} cards checked`);
+});
+
+test('drawing the plan changes no other number in the day', () => {
+  // The booked day run twice: once drawing its plan, and once with that
+  // plan already on the booking. The plan has a seed of its own, so the
+  // day's rng -- and everything drawn from it -- must not notice.
+  for (const seed of [741, 742, 743, 744]) {
+    const state = atMinimum(nationalReady(seed), 'regional');
+    state.tournament = newWeek('regional', state.day + RUN_UP_DAYS);
+    const drawn = runDay(state, seed * 3);
+    const planned = structuredClone(state);
+    planned.tournament.eventPlan = drawn.state.tournament.eventPlan;
+    const again = runDay(planned, seed * 3);
+    assert.deepEqual(again.report, drawn.report);
+    assert.deepEqual(again.state, drawn.state);
+  }
+});
+
+test('a planned evening\'s card takes the ordinary event\'s slot and leaves the rest of the day alone', () => {
+  // Same state, booked: once with tonight in the plan, once with a plan
+  // that leaves tonight alone. The ordinary roll is drawn from the day's
+  // rng at the same point either way, so on the day it is left alone the
+  // ordinary event is the one a resort with no championship card would
+  // roll -- checked by finding an evening whose ordinary roll came up.
+  let rolled = 0;
+  for (let seed = 751; seed < 791 && rolled < 3; seed++) {
+    const state = atMinimum(nationalReady(seed), 'regional');
+    state.tournament = newWeek('regional', state.day + RUN_UP_DAYS);
+    const day = state.day;
+    state.tournament.eventPlan = { runUp: [day + 5], week: [state.tournament.day] };
+    const ordinary = runDay(state, seed);
+    if (!ordinary.report.pendingEvent) continue;
+    rolled += 1;
+    assert.ok(!CHAMPIONSHIP_BY_ID.has(ordinary.report.pendingEvent.id), 'an ordinary event');
+    // And with tonight planned, the championship's card takes the slot.
+    state.tournament.eventPlan = { runUp: [day], week: [state.tournament.day] };
+    const planned = runDay(state, seed);
+    assert.equal(CHAMPIONSHIP_BY_ID.get(planned.report.pendingEvent.id)?.phase, 'runUp');
+    assert.deepEqual(planned.state.eventsSeen, state.eventsSeen, 'and the ordinary memory is untouched');
+    // Everything else the day computed is the same.
+    assert.deepEqual(planned.report.revenue, ordinary.report.revenue);
+    assert.deepEqual(planned.report.narration, ordinary.report.narration);
+  }
+  assert.equal(rolled, 3, 'sanity: found evenings whose ordinary roll came up');
 });

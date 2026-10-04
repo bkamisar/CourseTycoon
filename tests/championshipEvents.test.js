@@ -5,8 +5,11 @@ import { EVENTS, SPEAKERS, STANCES, eventContext } from '../src/sim/events.js';
 import {
   CHAMPIONSHIP_EVENTS, championshipAxes, ORDERED_AXES, UNORDERED_AXES,
   pinSettingPhrase, pacePhrase, resolveChoice, pendingEffectNote,
+  drawEventPlan, eventPlanSeed, pickChampionshipEvent, rememberChampionshipEvent,
 } from '../src/sim/championshipEvents.js';
-import { newGame } from '../src/sim/state.js';
+import { newGame, serialize, deserialize } from '../src/sim/state.js';
+import { makeRng } from '../src/sim/rng.js';
+import { PRACTICE_DAYS_BEFORE, practiceSeed } from '../src/sim/practiceRound.js';
 import { newWeek } from '../src/sim/championshipWeek.js';
 import { RUNGS, RUNG_IDS, contractFor } from '../src/sim/tournaments.js';
 import { applyEventChoice, pendingEventFor } from '../src/sim/day.js';
@@ -399,9 +402,173 @@ test('the sheet\'s pending line says what the cards said', () => {
   assert.equal(pendingEffectNote({ eventHandicap: 0, eventPace: 1 }), null);
   assert.equal(pendingEffectNote({}), null);
   assert.equal(pendingEffectNote({ eventHandicap: -0.375, eventPace: 1.04 }),
-    'Last night’s call: this round plays half a pin setting easier, and every hole plays 4% slower.');
+    'Called for this round: it plays half a pin setting easier, and every hole plays 4% slower.');
   assert.equal(pendingEffectNote({ eventHandicap: 0.75, eventPace: 1 }),
-    'Last night’s call: this round plays a whole pin setting harder.');
+    'Called for this round: it plays a whole pin setting harder.');
   assert.equal(pendingEffectNote({ eventHandicap: 0, eventPace: 1.02 }),
-    'Last night’s call: every hole plays 2% slower.');
+    'Called for this round: every hole plays 2% slower.');
+  // Read the evening the card was answered as well as the next morning, so
+  // it must not say when the call was made.
+  for (const note of [pendingEffectNote({ eventHandicap: 0.375 }), pendingEffectNote({ eventPace: 1.03 })]) {
+    assert.doesNotMatch(note, /night|tonight|yesterday|today/i, note);
+  }
+});
+
+// --- The rhythm (run-up spec §4 "The rhythm") -------------------------------
+
+/** The run-up evenings a plan may use, and the week's, for a booking. */
+function eveningsFor({ bookedDay, firstRoundDay, rounds }) {
+  const runUp = [];
+  for (let d = bookedDay; d <= firstRoundDay - 2; d++) {
+    if (d !== firstRoundDay - PRACTICE_DAYS_BEFORE) runUp.push(d);
+  }
+  const week = [];
+  for (let d = Math.max(bookedDay, firstRoundDay - 1); d <= firstRoundDay + rounds - 2; d++) week.push(d);
+  return { runUp, week };
+}
+
+test('a plan gives the run-up one or two evenings and every week at least one', () => {
+  const runUpSizes = new Map();
+  const weekSizes = new Map();
+  const runUpDays = new Set();
+  for (const rounds of [2, 3, 4]) {
+    for (let seed = 1; seed <= 300; seed++) {
+      const booking = { bookedDay: 100, firstRoundDay: 121, rounds };
+      const plan = drawEventPlan(makeRng(seed), booking);
+      const allowed = eveningsFor(booking);
+      assert.ok(plan.runUp.length === 1 || plan.runUp.length === 2, `run-up ${plan.runUp}`);
+      assert.equal(new Set(plan.runUp).size, plan.runUp.length, 'two different evenings');
+      assert.ok(plan.week.length >= 1 && plan.week.length <= rounds, `week ${plan.week}`);
+      assert.equal(new Set(plan.week).size, plan.week.length);
+      for (const d of plan.runUp) assert.ok(allowed.runUp.includes(d), `run-up evening ${d}`);
+      for (const d of plan.week) assert.ok(allowed.week.includes(d), `week evening ${d}`);
+      // Never the practice evening; the eve of round 1 is the week's; and
+      // never the last round's evening, which has no round after it.
+      assert.ok(!plan.runUp.includes(121 - PRACTICE_DAYS_BEFORE));
+      assert.ok(!plan.runUp.includes(120));
+      assert.ok(!plan.week.includes(121 + rounds - 1));
+      assert.deepEqual(plan.runUp, [...plan.runUp].sort((a, b) => a - b), 'in order');
+      assert.deepEqual(plan.week, [...plan.week].sort((a, b) => a - b), 'in order');
+      assert.deepEqual(drawEventPlan(makeRng(seed), booking), plan, 'deterministic');
+      runUpSizes.set(plan.runUp.length, (runUpSizes.get(plan.runUp.length) ?? 0) + 1);
+      const key = `${rounds}:${plan.week.length}`;
+      weekSizes.set(key, (weekSizes.get(key) ?? 0) + 1);
+      for (const d of plan.runUp) runUpDays.add(d);
+    }
+  }
+  // Half the run-ups get a second event, near enough.
+  const twos = runUpSizes.get(2) / 900;
+  assert.ok(twos > 0.42 && twos < 0.58, `second run-up event in ${(twos * 100).toFixed(0)}%`);
+  // Every evening the run-up offers is drawn some of the time.
+  assert.equal(runUpDays.size, eveningsFor({ bookedDay: 100, firstRoundDay: 121, rounds: 2 }).runUp.length);
+  // A four-round week can have every evening, or just one.
+  assert.ok(weekSizes.get('4:4') > 0 && weekSizes.get('4:1') > 0);
+});
+
+test('a late booking draws only the evenings it still has', () => {
+  for (let seed = 1; seed <= 50; seed++) {
+    // Five days out: the run-up evenings left are d..d+3 (the practice
+    // evening has already gone by).
+    const late = drawEventPlan(makeRng(seed), { bookedDay: 116, firstRoundDay: 121, rounds: 3 });
+    assert.ok(late.runUp.length >= 1);
+    for (const d of late.runUp) assert.ok(d >= 116 && d <= 119, `${d}`);
+    assert.ok(late.week.length >= 1);
+    // Booked on the eve of round 1: no run-up left at all.
+    const eve = drawEventPlan(makeRng(seed), { bookedDay: 120, firstRoundDay: 121, rounds: 3 });
+    assert.deepEqual(eve.runUp, []);
+    assert.ok(eve.week.length >= 1 && eve.week.every((d) => d >= 120 && d <= 122));
+    // A week already under way (a save from before plans existed) gets
+    // only the round evenings it has left.
+    const midWeek = drawEventPlan(makeRng(seed), { bookedDay: 122, firstRoundDay: 121, rounds: 4 });
+    assert.deepEqual(midWeek.runUp, []);
+    assert.ok(midWeek.week.length >= 1 && midWeek.week.every((d) => d >= 122 && d <= 123));
+    // And on its last round, nothing.
+    assert.deepEqual(drawEventPlan(makeRng(seed), { bookedDay: 124, firstRoundDay: 121, rounds: 4 }),
+      { runUp: [], week: [] });
+  }
+});
+
+test('the plan has a seed of its own, apart from the practice round\'s', () => {
+  assert.equal(eventPlanSeed(7, 121), eventPlanSeed(7, 121));
+  assert.notEqual(eventPlanSeed(7, 121), eventPlanSeed(8, 121), 'another save');
+  assert.notEqual(eventPlanSeed(7, 121), eventPlanSeed(7, 150), 'another booking');
+  for (let seed = 1; seed < 40; seed++) {
+    for (let day = 20; day < 400; day += 7) {
+      assert.notEqual(eventPlanSeed(seed, day), practiceSeed(seed, day - PRACTICE_DAYS_BEFORE));
+    }
+  }
+});
+
+function champContext(phase, rung = 'regional', weather = 'fair') {
+  return { weather, championship: { rung, phase, round: 1, rounds: 3, daysToRoundOne: 5, setup: 50 } };
+}
+
+test('a run-up evening draws a run-up event and a week evening a week event', () => {
+  // So a `nextRound` effect can never be offered in the run-up, where it
+  // would sit on the week until round 1.
+  for (const rung of ['countyOpen', 'regional', 'national']) {
+    for (const weather of ['clear', 'fair', 'drizzle', 'rain', 'storm', 'blowy']) {
+      for (let seed = 1; seed <= 40; seed++) {
+        const runUp = pickChampionshipEvent(champContext('runUp', rung, weather), makeRng(seed));
+        assert.equal(runUp.phase, 'runUp', runUp.id);
+        assert.ok(runUp.when(champContext('runUp', rung, weather)), `${runUp.id} eligible`);
+        const week = pickChampionshipEvent(champContext('week', rung, weather), makeRng(seed));
+        assert.equal(week.phase, 'week', week.id);
+        assert.ok(week.when(champContext('week', rung, weather)), `${week.id} eligible`);
+      }
+    }
+  }
+  assert.equal(pickChampionshipEvent({ weather: 'fair', championship: null }, makeRng(1)), null,
+    'nothing booked, nothing drawn');
+});
+
+test('a championship event is not repeated until its phase\'s pool is used up', () => {
+  for (const phase of ['runUp', 'week']) {
+    const pool = CHAMPIONSHIP_EVENTS.filter((e) => e.phase === phase);
+    for (const weather of ['clear', 'rain']) {
+      const context = champContext(phase, 'regional', weather);
+      const eligible = pool.filter((e) => e.when(context));
+      for (let seed = 1; seed <= 20; seed++) {
+        const rng = makeRng(seed);
+        let seen = [];
+        const shown = [];
+        for (let i = 0; i < eligible.length; i++) {
+          const picked = pickChampionshipEvent(context, rng, seen);
+          shown.push(picked.id);
+          seen = rememberChampionshipEvent(seen, picked.id);
+        }
+        assert.equal(new Set(shown).size, eligible.length, `${phase} in ${weather}: ${shown}`);
+        // And then they come round again.
+        const again = pickChampionshipEvent(context, rng, seen);
+        assert.ok(eligible.some((e) => e.id === again.id));
+      }
+    }
+  }
+});
+
+test('the memory starts a phase over once all of it has been seen, and keeps the other phase', () => {
+  const runUp = CHAMPIONSHIP_EVENTS.filter((e) => e.phase === 'runUp').map((e) => e.id);
+  const week = CHAMPIONSHIP_EVENTS.filter((e) => e.phase === 'week').map((e) => e.id);
+  let seen = rememberChampionshipEvent([], week[0]);
+  for (const id of runUp) seen = rememberChampionshipEvent(seen, id);
+  // The last of the run-up pool begins a new round of it, so it is not
+  // shown again first; the week's memory is untouched.
+  assert.deepEqual(seen, [week[0], runUp.at(-1)]);
+  assert.deepEqual(rememberChampionshipEvent(seen, null), seen);
+  assert.deepEqual(rememberChampionshipEvent(seen, 'not-an-event'), seen);
+  assert.deepEqual(rememberChampionshipEvent(seen, week[0]), seen, 'seen once is seen');
+});
+
+test('the championship memory starts empty and survives a save, old or new', () => {
+  const state = newGame(4);
+  assert.deepEqual(state.championshipEventsSeen, []);
+  state.championshipEventsSeen = ['champ-greens-mower'];
+  assert.deepEqual(deserialize(serialize(state)).championshipEventsSeen, ['champ-greens-mower']);
+  const old = JSON.parse(serialize(newGame(4)));
+  delete old.championshipEventsSeen;
+  assert.deepEqual(deserialize(JSON.stringify(old)).championshipEventsSeen, []);
+});
+
+test('a booking starts with no plan', () => {
+  assert.equal(newWeek('regional', 50).eventPlan, null);
 });

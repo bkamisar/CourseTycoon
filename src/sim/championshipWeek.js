@@ -85,6 +85,13 @@ export function newWeek(rungId, day) {
     // too late to have one. Kept, not recomputed, so the sheet shows what
     // the card said.
     practice: null,
+    // Which evenings get a championship event: { runUp: [day...], week:
+    // [day...] } (championshipEvents.js `drawEventPlan`). Drawn by `runDay`
+    // on the first evening it sees the booking and kept, so it is the same
+    // after a save; null until then. Which events have been shown is the
+    // save's (`state.championshipEventsSeen`), not the booking's, so it
+    // carries up the ladder.
+    eventPlan: null,
   };
 }
 

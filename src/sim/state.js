@@ -121,6 +121,10 @@ export function newGame(seed) {
     // Which decision events have been offered lately, so the same one does
     // not come up twice while the library still has something unseen.
     eventsSeen: [],
+    // And the championship's own events (championshipEvents.js), kept for
+    // the whole ladder so a Regional does not open with the County's
+    // events while it has others to show.
+    championshipEventsSeen: [],
   };
 }
 
@@ -196,6 +200,7 @@ export function deserialize(text) {
   // against a missing key.
   if (!parsed.goodwill) parsed.goodwill = emptyGoodwill();
   if (!parsed.eventsSeen) parsed.eventsSeen = [];
+  if (!Array.isArray(parsed.championshipEventsSeen)) parsed.championshipEventsSeen = [];
   // Saves from before Act III have neither. Default them rather than let
   // every later reader guard against a missing key.
   if (typeof parsed.resort?.setup !== 'number') parsed.resort.setup = 0;
