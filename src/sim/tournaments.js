@@ -356,9 +356,11 @@ export function setupClimb(keepers = 0) {
  * `climb` and `soften` are the day's weather (`setupClimb`/`setupSoften`
  * in weather.js, run-up spec 2026-10-04 §3). `climb` multiplies the
  * crew's work: wet greens cannot be firmed. `soften` is what heavy rain
- * takes off a BOOKED course before the day's work, climbing or holding;
- * a held course therefore drops by exactly `soften` today and, being
- * below its target, climbs back from tomorrow. Unbooked, softening is
+ * takes off a BOOKED course before the day's work, whether climbing,
+ * holding or easing down (a target lowered below the course: the rain
+ * just speeds the ease, harmlessly). A held course therefore drops by
+ * exactly `soften` today and, being below its target, climbs back from
+ * tomorrow. Unbooked, softening is
  * ignored -- the course is already decaying, and rain is not a second
  * decay on top. Both default to a neutral day so callers that know
  * nothing of weather are unchanged.

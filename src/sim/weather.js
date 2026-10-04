@@ -66,6 +66,16 @@ import { makeRng } from './rng.js';
  * and a storm 2.3, which is also why the thinnest rung fails as often as
  * the heaviest.
  *
+ * The pass depends on the crew being sized on RUN_UP_DAYS (21) neutral
+ * updates while the real weather gets 22 — the extra one is the round-1
+ * morning, and 22 is what the game actually gives a booking made on day
+ * D (runDay updates the setup on days D through D + 21, before play).
+ * Sized and measured on 21/21 it reads 88.3 / 85.8 / 83.3% and fails.
+ * Sized on 22/22 the smallest crew becomes knife-edge (four keepers reach
+ * a Regional's 70 at 70.4 and five a National's 86 at 88 in neutral
+ * weather), so any weather averaging below 1 sinks it: 91.7 / 16.7 /
+ * 28.3%.
+ *
  * "Reach" means arrive at the target on some morning up to and including
  * round 1. A course already held at its target can still be softened by
  * rain ON the round-1 morning, and only climbs back the day after, so the

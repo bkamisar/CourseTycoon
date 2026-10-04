@@ -184,6 +184,18 @@ Listed so they can be reviewed in the morning:
   range = 10th–90th percentile; neutral weather for the setup projection.
 - Weather multipliers and softening values in §3 (starting values; calibrated
   against §7.2).
+  - **Rain climb raised to ×0.35 (from ×0.25)** to meet §7.2: at 0.25 the
+    National's neutral-weather crew (six keepers) arrived in only 88.3% of
+    120 seeds; at 0.35 all three rungs measure 91.7%. Nothing else in the
+    table moved. Full numbers in `src/sim/weather.js`.
+  - **"Reach the target" is counted as reaching it on any morning up to and
+    including round 1.** Strictly at the target on the round-1 morning is
+    ~82–83% (81.7 / 83.3 / 83.3%), because rain that morning softens a course
+    already held at its target and it only climbs back the next day. That is
+    weather on the day, which the player plans around with the 3-day
+    forecast, not a crew that failed to get there.
+  - **Softening applies on round days too**, like every other booked day
+    (§3: "while booked, climbing or holding").
 - Pool sizes 7 and 9; the three new effect kinds; how the rhythm is drawn.
 - Ordinary events suppressed on round days, the practice evening and
   championship-event evenings.

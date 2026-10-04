@@ -8,6 +8,7 @@ import {
 } from '../src/sim/tournaments.js';
 import { newWeek, withPins } from '../src/sim/championshipWeek.js';
 import { narrowToDifficulty } from '../tools/championshipPolicy.js';
+import { CONDITIONS } from '../src/sim/weather.js';
 
 /** A resort that has finished Act II, which is where Act III begins. */
 function actThreeResort(seed = 3) {
@@ -969,4 +970,27 @@ test('a run of heavy rain slows the crew\'s climb toward a national', () => {
   assert.ok(Math.abs(fair - 3 * 8 * 0.8) < 1e-9, `three fair days with eight keepers climbed ${fair.toFixed(2)}`);
   assert.ok(rain < fair / 2,
     `three days of heavy rain climbed ${rain.toFixed(2)} against ${fair.toFixed(2)} in fair weather`);
+});
+
+test('heavy rain and storms soften a held course on the real day', () => {
+  // Through runDay rather than nextSetup alone, so a day.js that stopped
+  // passing the sky's softening on would fail here. Weather seeds found by
+  // search: 14 rains on day 1, 81 storms on day 1; asserted as
+  // preconditions. Held exactly at its target with a full crew, the course
+  // reads target - setupSoften that evening (it is not climbing today, so
+  // nothing is put back until tomorrow).
+  for (const [weatherSeed, key] of [[14, 'rain'], [81, 'storm']]) {
+    let state = openFullCourse(actThreeResort(41));
+    state.weatherSeed = weatherSeed;
+    for (let i = 0; i < 2; i++) state.resort.staff.push({ role: 'groundskeeper' });
+    state.resort.setup = 86;
+    state.resort.setupTarget = 86;
+    state.tournament = newWeek('national', state.day + RUN_UP_DAYS);
+    const { state: after, report } = runDay(state, 4700);
+    assert.equal(report.weather.key, key, `precondition: weather seed ${weatherSeed} day ${state.day}`);
+    const soften = CONDITIONS[key].setupSoften;
+    assert.ok(soften > 0, `sanity: ${key} softens`);
+    assert.equal(after.resort.setup, 86 - soften,
+      `${key}: a course held at 86 read ${after.resort.setup} that evening`);
+  }
 });
