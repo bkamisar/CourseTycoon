@@ -7,6 +7,7 @@ import { newWeek, recordRound } from '../src/sim/championshipWeek.js';
 import { RUNGS } from '../src/sim/tournaments.js';
 import { toParText, averageToParText } from '../src/ui/toPar.js';
 import { computeHudData } from '../src/ui/hud.js';
+import { narrowToDifficulty } from '../tools/championshipPolicy.js';
 
 test('the HUD says nothing about tournaments when none is booked', () => {
   assert.equal(computeHudData(newGame(1)).tournament, null);
@@ -24,14 +25,33 @@ test('the HUD counts down to a booked championship', () => {
   assert.equal(data.tournament.daysLeft, 21);
   assert.equal(data.tournament.label, 'Regional Championship');
   assert.equal(data.tournament.setup, 70);
-  // The band is the decision. A countdown that does not say whether the
-  // course is set right is a clock, not information. Asserted on both
-  // sides, because a readout that always says "fine" is worse than none.
+  // The band is information now, not the decision (the winning score is
+  // judged), but the readout still reports it truthfully on both sides.
   assert.equal(data.tournament.inBand, true, '70 is inside the regional band of 62-78');
 
   state.resort.setup = 61;
   assert.equal(computeHudData(state).tournament.inBand, false,
-    '61 is one under the band and must not read as ready');
+    '61 is one under the band');
+});
+
+test('the countdown warns on the difficulty floor, not on the band', () => {
+  // The row used to turn amber whenever the setup sat outside the band,
+  // which told a player on a course well past the minimum that they were
+  // failing. The floor is the only thing on the line that is a gate.
+  const state = eighteen(newGame(6));
+  state.day = 40;
+  state.tournament = { rung: 'countyOpen', day: 61, resolved: false };
+  const raw = computeHudData(state).tournament;
+  assert.equal(raw.difficultyMet, false, 'sanity: the template course is under the County floor');
+  assert.equal(raw.warning, true, 'under the floor warns');
+
+  narrowToDifficulty(state.resort.courses[0].holes, RUNGS.countyOpen.minDifficulty);
+  for (const setup of [10, 52, 95]) {
+    state.resort.setup = setup;
+    const t = computeHudData(state).tournament;
+    assert.equal(t.difficultyMet, true);
+    assert.equal(t.warning, false, `setup ${setup} on a course at the floor must not warn`);
+  }
 });
 
 test('the countdown says when the championship is today', () => {

@@ -141,10 +141,11 @@ export function computeChampionshipData(state) {
       setup,
       target,
       band,
-      // Two different questions: is the course where it needs to be, and
-      // is the player even asking for the right thing. A sheet answering
-      // only the first would let somebody grind three weeks toward a
-      // number that was never going to score.
+      // Two different questions: is the course where they suggest, and is
+      // the player asking the crew for somewhere they suggest. Information,
+      // not the verdict -- the week is judged on the winning score, and the
+      // band is the governing body's advice for a course at the rung's
+      // minimum difficulty (see `dialNote`).
       targetInBand: band ? withinBand(target, band) : false,
       inBand: band ? withinBand(setup, band) : false,
       arrived: target > 0 && setup >= target,
@@ -289,6 +290,25 @@ function weekSection(data, state, commit) {
 }
 
 /**
+ * What the sheet says under the dial about the target the crew are asked for.
+ *
+ * The band used to be the judge, and this said so ("will not score ... is
+ * judged between"). It is now the governing body's suggestion for a course
+ * at the rung's minimum difficulty, and the week is judged on the winning
+ * score -- so outside the band is a risk in a direction, not a verdict. A
+ * course well past the minimum plays harder on its own and may want a
+ * softer setup than the band to keep the winner in range.
+ */
+export function dialNote(dial, band) {
+  if (withinBand(dial.target, band)) {
+    return 'The crew work toward this and stop when they reach it. Firm greens are what a championship wants and what a Tuesday fourball hates, so the everyday trade pays for it until the week arrives.';
+  }
+  return dial.target < band.low
+    ? `Asking for ${dial.target}, under their ${band.low}–${band.high}. On a course near the minimum difficulty the field may take it apart; one well past the minimum may want it this soft.`
+    : `Asking for ${dial.target}, over their ${band.low}–${band.high}. Firm enough to risk pushing the winner over the target, more so on a course past the minimum.`;
+}
+
+/**
  * The dial. Only drawn while something is booked, because setting a target
  * with nothing to prepare for is a slider that does nothing.
  *
@@ -311,6 +331,12 @@ function dialSection(data, state, commit) {
   // "Suggest" because the band is guidance now: the judge is the winning
   // total, and the setup is only the usual way of getting the greens there.
   wrap.appendChild(line('Setup they suggest', `${b.band.low}–${b.band.high}`));
+  // The spec's promise (§8): the band was calibrated at the rung's minimum
+  // difficulty, so it is advice for that course and not for every course.
+  const advice = document.createElement('div');
+  advice.className = 'champ-detail';
+  advice.textContent = 'Their advice for a course at the minimum difficulty. The week is judged on the winning score, so a course well past the minimum may want a softer setup.';
+  wrap.appendChild(advice);
   wrap.appendChild(line('Course difficulty', `${data.difficulty} (at least ${b.minDifficulty})`,
     b.difficultyMet ? 'champ-ok' : 'champ-off'));
   wrap.appendChild(line('Preparing costs', `$${b.prepPerDay.toLocaleString()}/day`));
@@ -342,9 +368,7 @@ function dialSection(data, state, commit) {
 
   const note = document.createElement('div');
   note.className = 'champ-detail';
-  note.textContent = data.dial.targetInBand
-    ? 'The crew work toward this and stop when they reach it. Firm greens are what a championship wants and what a Tuesday fourball hates, so the everyday trade pays for it until the week arrives.'
-    : `Asking for ${data.dial.target} will not score: ${b.label} is judged between ${b.band.low} and ${b.band.high}, and overcooking is as bad as undercooking.`;
+  note.textContent = dialNote(data.dial, b.band);
   wrap.appendChild(note);
 
   return wrap;
@@ -370,7 +394,7 @@ function applySection(data, state, commit) {
     wrap.appendChild(line(bonus.label, `+$${bonus.amount.toLocaleString()}`));
   }
   wrap.appendChild(line('At best', `$${data.contract.ceiling.toLocaleString()}`, 'champ-ok'));
-  wrap.appendChild(line('Course wanted at', `${n.band.low}–${n.band.high}`));
+  wrap.appendChild(line('Setup they suggest', `${n.band.low}–${n.band.high}`));
   wrap.appendChild(line('Rounds', String(n.rounds)));
   wrap.appendChild(line('Winning score wanted', `${toParText(n.target.low)} to ${toParText(n.target.high)}`));
   wrap.appendChild(line('Course difficulty', `${data.difficulty} (at least ${n.minDifficulty})`,

@@ -30,10 +30,11 @@ import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 /**
  * What the HUD needs to know about a booked championship, or null.
  *
- * `inBand` rides along because a countdown that does not say whether the
- * course is set right is a clock rather than information -- the run-up is
- * three weeks long and the one thing a player needs to glance at is
- * whether the crew are heading for a number that will score.
+ * `inBand` rides along as information: the band is the governing body's
+ * suggested setup for a course at the rung's minimum difficulty, worth a
+ * glance through a three-week run-up. It is not the judge, so it does not
+ * colour the row; `warning` does, and follows only the difficulty floor,
+ * the one thing on this line that fails the week by itself.
  *
  * The judge is now the winning total on a course hard enough for the rung,
  * so the run-up readout carries the course's difficulty against the floor
@@ -64,6 +65,10 @@ function tournamentReadout(state) {
     difficulty: Math.floor(status.difficulty),
     minDifficulty: status.minDifficulty,
     difficultyMet: status.difficultyMet,
+    // The row turned amber whenever the setup sat outside the band, which
+    // told a player on a course well past the minimum -- who may want a
+    // softer setup -- that they were failing. Only the floor is a gate.
+    warning: !status.difficultyMet,
     inWeek: status.inWeek,
     round: status.round,
     rounds: status.rounds,
@@ -299,12 +304,13 @@ export function mountHud(root) {
         // morning, then the figure it settled. Once that says the course
         // was too easy the week pays the base fee whatever the scores do,
         // and the row says so rather than staying green.
-        tournament.classList.toggle('hud-tournament--off', !t.difficultyMet);
+        tournament.classList.toggle('hud-tournament--off', t.warning);
       } else {
         const when = t.daysLeft === 0 ? 'today' : `${t.daysLeft}d`;
         tournament.textContent = `${t.short} ${when} · setup ${t.setup} (${t.band.low}–${t.band.high})`
           + ` · course ${t.difficulty}/${t.minDifficulty}`;
-        tournament.classList.toggle('hud-tournament--off', !t.inBand || !t.difficultyMet);
+        // The band stays in the text as information; the colour is the floor.
+        tournament.classList.toggle('hud-tournament--off', t.warning);
       }
       tournament.hidden = false;
     } else {

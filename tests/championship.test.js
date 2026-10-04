@@ -7,7 +7,7 @@ import { RUNGS } from '../src/sim/tournaments.js';
 import { newWeek, recordRound, PIN_IDS } from '../src/sim/championshipWeek.js';
 import { runDay } from '../src/sim/day.js';
 import { effectsOf } from '../src/sim/weather.js';
-import { computeChampionshipData } from '../src/ui/championship.js';
+import { computeChampionshipData, dialNote } from '../src/ui/championship.js';
 
 function championshipResort(seed = 1) {
   const state = newGame(seed);
@@ -96,6 +96,24 @@ test('the dial reports where it is, where it is going, and whether that is right
   const off = computeChampionshipData(state);
   assert.equal(off.dial.targetInBand, false,
     'asking for 90 at a county open must not read as ready');
+});
+
+test('the note under the dial treats the band as advice, not the judge', () => {
+  // It used to say asking outside the band "will not score" and that the
+  // rung "is judged between" its ends. The week is judged on the winning
+  // score; the band is the suggestion for a course at the minimum.
+  const band = RUNGS.countyOpen.band;
+  for (const target of [20, 52, 90]) {
+    const note = dialNote({ target }, band);
+    assert.ok(!/will not score|judged between|as bad as/i.test(note),
+      `target ${target}: the note still calls the band the judge: "${note}"`);
+  }
+  assert.match(dialNote({ target: 20 }, band), /under their 45–60/);
+  assert.match(dialNote({ target: 20 }, band), /past the minimum/,
+    'a soft ask names the course it suits');
+  assert.match(dialNote({ target: 90 }, band), /over their 45–60/);
+  assert.match(dialNote({ target: 90 }, band), /winner over the target/,
+    'and a firm one names the risk, in terms of what is judged');
 });
 
 test('the sheet says whether the crowd is covered, and by how much', () => {
