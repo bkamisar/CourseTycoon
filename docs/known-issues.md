@@ -110,35 +110,6 @@ fewer holes, so it is lower, and it goes into the same running totals as the
 full eighteen-hole rounds. The leaderboard and the winning total then read
 better than the course played, and the evening report does not say why.
 
-### The last groups of a championship round can run off the end of the playback
-
-**Found:** 2026-10-03, in review of the championship week. Not seen in play yet.
-
-The playback clock runs 07:00 to 18:00. With a wide tee interval for the field
-(22 minutes is what holds the pace at a National), the last threeball tees off
-around two in the afternoon and, on a hard course, finishes a little after six.
-Those last groups may vanish from the playback before they hole out. Scores and
-pace are judged on the simulated round, not the clock, so nothing is lost but
-the view.
-
-### On a phone, Act III pushes "Open the day" off the edge of the toolbar
-
-**Found:** 2026-10-03, checking the championship week at 375px wide.
-
-Once the Championship button appears, the bottom toolbar holds eight buttons.
-On a 375-pixel-wide phone the last one, "Open the day", sits mostly past the
-right edge (its right side at 402 px), and the toolbar does not scroll, so only
-a sliver of it can be tapped. Wider phones (about 410 px and up) are fine.
-
-### The starter talks about the public on a day the course is shut
-
-**Found:** 2026-10-03, playing a round of a National.
-
-On a championship round day, with the course closed to the public, the evening
-report's narration can still say something like the starter "had two groups ask
-if there were forward tees". There were no groups: the only golfers on the
-course were the championship field.
-
 ### Regional championships overshoot their target more often since the run-up work
 
 **Found:** 2026-10-04, re-measuring the ladder.
