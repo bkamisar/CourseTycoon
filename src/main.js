@@ -382,7 +382,7 @@ canvas.addEventListener('click', (evt) => {
 // ---------------------------------------------------------------------
 
 const overviewToolbar = document.createElement('div');
-overviewToolbar.className = 'ov-toolbar';
+overviewToolbar.className = 'ov-toolbar ov-toolbar--overview';
 
 function toolbarButton(label, onClick, { primary = false } = {}) {
   const btn = document.createElement('button');
@@ -953,6 +953,41 @@ function injectToolbarStyles() {
        screens silently failed without this override. */
     .ov-toolbar[hidden] {
       display: none;
+    }
+    /* A phone. Act III's overview row is nine buttons (Back 9, Hotel,
+       Championship, Amenities, Staff, Pricing, ?, Open the day, and the
+       mute toggle), and at the 44px each can shrink to they come to 452px
+       -- "Open the day" ended at 402px on a 375px screen, off the edge and
+       unreachable, with "Championship" wrapped to "Champ/ionshi/p" in the
+       meantime. So on a narrow screen the row scrolls sideways (every
+       button keeps its tap target, at its natural width, on one line) and
+       the primary button is pinned to the right edge so the thing that
+       starts the day never scrolls away. The scrollbar is hidden so the
+       row keeps its height: the map's bottom inset is measured off it.
+       The playback row has six buttons and fits, so it keeps its even spread. */
+    @media (max-width: 480px) {
+      .ov-toolbar--overview {
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .ov-toolbar--overview::-webkit-scrollbar {
+        display: none;
+      }
+      .ov-toolbar--overview .ov-btn {
+        flex: 0 0 auto;
+        padding: 4px 10px;
+        white-space: nowrap;
+        overflow-wrap: normal;
+        word-break: normal;
+      }
+      .ov-toolbar--overview .ov-btn--icon {
+        flex: 0 0 44px;
+        padding: 0;
+      }
+      .ov-toolbar--overview .ov-btn--primary {
+        position: sticky;
+        right: 0;
+      }
     }
   `;
   document.head.appendChild(style);
