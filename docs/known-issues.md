@@ -62,14 +62,3 @@ Wear scales with traffic, so a resort that loses its golfers also stops
 damaging its greens, recovers, and draws them back. It is realistic and
 it works against "hard to dig out of". Left deliberately; revisit if a
 collapse ever feels too easy to recover from.
-
-### Regional championships overshoot their target more often since the run-up work
-
-**Found:** 2026-10-04, re-measuring the ladder.
-
-In 32 simulated ladders, the Regional hit its target first time in 22, down from 25
-before weather slowed the crew and championships got their own events. All 14 misses
-finished too high (the winner at +9 to +14 against a range of +2 to +8), none too low.
-The cause has not been diagnosed: it may be weather on the setup climb, the practice
-round, an event effect, or noise at this sample size. The measuring operator never reads
-the practice round's forecast, so it cannot correct course the way a player can.

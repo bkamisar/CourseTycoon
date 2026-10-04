@@ -965,6 +965,32 @@ function buildFor(state, rungId) {
  *   per day, medians: run-up $17.8k, round days -$1.6k, ordinary $25.8k,
  *   never bidding $26.5k.
  *
+ *   The Regional's first-attempt overshoot, investigated the same day (it
+ *   had been a known issue: 22 of 32 after the run-up work against 25 of 32
+ *   before, every miss high). Scratch runs on the same settled resorts, 8
+ *   samples each (64 first attempts, so a rate is good to about 5 points,
+ *   and two rates to about 7), hosted only, the Regional's first week:
+ *
+ *     variant                          hit        high  low  mean total
+ *     (a) current code                 51/64 80%   13    0    +6.9
+ *     (b) weather softening off        48/64 75%   16    0    +7.1
+ *     (c) championship events off      51/64 80%   13    0    +6.8
+ *     (d) floor margin +3 (as before)  46/64 72%   18    0    +6.8
+ *
+ *   Samples 1-4 of (a) are today's real run (26 of 32). Nothing moved by
+ *   more than noise, and no variant is better than the code as it is: the
+ *   dip from 25 to 22 was noise, and the rate is back at 80%, above the
+ *   76% the centre was calibrated for (tournaments.js). What is real and
+ *   unchanged is the SKEW: every miss is high because the Regional's
+ *   winning total runs about two strokes above the band's centre (median
+ *   +7 and mean +6.9 against a centre of +5; the 2026-10-03 table, before
+ *   any of this, averages +6.4), at setup 70 on every attempt. It is not
+ *   the softening, the events, or the floor margin; the practice round was
+ *   not isolated; it is probably the real settled courses against the
+ *   template the calibration used, which was not checked. A band that
+ *   missed low as often as high would hit more, but at 80% it is not
+ *   worth a retune on this evidence.
+ *
  * BEFORE THAT (2026-10-04, second run, purses 1.6x: $29k / $160k, $48k /
  * $380k, $88k / $800k, so its `paid` and `worth` columns are at those
  * purses, not today's). Measured after two changes to the game: a
@@ -1040,7 +1066,7 @@ function buildFor(state, rungId) {
  *   32 / 29 / 27 of 33 / 38 / 36, crowd 33 / 38 / 36. Profit per day,
  *   medians: run-up $17.8k (was $17.9k), round days -$1.6k, ordinary
  *   $25.8k, never bidding $26.5k. The Regional still overshoots when it
- *   misses (see docs/known-issues.md).
+ *   misses (investigated in the third run's last paragraph above).
  *
  * BEFORE THAT, the same day's measurement after the run-up work (weather on
  * the setup climb, the practice round, and the championship's own events,
