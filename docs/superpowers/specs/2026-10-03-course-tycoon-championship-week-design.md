@@ -438,6 +438,16 @@ measured. So Act III is no longer a money-maker: a
 championship pays for itself only when it is done well, and its reward is
 prestige and the act.
 
+Re-measured 2026-10-04 after the run-up work (weather on the climb, the
+practice round, the championship's own events; same command, purses unchanged
+at 1.6x): the 14 ladders that hit all three targets first time finished at a
+median of -$17k (quartiles -$87k to +$29k, range -$235k to +$110k), so the
+purses were left alone — the drift from +$21k is inside the noise and well
+inside the +-$100k that would trigger a rescale. A ladder with a miss lost in
+all 18 cases (median -$342k, -$818k to -$11k); 12 of them hit every rung on a
+retry, and still lost $11k to $451k (median -$265k) to the repeated run-up and
+the barred days. Tables above `playActThree` in `tools/operator.js`.
+
 The National's crowd bonus is out of reach for a sensible resort. Its 12,000
 gallery needs the short course on top of every other building; the short
 course costs about $1.1M over 240 days in golfers it takes off the main course,

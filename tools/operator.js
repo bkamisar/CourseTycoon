@@ -79,16 +79,24 @@ function eventById(id) {
 }
 
 /**
- * What the operator thinks a prestige point, a turf point and a setup point
- * are worth, in dollars. Stated, not tuned: prestige is the thing the
- * ladder pays for over the long run (a point is roughly a day's extra
- * demand across a season) and turf is the bonus' own gate (the contract's
- * turf bonus is $35k-$192k on 78), so $2,000 and $500 are round figures in
- * that neighbourhood, not fits to the measurement. A setup point is a few
- * hundred dollars of crew time (one keeper climbs 0.8 a day at $60-odd a
- * day, and a short climb is what the pace and target bonuses ride on).
+ * What the operator thinks a prestige point and a turf point are worth, in
+ * dollars. Stated, not tuned: prestige is the thing the ladder pays for
+ * over the long run (a point is roughly a day's extra demand across a
+ * season) and turf is the bonus' own gate (the contract's turf bonus is
+ * $35k-$192k on 78), so $2,000 and $500 are round figures in that
+ * neighbourhood, not fits to the measurement.
+ *
+ * Setup is worth NOTHING to this operator, on purpose. A first version
+ * priced a setup point at $250 (a few hundred dollars of crew time); it
+ * bought "thicker rough, setup +5, prestige +2" and the ladder's Regional
+ * first-attempt hit rate was 20/32, against 22/32 without (before the
+ * run-up work 25/32), every miss overshooting. Within noise at this sample
+ * size, but the reasoning stands: in a week a higher setup is a HARDER
+ * course, not a better one, so like the next round's handicap it helps or
+ * hurts depending on where the week is heading, which the operator does not
+ * read.
  */
-export const CHAMPIONSHIP_VALUE = Object.freeze({ prestige: 2000, turf: 500, setup: 250 });
+export const CHAMPIONSHIP_VALUE = Object.freeze({ prestige: 2000, turf: 500 });
 
 /** Share of the booked rung's pace bonus put at risk per 1% of slowdown. */
 const PACE_RISK_PER_PERCENT = 0.08;
@@ -100,7 +108,6 @@ const PACE_RISK_PER_PERCENT = 0.08;
  *   + money at face value
  *   + prestige at CHAMPIONSHIP_VALUE.prestige a point
  *   + turf at CHAMPIONSHIP_VALUE.turf a point
- *   + setup at CHAMPIONSHIP_VALUE.setup a point
  *   - a slower next round (`nextRound.pace` > 1) as a cost ONLY when the
  *     field's tee interval is 18 or tighter, where the field backs up
  *     behind it and the pace bonus is at risk (championshipEvents.js, PACE,
@@ -113,6 +120,7 @@ const PACE_RISK_PER_PERCENT = 0.08;
  *   0 a harder or easier next round (`nextRound.handicap`): it helps a week
  *     heading under its target and hurts one heading over, and the operator
  *     does not read which it is heading for.
+ *   0 setup: see CHAMPIONSHIP_VALUE.
  *   0 goodwill: nothing downstream of the operator reads it.
  */
 export function championshipChoiceScore(choice, rungId, { fieldInterval = FIELD_TEE_INTERVAL } = {}) {
@@ -120,7 +128,6 @@ export function championshipChoiceScore(choice, rungId, { fieldInterval = FIELD_
   let score = e.money ?? 0;
   score += (e.prestige ?? 0) * CHAMPIONSHIP_VALUE.prestige;
   score += (e.turf ?? 0) * CHAMPIONSHIP_VALUE.turf;
-  score += (e.setup ?? 0) * CHAMPIONSHIP_VALUE.setup;
   const pace = e.nextRound?.pace ?? 1;
   if (pace > 1 && fieldInterval <= 18) {
     const bonus = contractFor(rungId ?? 'countyOpen')?.bonuses.find((b) => b.id === 'pace')?.amount ?? 0;
@@ -202,9 +209,9 @@ export const LEVERS_NOT_PULLED = [
   'Choosing events by anything but a fixed stance preference.',
   'Act III: championship events (run-up and week) are answered by a flat '
   + 'score of the choice\'s resolved effects (championshipChoiceScore: '
-  + 'money at face, prestige $2,000, turf $500, setup $250 a point, a '
+  + 'money at face, prestige $2,000 and turf $500 a point, a '
   + 'slower next round a cost only at a field interval of 18 or less, '
-  + 'harder/easier next round and goodwill worth nothing). It never reads '
+  + 'harder/easier next round, setup and goodwill worth nothing). It never reads '
   + 'the forecast, the turf margin or whether the week is heading under '
   + 'or over its target, which are exactly the things the cards are '
   + 'written to make a player weigh; so nothing here says whether the '
@@ -893,7 +900,85 @@ function buildFor(state, rungId) {
  * against never bidding" is a claim about the twenty-one days as much as
  * about the day.
  *
- * Measured 2026-10-03, `node tools/actThree.js --seeds 8 --samples 4`:
+ * RE-MEASURED 2026-10-04, after the championship run-up work (weather on
+ * the setup climb, the practice round, and the championship's own events,
+ * answered by championshipChoiceScore). Same command, levers and settled
+ * resorts (the run-up work does not touch Acts I-II; the cache's fingerprint
+ * warned and the states were reused), purses unchanged at 1.6x. Retries
+ * exist now, so a missed rung is bid for again after its bar and appears
+ * twice. H = hit, m = missed the target but met the floor, F = floor failed
+ * (none did); worth is hosted money less never-bid money:
+ *
+ *   ladder  weeks played                             paid          worth
+ *    1.1  C +1 H, R +7 H, N +19 H                  $1,181,040    +$34,902
+ *    1.2  C -2 H, R +11 m, R +4 H, N +17 H         $1,295,440   -$300,733
+ *    1.3  C 0 H, R +8 H, N +18 H                   $1,181,040    -$12,492
+ *    1.4  C +1 H, R +9 m, R +7 H, N +18 H          $1,295,440    -$97,718
+ *    2.1  C -1 H, R +6 H, N +17 H                  $1,247,440    +$83,565
+ *    2.2  C +2 H, R +8 H, N +16 H                    $912,800   -$234,782
+ *    2.3  C 0 H, R +11 m, R +6 H, N +20 H          $1,295,440    -$11,256
+ *    2.4  C -2 H, R +6 H, N +17 H                  $1,247,440    -$32,571
+ *    3.1  C +1 H, R +6 H, N +22 m, N +19 H         $1,335,440   -$143,273
+ *    3.2  C -1 H, R +4 H, N +13 m, N +19 H         $1,335,440   -$324,381
+ *    3.3  C +2 H, R +9 m, R +14 m                    $256,000   -$777,075
+ *    3.4  C -1 H, R +9 m, R +7 H, N +22 m            $676,000   -$750,486
+ *    4.1  C -1 H, R +8 H, N +19 H                  $1,247,440   +$109,713
+ *    4.2  C +2 H, R +4 H, N +16 H                  $1,247,440    -$20,797
+ *    4.3  C +3 H, R +7 H, N +17 H                  $1,247,440    +$64,541
+ *    4.4  C +1 H, R +7 H, N +15 H                  $1,055,200   -$108,842
+ *    5.1  C 0 H, R +2 H, N +21 m, N +16 H          $1,269,040   -$387,353
+ *    5.2  C +3 H, R +8 H, N +16 H                  $1,181,040    +$13,278
+ *    5.3  C +4 m, C +2 H, R +5 H, N +19 H          $1,276,440    -$77,407
+ *    5.4  C +2 H, R +4 H, N +21 m, N +18 H         $1,269,040   -$288,592
+ *    6.1  C -1 H, R +10 m, R +5 H, N +20 H         $1,295,440   -$242,362
+ *    6.2  C -1 H, R +6 H, N +23 m, N +16 H         $1,335,440   -$229,399
+ *    6.3  C 0 H, R +6 H, N +15 H                   $1,247,440     -$9,564
+ *    6.4  C +2 H, R +4 H, N +17 H                  $1,247,440   -$104,893
+ *    7.1  C +1 H, R +10 m, R +10 m                   $256,000   -$712,824
+ *    7.2  C +2 H, R +9 m, R +7 H, N +20 H          $1,153,040   -$450,778
+ *    7.3  C +5 m, C -1 H, R +3 H, N +22 m            $657,000   -$818,064
+ *    7.4  C -3 H, R +8 H, N +24 m, N +18 H         $1,193,040   -$359,493
+ *    8.1  C -2 H, R +7 H, N +20 H                  $1,105,040   -$116,559
+ *    8.2  C -2 H, R +2 H, N +20 H                  $1,105,040    -$26,824
+ *    8.3  C -3 H, R +9 m, R +12 m                    $256,000   -$662,934
+ *    8.4  C -2 H, R +11 m, R +12 m                   $256,000   -$653,597
+ *
+ *   All three hit first time (14): median -$17k, quartiles -$87k .. +$29k,
+ *                        range -$235k .. +$110k, 9 of 14 below zero.
+ *   A week missed (18):  median -$342k, quartiles -$661k .. -$233k, range
+ *                        -$818k .. -$11k, all lose. Of these, 12 missed a rung
+ *                        and then hit every rung on the retry (median -$265k,
+ *                        -$451k .. -$11k) and 6 never finished the ladder in
+ *                        240 days (median -$732k, -$818k .. -$653k).
+ *   Every sample (32):   median -$130k, quartiles -$366k .. -$19k.
+ *
+ *   BEFORE the run-up work (2026-10-03, the table below): all-hit median
+ *   +$21k (13 ladders, quartiles -$42k .. +$101k); a week missed median
+ *   -$635k (19; measured before retries, so not like for like). The all-hit
+ *   median moved by about $38k, inside the noise of 14 ladders, so the purses
+ *   are LEFT at 1.6x (the break-even multiplier on today's purses reads
+ *   x1.014; the rule is to rescale only past about +-$100k).
+ *
+ *   First attempts per rung (32 ladders; a retry is not counted): target
+ *   County 30 of 32, Regional 22 of 32, National 20 of the 28 that got that
+ *   far (before: 28 / 25 / 19 of 32). Turf 32 / 32 / 25 and pace 32 / 25 /
+ *   23 of those same attempts. Over every week played, retries included: target 32 / 28 /
+ *   26 of 34 / 42 / 34, floor 100%, crowd 34 / 42 / 0. Regional misses all
+ *   overshot (winning total +9 .. +14 against a band of +2 .. +8), the same
+ *   direction as before. Profit per day, medians: run-up $17.9k (was
+ *   $17.7k), round days -$1.5k, ordinary $25.5k, never bidding $26.5k.
+ *
+ *   The championship events are in these numbers but not counted: a ladder's
+ *   result does not record which cards were drawn or answered, so how often
+ *   each came up is not measured here. A first run with the operator also
+ *   valuing a setup point at $250 got Regional 20 / 32 on the first attempt
+ *   and an all-hit median of +$13k (12 ladders); the policy now reads setup
+ *   as worth nothing (see CHAMPIONSHIP_VALUE) and the numbers above are that
+ *   run's. The difference between the two is within the run-to-run noise at
+ *   this sample size, so it is a reason not to price setup, not evidence it
+ *   is harmful.
+ *
+ * BEFORE THE RUN-UP WORK. Measured 2026-10-03, `node tools/actThree.js --seeds 8 --samples 4`:
  * green fee 80, interval 14, room rate 300; Acts I and II played by this
  * operator, then 240 days of Act III, hosted against the same resort
  * never bidding, four Act III seeds per settled resort (32 ladders).
