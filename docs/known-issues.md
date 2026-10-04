@@ -120,3 +120,22 @@ around two in the afternoon and, on a hard course, finishes a little after six.
 Those last groups may vanish from the playback before they hole out. Scores and
 pace are judged on the simulated round, not the clock, so nothing is lost but
 the view.
+
+### On a phone, Act III pushes "Open the day" off the edge of the toolbar
+
+**Found:** 2026-10-03, checking the championship week at 375px wide.
+
+Once the Championship button appears, the bottom toolbar holds eight buttons.
+On a 375-pixel-wide phone the last one, "Open the day", sits mostly past the
+right edge (its right side at 402 px), and the toolbar does not scroll, so only
+a sliver of it can be tapped. Wider phones (about 410 px and up) are fine.
+
+### The starter talks about the public on a day the course is shut
+
+**Found:** 2026-10-03, playing a round of a National.
+
+On a championship round day, with the course closed to the public, the evening
+report's narration can still say something like the starter "had two groups ask
+if there were forward tees". There were no groups: the only golfers on the
+course were the championship field.
+
