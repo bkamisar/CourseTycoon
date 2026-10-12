@@ -64,6 +64,13 @@ const ITEM_LIST = [
   // 0.65. Committing means giving the whole counter over to it, which is
   // the decision these exist to offer.
   ['cigarettes',        'Cigarettes',         'goods', 14,  9,   0, true,  0.95, 0.10, 0.05, 2,  1],
+  // An easter egg, for a friend whose daughter was born while he was
+  // playing this. Mechanically it IS the packet of cigarettes above --
+  // same price, same cost, same three appeals, same everything -- so a
+  // board that stocks it behaves exactly like one that stocks those, and
+  // nothing balanced against that line has to be measured again. It is
+  // here to be found, not to be optimised.
+  ['cigars',            'Cigars, it’s a girl', 'goods', 14, 9,   0, true,  0.95, 0.10, 0.05, 2,  1],
   ['cartGirlShots',     'Shots with the cart girl', 'drink', 24, 7, 0, true, 0.15, 0.10, 0.85, 5,  2],
   ['proV1s',            'Sleeve of Pro V1s',  'goods', 18, 11,   0, true,  0.20, 0.95, 0.15, 3,  1],
   ['transfusion',       'Transfusion',        'drink', 12,  5,   0, true,  0.90, 0.80, 0.70, 4,  5],

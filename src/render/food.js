@@ -396,6 +396,13 @@ const cigarettes = [
   '..oWWWWWWo..', '..oWWWWWWo..', '..oooooooo..', '............',
 ];
 
+/** One, lit, with the band still on it. Somebody is handing these out. */
+const cigars = [
+  '............', '..........W.', '.........W..', '..........W.',
+  '............', '..oooooooo..', '.oCCRRCCCCMM', '.oCCRRCCCCMM',
+  '..oooooooo..', '............', '............', '............',
+];
+
 /** Two shot glasses, poured. */
 const cartGirlShots = [
   '............', '............', '..oooo.oooo.', '..oAAo.oAAo.',
@@ -419,7 +426,7 @@ export const FOOD_SPRITES = {
   whiskeySour, oldFashioned, negroni, manhattan, martini, espressoMartini, candyBar, trailMix, turkeyWrap, chickenCaesarWrap,
   hotDog, breakfastSandwich, chiliBowl, burgerFries, clubSandwich,
   seasonalSalad, oysters, lobsterRoll, steakFrites,
-  cigarettes, cartGirlShots, proV1s,
+  cigarettes, cigars, cartGirlShots, proV1s,
 };
 
 /**
