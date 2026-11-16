@@ -118,6 +118,9 @@ export function newGame(seed) {
     // what lets a forecast be the same thing as the weather rather than a
     // prediction that can drift from it. See weather.js.
     weatherSeed: seed,
+    // Best score on each hole the player has played themselves, keyed by
+    // hole id: { strokes, design }. See src/sim/playGolf.js#recordPlay.
+    playRecords: {},
     // Which decision events have been offered lately, so the same one does
     // not come up twice while the library still has something unseen.
     eventsSeen: [],
@@ -199,6 +202,10 @@ export function deserialize(text) {
   // field. Default them safely rather than let every later reader guard
   // against a missing key.
   if (!parsed.goodwill) parsed.goodwill = emptyGoodwill();
+  // Saves from before the course could be played have no scorecard.
+  if (!parsed.playRecords || typeof parsed.playRecords !== 'object' || Array.isArray(parsed.playRecords)) {
+    parsed.playRecords = {};
+  }
   if (!parsed.eventsSeen) parsed.eventsSeen = [];
   if (!Array.isArray(parsed.championshipEventsSeen)) parsed.championshipEventsSeen = [];
   // Saves from before Act III have neither. Default them rather than let

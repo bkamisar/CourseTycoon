@@ -2,8 +2,10 @@ import { LIE, lieAt } from './terrain.js';
 import { pointAtDistance, greenCentre, clamp } from './hole.js';
 import { distanceToPath } from './geometry.js';
 
-/** Multipliers applied to a golfer's full range by the lie they play from. */
-const LIE_RANGE = {
+/** Multipliers applied to a golfer's full range by the lie they play from.
+ * Exported so the playable mode (playGolf.js) shortens the player's clubs by
+ * exactly what it costs a simulated guest. */
+export const LIE_RANGE = {
   [LIE.TEE]: 1.0,
   [LIE.FAIRWAY]: 1.0,
   [LIE.GREEN]: 1.0,
@@ -14,7 +16,7 @@ const LIE_RANGE = {
 };
 
 /** Extra dispersion multiplier by lie — bad lies scatter as well as shorten. */
-const LIE_SPREAD = {
+export const LIE_SPREAD = {
   [LIE.TEE]: 1.0,
   [LIE.FAIRWAY]: 1.0,
   [LIE.GREEN]: 1.0,
@@ -89,7 +91,7 @@ export function distanceRemaining(hole, point) {
  * slow: this runs on every shot, and the balance harness simulates
  * thousands of days.
  */
-function progressAlong(hole, point) {
+export function progressAlong(hole, point) {
   const path = hole.corridor;
   let best = 0;
   let bestDist = Infinity;
