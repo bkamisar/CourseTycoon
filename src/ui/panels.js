@@ -18,12 +18,10 @@ import { openMenuBoard } from './menuBoard.js';
 import { kitchenCapacity, kitchenLoad } from '../sim/kitchen.js';
 import { shopCapacity, PER_SHOP_STAFF, BASE_SHOP_CAPACITY } from '../sim/shop.js';
 import { PER_COOK, BASE_CAPACITY } from '../sim/kitchen.js';
-import { AMENITIES, WAGES, perceivedValue, amenityPerceivedValue, demandGroups, demolitionRefund } from '../sim/economy.js';
+import { AMENITIES, WAGES, amenityPerceivedValue, demolitionRefund } from '../sim/economy.js';
 import { maxGroupsForDay } from '../sim/schedule.js';
-import { holeStats, courseDifficultyOf } from '../sim/hole.js';
-import { marshalPaceFactor } from '../sim/day.js';
+import { marshalPaceFactor, courseToday, demandToday } from '../sim/day.js';
 import { openHoles } from '../sim/state.js';
-import { courseRating } from '../sim/ratings.js';
 import { expectedMinutes } from '../sim/round.js';
 import { ordinal } from '../sim/satisfaction.js';
 
@@ -658,57 +656,16 @@ export function openPricingSheet(sheetHost, { state, onChange }) {
       const feeConsequence = document.createElement('div');
       feeConsequence.className = 'panel-consequence';
 
+      // Both read the simulation's own view of today -- see `courseToday`
+      // in src/sim/day.js for the four ways a hand-made copy of it drifted.
+      // Both read the simulation's own view of today -- see `courseToday`
+      // in src/sim/day.js for the four ways a hand-made copy of it drifted.
       function currentValuePerRound() {
-        const holes = openHoles(current);
-        const rating = holes.length ? courseRating(holes, current.turfQuality) : 0;
-        return perceivedValue({
-          courseRating: rating,
-          prestige: current.prestige,
-          amenities: current.resort.amenities,
-          holesOpen: holes.length,
-        });
+        return courseToday(current).value;
       }
 
-      /**
-       * How many groups actually want to play today, at the current
-       * price, pace and amenities — the same call `src/sim/day.js` makes
-       * to decide who shows up, fed the same inputs it computes (course
-       * difficulty and scenery averaged over the open holes, recent
-       * satisfaction, whether rooms exist). Mirrors `runDay`'s own
-       * demand computation rather than a re-derived shortcut, so this
-       * sheet can never show a demand figure the simulation wouldn't
-       * also produce.
-       *
-       * This is what makes an amenity's demand effect visible: raising
-       * `perceivedValue` (see the Amenities sheet) raises this number
-       * too, and the ONE moment that matters to the player is whether it
-       * has room to land — which `updateIntervalConsequence` below reads
-       * this to say plainly.
-       */
       function currentDemand() {
-        const holes = openHoles(current);
-        if (holes.length === 0) return { total: 0 };
-        const rating = courseRating(holes, current.turfQuality);
-        const courseDifficulty = courseDifficultyOf(holes);
-        const averageScenery = holes.reduce((s, h) => s + holeStats(h).scenery, 0) / holes.length;
-        const recentHistory = current.satisfactionHistory.slice(-3);
-        const recentSatisfaction = recentHistory.length
-          ? recentHistory.reduce((s, v) => s + v, 0) / recentHistory.length
-          : 50;
-        const hasRooms = (current.resort.rooms?.count ?? 0) > 0;
-        return demandGroups({
-          courseRating: rating,
-          prestige: current.prestige,
-          amenities: current.resort.amenities,
-          greenFee: current.resort.pricing.greenFee,
-          teeInterval: current.resort.pricing.teeInterval,
-          recentSatisfaction,
-          holesOpen: holes.length,
-          courseDifficulty,
-          scenery: averageScenery,
-          turfQuality: current.turfQuality,
-          hasRooms,
-        });
+        return demandToday(current) ?? { total: 0 };
       }
 
       function updateFeeConsequence() {

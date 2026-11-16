@@ -860,3 +860,30 @@ test('a grandstand does nothing for a Tuesday fourball', () => {
   assert.ok(b.averageSatisfaction < a.averageSatisfaction,
     'four hotel amenities are worth something to a round; four grandstands are not');
 });
+
+// --- Screens that preview a day read the day's own inputs ---------------
+
+test('the pricing forecast is the day: same rooms, same setup, same closures, same crowd', () => {
+  // The Pricing sheet re-derived these by hand and had drifted: it looked
+  // for hotel rooms in `rooms.count`, ignored a championship's setup and
+  // any closed holes, and rated the course without the crowd.
+  const { demandToday, courseToday } = dayModule;
+  const state = newGame(41);
+  state.resort.rooms = { standard: 20, suite: 6 };
+  state.resort.setup = 40;
+  state.conditions = [{ id: 'road', label: 'Road shut', days: 3, daysLeft: 3, demandFactor: 0.7 }];
+  state.prestige = 60;
+  // Find a fair-weather day so the day's demand needs no weather factor.
+  let probe = state;
+  for (let d = 0; d < 40 && dayModule.runDay(probe, 1).report.weather.key !== 'fair'; d++) {
+    probe = { ...probe, day: probe.day + 1 };
+  }
+  const { report } = runDay(probe, 1);
+  assert.equal(report.weather.key, 'fair', 'sanity: found a fair day');
+
+  const forecast = demandToday(probe);
+  assert.ok(courseToday(probe).hasRooms, 'twenty-six rooms is a hotel');
+  assert.equal(forecast.total, report.groupsPlayed + report.divertedGroups,
+    'the forecast is exactly the crowd the day draws');
+  assert.equal(Math.round(courseToday(probe).rating), Math.round(report.courseRating));
+});

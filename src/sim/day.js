@@ -275,42 +275,12 @@ export function runDay(state, seed) {
   const hasHalfwayHouse = Boolean(halfwayHouse);
   const halfwayEnergy = halfwayRestoreTo(halfwayHouse?.menu);
 
-  // Rated against yesterday's crowd: rating feeds demand and demand decides
-  // today's crowd, so today's is not knowable yet. The lag is the point -
-  // change the course and the rating dips until the clientele catches up.
-  //
-  // "Yesterday's" is the last crowd that actually played. A day nobody
-  // played -- a championship round, above all -- leaves an empty crowd in
-  // the history, and an empty crowd falls back to the average golfer: the
-  // rating of a course built for serious golfers swung four or five points
-  // between two closed days, rated against people who were not there.
-  const yesterdayCrowd = lastCrowdThatPlayed(next.history);
-  const rating = holes.length ? courseRating(holes, next.turfQuality, yesterdayCrowd) : 0;
-
-  // The mean difficulty across every open hole is what the segments react
-  // to — both when deciding whether to turn up (economy.demandGroups) and
-  // when deciding how they felt about the round (satisfaction.
-  // guestSatisfaction). Computed once here and threaded through both, so
-  // the crowd that arrives and the crowd that leaves happy can never
-  // disagree about what this course's difficulty actually is.
-  const baseDifficulty = courseDifficultyOf(holes);
-  // Firm greens and thick rough are what a championship wants and what a
-  // Tuesday fourball hates. This is the whole cost of the run-up: the
-  // course the regulars are paying for gets worse for weeks before
-  // anybody is paid anything.
-  const courseDifficulty = clamp(baseDifficulty + setupDifficultyBonus(next.resort.setup ?? 0), 0, 100);
-  const averageScenery = holes.length
-    ? holes.reduce((s, h) => s + holeStats(h).scenery, 0) / holes.length
-    : 0;
-  // Destination guests are mostly an Act II crowd; Act I has no rooms yet.
-  const hasRooms = totalRooms(next.resort.rooms) > 0;
-
-  // Word of mouth from the last few days. No history yet (day one) is
-  // neutral, so the resort isn't punished or rewarded before it has played.
-  const recentHistory = next.satisfactionHistory.slice(-3);
-  const recentSatisfaction = recentHistory.length
-    ? recentHistory.reduce((s, v) => s + v, 0) / recentHistory.length
-    : 50;
+  // The course as today's golfers will meet it: rating, difficulty,
+  // scenery, what a round is worth. One function, so the Pricing sheet's
+  // preview reads exactly what the day reads -- see `courseToday`.
+  const {
+    rating, courseDifficulty, averageScenery, hasRooms, recentSatisfaction, value,
+  } = courseToday(next);
 
   // Nobody comes to a resort with no golf. Otherwise, each segment's own
   // appeal for this exact course decides its own slice of the tee sheet
@@ -344,26 +314,7 @@ export function runDay(state, seed) {
   const fieldHoles = championshipToday ? openHoles(next) : holes;
 
   const demand = holes.length && !championshipToday
-    ? demandGroups({
-        weather: sky.demand,
-        courseRating: rating,
-        prestige: next.prestige,
-        amenities: next.resort.amenities,
-        greenFee,
-        teeInterval,
-        recentSatisfaction,
-        holesOpen: holes.length,
-        courseDifficulty,
-        scenery: averageScenery,
-        turfQuality: next.turfQuality,
-        hasRooms,
-        rooms: next.resort.rooms,
-        // A bad write-up, an outbreak, a road shut. Folded in with the
-        // weather because it is the same kind of thing: a multiplier on
-        // how many people want to come that the player cannot argue with
-        // today, only outlast.
-        conditionFactor: wrong.demandFactor,
-      })
+    ? demandToday(next, { weather: sky.demand })
     : {
         total: 0,
         share: Object.fromEntries(SEGMENT_KEYS.map((k) => [k, 0])),
@@ -454,10 +405,6 @@ export function runDay(state, seed) {
         bottleneckHoleIndex: null, overrunGroups: 0, averageRoundMinutes: 0 };
 
   // Satisfaction, once each group's waiting is known.
-  const value = perceivedValue({
-    courseRating: rating, prestige: next.prestige, amenities: next.resort.amenities,
-    holesOpen: holes.length,
-  });
   const amenityBonus = amenityBonusBySegment(next.resort.amenities);
 
   // The kitchen, once per day: how much prep every board on the resort
@@ -1383,6 +1330,94 @@ export function pendingEventFor(event, state) {
       return { label, cost, stance };
     }),
   };
+}
+
+/**
+ * The course as today's golfers meet it, before anybody tees off.
+ *
+ * `runDay` uses exactly this, and so does every screen that previews a
+ * day -- the Pricing sheet's "a round here is worth" line, its fee
+ * ceiling, its demand forecast, the HUD's course rating. Those used to
+ * re-derive it by hand and had drifted four ways: they rated the course
+ * without the crowd that plays it, ignored a championship's setup, ignored
+ * holes a decision event had shut, and looked for hotel rooms in a field
+ * (`rooms.count`) that saves have not had since rooms became standard and
+ * suite -- so from Act II on the forecast believed there was no hotel,
+ * cut destination guests to a quarter, and left the beds out of the
+ * catchment.
+ *
+ * Read on the state as it stands: inside `runDay` that is after the crew
+ * has worked on the setup this morning, which is the course the day plays.
+ */
+export function courseToday(state) {
+  const holes = playableHoles(state);
+  // Rated against the last crowd that actually played: rating feeds
+  // demand and demand decides today's crowd, so today's is not knowable
+  // yet. The lag is the point -- change the course and the rating dips
+  // until the clientele catches up. "Last that played" because a day
+  // nobody played (a championship round, above all) leaves an empty crowd
+  // in the history, and an empty crowd falls back to the average golfer.
+  const rating = holes.length
+    ? courseRating(holes, state.turfQuality, lastCrowdThatPlayed(state.history ?? []))
+    : 0;
+  // What the segments react to, both when deciding whether to come and
+  // when deciding how they felt. Firm greens and thick rough are what a
+  // championship wants and what a Tuesday fourball hates: the run-up's
+  // cost to the everyday trade lives in the setup term.
+  const courseDifficulty = clamp(
+    courseDifficultyOf(holes) + setupDifficultyBonus(state.resort.setup ?? 0), 0, 100
+  );
+  const averageScenery = holes.length
+    ? holes.reduce((sum, h) => sum + holeStats(h).scenery, 0) / holes.length
+    : 0;
+  // Word of mouth from the last few days. No history yet (day one) is
+  // neutral, so the resort is neither punished nor rewarded before it has
+  // played.
+  const recent = (state.satisfactionHistory ?? []).slice(-3);
+  const recentSatisfaction = recent.length
+    ? recent.reduce((sum, v) => sum + v, 0) / recent.length
+    : 50;
+  return {
+    holes,
+    rating,
+    courseDifficulty,
+    averageScenery,
+    // Destination guests are mostly an Act II crowd; Act I has no rooms.
+    hasRooms: totalRooms(state.resort.rooms) > 0,
+    recentSatisfaction,
+    value: perceivedValue({
+      courseRating: rating, prestige: state.prestige, amenities: state.resort.amenities,
+      holesOpen: holes.length,
+    }),
+  };
+}
+
+/**
+ * Who wants to come today, as `runDay` asks it -- everything but the
+ * weather, which the caller passes (1 for a preview: the player is
+ * choosing a price for an ordinary day, not for tomorrow's forecast).
+ */
+export function demandToday(state, { weather = 1 } = {}) {
+  const today = courseToday(state);
+  if (today.holes.length === 0) return null;
+  return demandGroups({
+    weather,
+    courseRating: today.rating,
+    prestige: state.prestige,
+    amenities: state.resort.amenities,
+    greenFee: state.resort.pricing.greenFee,
+    teeInterval: state.resort.pricing.teeInterval,
+    recentSatisfaction: today.recentSatisfaction,
+    holesOpen: today.holes.length,
+    courseDifficulty: today.courseDifficulty,
+    scenery: today.averageScenery,
+    turfQuality: state.turfQuality,
+    hasRooms: today.hasRooms,
+    rooms: state.resort.rooms,
+    // A bad write-up, an outbreak, a road shut: a multiplier on how many
+    // people want to come that the player cannot argue with today.
+    conditionFactor: conditionEffects(state.conditions ?? []).demandFactor,
+  });
 }
 
 /** What one course amenity is worth to a round, before a crowd weighs it. */

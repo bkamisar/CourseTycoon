@@ -6,7 +6,7 @@
  * straight off `state` or off a `src/sim/ratings.js` call, never computed
  * here. Course rating in particular mirrors exactly what `src/sim/day.js`
  * does for the same state (rating is 0 with no open holes, otherwise
- * `courseRating(playableHoles(state), state.turfQuality)` -- the open holes
+ * `courseToday(state).rating` in src/sim/day.js -- the open holes
  * less any a decision event has closed), so the HUD figure
  * always agrees with what the day's own report will say.
  *
@@ -21,10 +21,9 @@
  */
 import { PALETTE } from '../render/palette.js';
 import { withinBand } from '../sim/tournaments.js';
-import { playableHoles } from '../sim/state.js';
 import { championshipStatus } from '../sim/championshipWeek.js';
 import { toParText } from './toPar.js';
-import { courseRating } from '../sim/ratings.js';
+import { courseToday } from '../sim/day.js';
 import { SEGMENTS, SEGMENT_KEYS } from '../sim/segments.js';
 
 /**
@@ -79,11 +78,9 @@ function tournamentReadout(state) {
 }
 
 export function computeHudData(state) {
-  const holes = playableHoles(state);
   const lastReport = state.history.length ? state.history[state.history.length - 1] : null;
-  const rating = holes.length
-    ? courseRating(holes, state.turfQuality, lastReport?.crowd ?? null)
-    : 0;
+  // The day's own rating, not a copy of how it is worked out.
+  const { rating } = courseToday(state);
   return {
     money: state.money,
     day: state.day,
