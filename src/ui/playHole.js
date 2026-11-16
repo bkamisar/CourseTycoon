@@ -27,12 +27,16 @@ import {
 } from '../sim/playGolf.js';
 import { greenSlope, slopeFraction } from '../sim/putting.js';
 import { LIE } from '../sim/terrain.js';
+import { IMPACT_MS } from '../render/playView.js';
 import { headerLines, caddieLine, strokeLine, finishLine, meterHint } from './playCopy.js';
 
 /** Internal canvas px a finger may wander and still count as a tap. */
 const TAP_THRESHOLD_PX = 4;
 /** How long a result line holds the screen before the next shot. */
 const MESSAGE_MS = 1100;
+/** The ball's tail in flight: how many past positions, and how far apart in time. */
+const TRAIL_POINTS = 6;
+const TRAIL_STEP_MS = 35;
 
 /** Where a cursor value sits along the meter bar, 0–100. */
 export function meterPercent(value) {
@@ -167,6 +171,7 @@ export function mountPlayHole({
   let outcome = null;
   let struckAt = 0;
   let messageUntil = 0;
+  let impact = null;          // { x, y, kind, at } — the burst where the last ball came down
   let line = '';              // result / finish line, shown in place of the caddie
   let bestNow = best;
   let roundNow = round;
@@ -187,6 +192,10 @@ export function mountPlayHole({
   // while the target is dragged, or the ground would slide under the
   // finger that is aiming at it.
   function ensureCamera() {
+    // ...and it holds still from the strike until the next shot is set up:
+    // the player watches the ball land where it was hit to, reads what
+    // happened, and only then does the view move on.
+    if (camera && phase !== 'aim' && phase !== 'swing') return;
     const key = `${viewRect.y}|${viewRect.height}|${play.strokes}|${play.ball.x}|${play.ball.y}|${play.lie}`;
     if (key === cameraKey && camera) return;
     cameraKey = key;
@@ -305,7 +314,16 @@ export function mountPlayHole({
     updateDock();
   }
 
+  function impactKind() {
+    if (outcome.holed) return 'cup';
+    if (outcome.penalty === 'water') return 'water';
+    if (outcome.kind === 'putt' || outcome.penalty === 'lost') return null;
+    return outcome.lie === LIE.SAND ? 'sand' : 'turf';
+  }
+
   function land(now) {
+    const kind = impactKind();
+    impact = kind ? { x: outcome.to.x, y: outcome.to.y, kind, at: now } : null;
     play = applyStroke(play, outcome);
     if (outcome.penalty === 'water') sfx?.splash();
     if (isFinished(play)) {
@@ -361,24 +379,41 @@ export function mountPlayHole({
 
     let ball = play.ball;
     let lift = 0;
+    let trail = [];
     if (phase === 'flight') {
-      const f = flightAt(outcome, now - struckAt);
+      const elapsed = now - struckAt;
+      const f = flightAt(outcome, elapsed);
       if (f.done) {
         land(now);
         ball = play.ball;
       } else {
         ball = f;
         lift = f.lift;
+        if (outcome.kind === 'swing') {
+          for (let k = TRAIL_POINTS; k >= 1; k--) {
+            const then = elapsed - k * TRAIL_STEP_MS;
+            if (then > 0) trail.push(flightAt(outcome, then));
+          }
+        }
       }
     }
+    if (impact && now - impact.at >= IMPACT_MS) impact = null;
     if (phase === 'message' && now >= messageUntil) nextShot();
 
     ensureCamera();
     updateMeter(now);
 
-    const putting = play.lie === LIE.GREEN && phase !== 'flight';
+    const putting = play.lie === LIE.GREEN && (phase === 'aim' || phase === 'swing');
+    // The golfer stands where the ball is struck from: beside it while
+    // aiming, and still there, followed through, while it flies and lands.
+    let golfer = null;
+    if (phase === 'aim') golfer = { at: play.ball, pose: 'address' };
+    else if (phase === 'swing') golfer = { at: play.ball, pose: swing.phase === 'ready' ? 'address' : 'backswing' };
+    else if (outcome && !(phase === 'finished' && play.holed)) golfer = { at: outcome.from, pose: 'finish' };
     drawPlayScene(ctx, rect.width, rect.height, {
-      hole, viewRect, camera, ball, lift,
+      hole, viewRect, camera, ball, lift, trail, golfer,
+      impact: impact ? { ...impact, age: now - impact.at } : null,
+      weatherKey: weather.key, timeMs: now,
       target: phase === 'aim' || phase === 'swing' ? target : null,
       reachYards: play.lie === LIE.GREEN ? null : reachFrom(play.lie),
       slope: putting || (outcome && outcome.kind === 'putt') ? greenSlope(hole) : null,

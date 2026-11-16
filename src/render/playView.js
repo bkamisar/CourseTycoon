@@ -11,8 +11,9 @@
  * so a ball is two crisp pixels at any zoom.
  */
 import { PALETTE } from './palette.js';
-import { SPRITES, drawSprite } from './sprites.js';
-import { drawHole } from './holeView.js';
+import { SPRITES, drawSprite, drawSpriteOutlined } from './sprites.js';
+import { drawWeather } from './weatherFx.js';
+import { drawHole, fillWoods } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
 import { greenRadius } from '../sim/terrain.js';
 
@@ -110,6 +111,66 @@ function drawAim(ctx, camera, ball, target) {
   ctx.fillRect(x, y - 3, 1, 7);
 }
 
+/** How long the burst where a ball came down stays on screen. */
+export const IMPACT_MS = 520;
+
+const IMPACT_STYLE = {
+  // colour, particles, how far they spread (px), how high they jump (px)
+  water: { colour: 'WATER_LIGHT', count: 9, spread: 9, jump: 6 },
+  sand: { colour: 'SAND_LIGHT', count: 8, spread: 7, jump: 4 },
+  turf: { colour: 'UI_LIGHT', count: 5, spread: 4, jump: 2 },
+  cup: { colour: 'ACCENT', count: 10, spread: 10, jump: 7 },
+};
+
+/**
+ * Where the particles of an impact are, `age` ms after it. Pure, so the
+ * shape of a splash is a fact that can be tested rather than a look that
+ * can only be squinted at: a ring that widens, flattened to read as lying
+ * on the ground, with every particle jumping up and coming back down.
+ */
+export function impactParticles(kind, age) {
+  const style = IMPACT_STYLE[kind];
+  if (!style || age < 0 || age >= IMPACT_MS) return [];
+  const t = age / IMPACT_MS;
+  const reach = 1 + style.spread * t;
+  const jump = Math.sin(Math.PI * t) * style.jump;
+  const particles = [];
+  for (let i = 0; i < style.count; i++) {
+    const angle = (i / style.count) * Math.PI * 2 + 0.4;
+    particles.push({ dx: Math.cos(angle) * reach, dy: Math.sin(angle) * reach * 0.55 - jump });
+  }
+  return particles;
+}
+
+function drawImpact(ctx, camera, impact) {
+  const style = IMPACT_STYLE[impact.kind];
+  if (!style) return;
+  const s = camera.toScreen(impact);
+  ctx.fillStyle = PALETTE[style.colour];
+  for (const p of impactParticles(impact.kind, impact.age)) dot(ctx, { x: s.x + p.dx, y: s.y + p.dy });
+}
+
+const GOLFER_POSE = { address: 'golferAddress', backswing: 'golferBackswing', finish: 'golferFinish' };
+
+/** The player's golfer, standing to the left of where the ball is (or
+ * was) struck from, feet level with it. Fixed size at any zoom, like the
+ * flag and the tee — he is a marker for "you are here", not scenery. */
+function drawGolfer(ctx, camera, golfer) {
+  const sprite = SPRITES[GOLFER_POSE[golfer.pose] ?? GOLFER_POSE.address];
+  const s = camera.toScreen(golfer.at);
+  drawSpriteOutlined(ctx, sprite, s.x - sprite[0].length - 1, s.y - (sprite.length - 2));
+}
+
+/** The last few places the ball was, oldest first and faintest: the tail
+ * that makes a white dot crossing green stripes readable as a shot. */
+function drawTrail(ctx, camera, trail) {
+  trail.forEach((p, i) => {
+    const s = camera.toScreen(p);
+    ctx.fillStyle = i < trail.length / 2 ? PALETTE.UI_LIGHT : PALETTE.WHITE;
+    ctx.fillRect(Math.round(s.x), Math.round(s.y) - Math.round(p.lift ?? 0), 1, 1);
+  });
+}
+
 function drawBall(ctx, camera, ball, lift) {
   const s = camera.toScreen(ball);
   const x = Math.round(s.x);
@@ -128,6 +189,10 @@ function drawBall(ctx, camera, ball, lift) {
  *   target,                  // world yards, or null to hide the aim line
  *   reachYards,              // number, or null to hide the ring (hidden on the green)
  *   slope, slopeFraction,    // the green's slope, or slope null when not putting
+ *   golfer,                  // { at: {x,y}, pose } or null
+ *   trail,                   // [{ x, y, lift }] oldest first, or []
+ *   impact,                  // { x, y, kind, age } or null
+ *   weatherKey, timeMs,      // today's condition and the animation clock
  * }
  * `canvasWidth`/`canvasHeight` are the surface's, for the clear.
  */
@@ -144,13 +209,19 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
   ctx.rect(viewRect.x, viewRect.y, viewRect.width, viewRect.height);
   ctx.clip();
 
-  // Beyond the hole is woods — exactly what lieAt returns out there.
-  ctx.fillStyle = PALETTE.TREE;
-  ctx.fillRect(viewRect.x, viewRect.y, viewRect.width, viewRect.height);
-
   ctx.save();
   ctx.translate(camera.tx, camera.ty);
   ctx.scale(camera.zoom, camera.zoom);
+  // Beyond the hole is woods — exactly what lieAt returns out there —
+  // painted under the same zoom as the hole, so the canopies outside the
+  // hole's own rectangle are the same size as the ones inside it. The
+  // rectangle filled is the view, mapped back through the zoom.
+  fillWoods(ctx, {
+    x: (viewRect.x - camera.tx) / camera.zoom,
+    y: (viewRect.y - camera.ty) / camera.zoom,
+    width: viewRect.width / camera.zoom,
+    height: viewRect.height / camera.zoom,
+  });
   drawHole(ctx, hole, viewRect, { flag: false, clip: false });
   ctx.restore();
 
@@ -160,7 +231,11 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
     if (scene.reachYards) drawReachRing(ctx, camera, scene.ball, scene.reachYards);
     drawAim(ctx, camera, scene.ball, scene.target);
   }
+  if (scene.impact) drawImpact(ctx, camera, scene.impact);
+  if (scene.golfer) drawGolfer(ctx, camera, scene.golfer);
+  if (scene.trail?.length) drawTrail(ctx, camera, scene.trail);
   drawBall(ctx, camera, scene.ball, scene.lift ?? 0);
+  if (scene.weatherKey) drawWeather(ctx, viewRect, scene.weatherKey, scene.timeMs ?? 0);
 
   ctx.restore();
 }

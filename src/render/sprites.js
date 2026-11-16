@@ -30,6 +30,10 @@ export const SPRITE_CHARS = {
   H: 'FAIRWAY_SHADOW',
   R: 'ROUGH',
   K: 'ROUGH_SHADOW',
+  M: 'FOOD_RED',
+  Y: 'FOOD_BERRY',
+  C: 'WATER_LIGHT',
+  N: 'FOOD_MEAT_PALE',
 };
 
 // --- Actors -----------------------------------------------------------
@@ -63,6 +67,78 @@ const golferWalk2 = [
   '..DW.DD.',
   '.OW...OO',
   '........',
+  '........',
+];
+
+/**
+ * A golfer small enough to stand on an overview plot: 5 wide x 7 tall,
+ * two walk frames. `s` is the shirt, which `shirted()` recolours so the
+ * groups on the course are not a field of identical people.
+ */
+const miniGolferWalk1 = [
+  '.AAA.',
+  '.NNN.',
+  'sssss',
+  '.sss.',
+  '.DDD.',
+  '.D.D.',
+  'O...O',
+];
+
+const miniGolferWalk2 = [
+  '.AAA.',
+  '.NNN.',
+  'sssss',
+  '.sss.',
+  '.DDD.',
+  '..D..',
+  '.OO..',
+];
+
+/** The player's golfer, 8 wide x 12 tall, facing the target (up the
+ * screen) in three poses: over the ball, club back, and followed through. */
+const golferAddress = [
+  '..AAA...',
+  '..ONO...',
+  '..OOO...',
+  '.DWWWD..',
+  '.DWWWD..',
+  '..DWDL..',
+  '..DWD.L.',
+  '..DDD..L',
+  '..D.D..L',
+  '..D.D...',
+  '.OO.OO..',
+  '........',
+];
+
+const golferBackswing = [
+  'L.AAA...',
+  'L.ONO...',
+  '.LOOO...',
+  '.LWWWD..',
+  '.DWWWD..',
+  '..DWD...',
+  '..DWD...',
+  '..DDD...',
+  '..D.D...',
+  '..D.D...',
+  '.OO.OO..',
+  '........',
+];
+
+const golferFinish = [
+  '..AAA..L',
+  '..ONO.L.',
+  '..OOOL..',
+  '.DWWWL..',
+  '.DWWWD..',
+  '..DWD...',
+  '..DWD...',
+  '..DDD...',
+  '..D.D...',
+  '.D..D...',
+  'OO..OO..',
   '........',
 ];
 
@@ -250,6 +326,11 @@ export const SPRITES = {
   beverageCart,
   golferWalk1,
   golferWalk2,
+  miniGolferWalk1,
+  miniGolferWalk2,
+  golferAddress,
+  golferBackswing,
+  golferFinish,
   flag,
   tee,
   tree,
@@ -265,6 +346,50 @@ export const SPRITES = {
   practiceGreen,
   cartBarn,
 };
+
+/** Shirt colours for the groups on the course, as sprite colour keys. */
+export const SHIRT_KEYS = ['M', 'B', 'A', 'W', 'Y', 'C'];
+
+const shirtedCache = new Map();
+
+/** `sprite` with its shirt pixels (`s`) recoloured to SHIRT_KEYS[index].
+ * Cached: this is asked for every golfer on every frame. */
+export function shirted(sprite, index) {
+  const key = SHIRT_KEYS[((index % SHIRT_KEYS.length) + SHIRT_KEYS.length) % SHIRT_KEYS.length];
+  let byKey = shirtedCache.get(sprite);
+  if (!byKey) {
+    byKey = new Map();
+    shirtedCache.set(sprite, byKey);
+  }
+  if (!byKey.has(key)) byKey.set(key, sprite.map((row) => row.replaceAll('s', key)));
+  return byKey.get(key);
+}
+
+/**
+ * Blits a sprite with a one-pixel dark outline all the way round it.
+ *
+ * A figure a few pixels tall has to be read against mown stripes, sand,
+ * water and canopy, and no single shirt colour survives all four. The
+ * outline does: it is the same trick every 8-bit sprite on a busy
+ * background uses.
+ */
+export function drawSpriteOutlined(ctx, sprite, x, y, options) {
+  const ox = Math.round(x);
+  const oy = Math.round(y);
+  const width = sprite[0].length;
+  const flip = options?.flip ?? false;
+  ctx.fillStyle = PALETTE.OUTLINE;
+  for (let row = 0; row < sprite.length; row++) {
+    const line = sprite[row];
+    for (let col = 0; col < line.length; col++) {
+      if (line[col] === '.') continue;
+      const px = flip ? width - 1 - col : col;
+      ctx.fillRect(ox + px - 1, oy + row, 3, 1);
+      ctx.fillRect(ox + px, oy + row - 1, 1, 3);
+    }
+  }
+  drawSprite(ctx, sprite, ox, oy, options);
+}
 
 /**
  * Blits a sprite at integer canvas coordinates. Coordinates are rounded —

@@ -16,7 +16,8 @@
  * drift off the fairway it is meant to be walking down.
  */
 import { PALETTE } from './palette.js';
-import { SPRITES, drawSprite } from './sprites.js';
+import { SPRITES, drawSprite, shirted, drawSpriteOutlined } from './sprites.js';
+import { animationFrame } from './animClock.js';
 import { computeHoleTransform } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
 import { pathLength, pointAtDistance } from '../sim/geometry.js';
@@ -127,15 +128,23 @@ export function computeEffects(timeline, holes, regions, minute, window = EFFECT
   return effects;
 }
 
-/** Draws a small pixel marker for every active group token. */
+/** How long each walk frame is held, in ms of animation time. */
+const WALK_FRAME_MS = 260;
+
+/**
+ * Draws every group on the course as a small walking golfer, feet on the
+ * token's position, in the group's own shirt.
+ *
+ * A group used to be a three-pixel dot. A dot says where the group is; a
+ * figure says there are people on your golf course, which is the whole
+ * point of watching the day.
+ */
 export function drawTokens(ctx, tokens) {
   for (const tok of tokens) {
-    const x = Math.round(tok.x);
-    const y = Math.round(tok.y);
-    ctx.fillStyle = PALETTE.OUTLINE;
-    ctx.fillRect(x - 1, y - 1, 3, 3);
-    ctx.fillStyle = PALETTE.WHITE;
-    ctx.fillRect(x, y, 1, 1);
+    const frame = animationFrame(WALK_FRAME_MS, 2, tok.groupIndex);
+    const base = frame === 0 ? SPRITES.miniGolferWalk1 : SPRITES.miniGolferWalk2;
+    const sprite = shirted(base, tok.groupIndex);
+    drawSpriteOutlined(ctx, sprite, tok.x - 2, tok.y - (sprite.length - 1));
   }
 }
 

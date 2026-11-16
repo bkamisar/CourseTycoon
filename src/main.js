@@ -10,6 +10,8 @@
 import { createSurface, topChromeOverlapPx, bottomChromeOverlapPx } from './render/pixel.js';
 import { PALETTE } from './render/palette.js';
 import { drawResort, hasBackNine } from './render/resortView.js';
+import { setAnimationTime, animationTime } from './render/animClock.js';
+import { drawWeather } from './render/weatherFx.js';
 import { computeTokens, computeEffects, drawTokens, drawEffects } from './render/tokens.js';
 import { openHoles } from './sim/state.js';
 import { runDay, applyEventChoice } from './sim/day.js';
@@ -189,7 +191,11 @@ function drawOverview() {
   // comment on render() in src/ui/editor.js for why that matters.
   ctx.fillStyle = PALETTE.OUTLINE;
   ctx.fillRect(0, 0, width, height);
-  regions = drawResort(ctx, state, { ...insetRectForChrome(overviewToolbar), nine: shownNine });
+  const mapRect = insetRectForChrome(overviewToolbar);
+  regions = drawResort(ctx, state, { ...mapRect, nine: shownNine });
+  // Today's weather, falling on the course the forecast says it will fall
+  // on: the same `weatherOn` call the day itself is about to make.
+  drawWeather(ctx, mapRect, weatherOn(state.weatherSeed, state.day), animationTime());
   hud.update(state);
   amenityBar.update(state);
 }
@@ -222,7 +228,8 @@ function openPlayFor(holeId, { fresh = false } = {}) {
   if (fresh) playRound = [];
   const hole = state.resort.courses[0].holes.find((h) => h.id === holeId);
   const par = parOf(hole);
-  const today = effectsOf(weatherOn(state.weatherSeed, state.day));
+  const weatherKey = weatherOn(state.weatherSeed, state.day);
+  const today = effectsOf(weatherKey);
   const nextId = nextOpenHoleAfter(holeId);
   router.go('play');
   activePlay = mountPlayHole({
@@ -233,7 +240,7 @@ function openPlayFor(holeId, { fresh = false } = {}) {
     par,
     lengthYards: holeStats(hole).length,
     best: bestOn(state, hole),
-    weather: { short: today.short, spread: today.spread },
+    weather: { key: weatherKey, short: today.short, spread: today.spread },
     round: roundLine(playRound),
     hasNext: nextId !== null,
     topInsetPx: embedded ? EMBEDDED_TOP_INSET : 0,
@@ -763,11 +770,15 @@ function drawPlayback() {
   const { ctx, width, height } = surface;
   ctx.fillStyle = PALETTE.OUTLINE;
   ctx.fillRect(0, 0, width, height);
-  regions = drawResort(ctx, dayResult.state, { ...insetRectForChrome(playbackToolbar), nine: shownNine });
+  const mapRect = insetRectForChrome(playbackToolbar);
+  regions = drawResort(ctx, dayResult.state, { ...mapRect, nine: shownNine });
   const holes = openHoles(dayResult.state);
   const minute = clock.minute;
   drawTokens(ctx, computeTokens(dayResult.timeline, holes, regions, minute));
   drawEffects(ctx, computeEffects(dayResult.timeline, holes, regions, minute));
+  // `state` is still the morning's until the report is dismissed, so its
+  // day is the day being watched.
+  drawWeather(ctx, mapRect, weatherOn(state.weatherSeed, state.day), animationTime());
   hud.update(state); // yesterday's figures -- today's are still a secret until the report
   amenityBar.update(state);
 }
@@ -919,6 +930,10 @@ function commitDay() {
 function frame(now) {
   const dt = lastFrameTime === null ? 0 : now - lastFrameTime;
   lastFrameTime = now;
+  // The one clock every animated detail on the canvas reads — light on
+  // water, rain, walking golfers. Set here, once, so a frame is drawn at
+  // one instant and nothing in src/render reads the time for itself.
+  setAnimationTime(now);
 
   switch (router.current) {
     case 'start':
