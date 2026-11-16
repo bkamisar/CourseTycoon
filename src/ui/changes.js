@@ -31,13 +31,19 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-11-16b';
+export const BUILD = '2026-11-16c';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-11-16c',
+    notes: [
+      'The swing meter is a little kinder. The bar moves about a sixth slower, up and back, so both the power tap and the strike are easier to catch. Nothing else about a shot has changed: the same clubs, the same greens, the same cup.',
+    ],
+  },
   {
     version: '2026-11-16b',
     notes: [

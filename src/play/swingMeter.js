@@ -16,16 +16,20 @@
  * line: above it is early (+, the ball goes right), below it is late (−,
  * left). Left alone it runs out at METER.LATE_LIMIT, a full miss.
  *
- * WHY THESE NUMBERS. A person tapping to a moving cursor is good to about
- * 35 ms. At SPEED 0.001/ms that is 3.5% of the bar: nine yards on a drive,
- * and — through ACC_WINDOW — a little under half of the worst possible
- * miss. tools/playGolfBot.js plays the six templates at that skill and
- * lands on par, which is the whole calibration target; see its table
- * before changing anything here.
+ * WHY THESE NUMBERS. The first build guessed that a person tapping to a
+ * moving cursor is good to about 35 ms, and ran the bar at 0.001 a
+ * millisecond so that such a player scored par. The first person to play
+ * it asked for it slightly easier, which is the only measurement of a
+ * person this game has, so the bar now runs 15% slower. Par is a player
+ * good to about 41 ms: 3.5% of the bar, nine yards on a drive, and —
+ * through ACC_WINDOW — a little under half of the worst possible miss.
+ * The old 35 ms player now beats par by a third of a stroke a hole.
+ * tools/playGolfBot.js is the measurement; see its table before changing
+ * anything here.
  */
 export const METER = Object.freeze({
-  /** Bar units per millisecond, both directions. 0 → 1 takes one second. */
-  SPEED: 0.001,
+  /** Bar units per millisecond, both directions. 0 → 1 takes a little under 1.2 seconds. */
+  SPEED: 0.00085,
   /** Top of the bar. Everything above 1 is overswing. */
   MAX: 1.1,
   /** Softest swing the meter will accept — a tap-tap must still move the ball. */

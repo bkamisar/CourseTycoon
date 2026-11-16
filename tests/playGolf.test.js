@@ -331,7 +331,9 @@ test('the bag is ordered shortest first, which planShot relies on', () => {
 //
 // tools/playGolfBot.js is the measurement; these pin its conclusions on a
 // fresh set of seeds so a retune that breaks the feel fails loudly. The
-// floors are loose on purpose (the table has -0.11 / -0.80 / +0.82).
+// floors are loose on purpose (the table has -0.12 / -0.93 / +0.49).
+// Par moved from 35 ms to 41 ms when the meter was slowed 15% after the
+// first playtest; the sloppy player's floor came down with it.
 
 function averageOverPar(sd, plays = 120) {
   let over = 0;
@@ -347,16 +349,16 @@ function averageOverPar(sd, plays = 120) {
   return over / n;
 }
 
-test('ordinary timing (35 ms) plays to about par', () => {
-  const over = averageOverPar(35);
-  assert.ok(over > -0.5 && over < 0.4, `35 ms averaged ${over.toFixed(2)} a hole`);
+test('ordinary timing (41 ms) plays to about par', () => {
+  const over = averageOverPar(41);
+  assert.ok(over > -0.5 && over < 0.4, `41 ms averaged ${over.toFixed(2)} a hole`);
 });
 
 test('sharper timing scores lower and sloppier timing scores higher', () => {
   const sharp = averageOverPar(20);
   const sloppy = averageOverPar(60);
-  assert.ok(sharp < -0.4, `20 ms averaged ${sharp.toFixed(2)}`);
-  assert.ok(sloppy > 0.4 && sloppy < 1.6, `60 ms averaged ${sloppy.toFixed(2)}`);
+  assert.ok(sharp < -0.5, `20 ms averaged ${sharp.toFixed(2)}`);
+  assert.ok(sloppy > 0.15 && sloppy < 1.2, `60 ms averaged ${sloppy.toFixed(2)}`);
 });
 
 test('every template can be finished by a sloppy player without picking up often', () => {

@@ -59,7 +59,7 @@ same whether it is a drive or a chip.
 
 **Meter.** One bar, three taps (or three presses of Space):
 
-1. **Start.** The cursor climbs the bar, one second from empty to 100%.
+1. **Start.** The cursor climbs the bar, a little under 1.2 seconds from empty to 100%.
 2. **Power.** Tap when the cursor reaches the mark. Short of it is short; past 100%
    (the bar runs to 110%) is extra carry and a wilder strike.
 3. **Strike.** The cursor runs back down to the strike line. Tap on the line. Early
@@ -103,8 +103,8 @@ What the course does to that shot is exactly what it does to a guest:
 
 - **Bag:** Chip 40 · Pitch 70 · Wedge 105 · 9 iron 135 · 7 iron 165 · 5 iron 195 ·
   3 wood 225 · Driver 250 yards at 100% from a clean lie.
-- **Strike:** ±80 ms either side of the line is the full range of error; at the
-  limit the ball starts 12° off line (52 yards wide on a full drive). Within ±12 ms
+- **Strike:** ±94 ms either side of the line is the full range of error; at the
+  limit the ball starts 12° off line (52 yards wide on a full drive). Within ±14 ms
   it is called perfect and flies dead straight. Overswing to 110% multiplies the
   error by up to 1.5.
 - **Penalties:** water, or a ball more than 40 yards beyond the rough, costs one
@@ -126,14 +126,24 @@ What the course does to that shot is exactly what it does to a guest:
 
 `tools/playGolfBot.js` plays the six hole templates through the real meter, tapping
 at the ideal instants plus a normally distributed error. 400 plays per hole,
-2026-11-16:
+2026-11-16, at the meter speed the game now ships with (see the note below the
+table):
 
 | Tap error | Strokes vs par, per hole | Putts | Fairways | Greens in reg. |
 |---|---|---|---|---|
 | 0 ms (not a person) | −2.17 | 0.00 | 100% | 100% |
-| 20 ms (sharp) | −0.80 | 1.19 | 85% | 89% |
-| **35 ms (paying attention)** | **−0.11** | **1.50** | **61%** | **64%** |
-| 60 ms (sloppy) | +0.82 | 1.97 | 37% | 31% |
+| 20 ms (sharp) | −0.93 | 1.11 | 90% | 93% |
+| 35 ms | −0.37 | 1.38 | 70% | 73% |
+| **41 ms (paying attention)** | **−0.12** | **1.49** | **61%** | **64%** |
+| 60 ms (sloppy) | +0.49 | 1.79 | 43% | 40% |
+
+**Slowed after the first playtest.** The meter first ran at one second from empty
+to full, where par was a 35 ms player (−0.11; 20 ms scored −0.80 and 60 ms +0.82).
+The first person to play it asked for the slider slightly easier, so the bar was
+slowed 15% (`METER.SPEED` 0.001 → 0.00085). A slower bar is the same as a steadier
+hand, so par is now a 41 ms player and everyone gains between a tenth and a third
+of a stroke a hole. Speed was chosen over the strike window because it eases both
+taps — distance and direction — and it is the one the player can see.
 
 The target was "ordinary timing plays to par", and it does. The first constants
 tried (a ±100 ms strike window, 10°, a 3° putter into a 0.2-yard cup) scored −0.74
@@ -141,9 +151,10 @@ at 35 ms with 1.12 putts — everything inside eight yards was a gimme — so th
 windows were tightened and re-measured. Three tests in `tests/playGolf.test.js` pin
 these conclusions on fresh seeds.
 
-Two honest caveats. **The 35 ms figure is an assumption about people**, not a
-measurement of one; the first real playtest will say whether it is 35 or 60, and
-`METER.ACC_WINDOW` is the one dial to turn. And reading the green is worth little
+Two honest caveats. **The figure for ordinary timing is still mostly an assumption
+about people.** One playtest has moved it from 35 ms to 41; more play will say
+whether it should move again, and `METER.SPEED` (both taps) and `METER.ACC_WINDOW`
+(direction only) are the dials. And reading the green is worth little
 to the robot (1.50 putts reading perfectly, 1.55 aiming at the cup) because timing
 error swamps break at these slopes — fine for a first version, and the first thing
 to strengthen if putting feels flat.

@@ -1400,8 +1400,11 @@ driving the game with scripted input and reading the page and the canvas back:
    hidden, so screenshots were not possible; the canvas was captured directly (and looks
    right), but the DOM chrome was only measured, never looked at. First job: open the
    game, press Play, and look. Fix anything ugly in the CSS in `src/ui/playHole.js`.
-2. **Feel.** The constants assume a person taps to within about 35 ms. Play nine holes
-   on a phone. If par is out of reach, raise `METER.ACC_WINDOW` in
+2. **Feel.** The constants first assumed a person taps to within about 35 ms. The
+   first playtest asked for the slider slightly easier, so `METER.SPEED` was slowed
+   15% (0.001 → 0.00085, build `2026-11-16c`) and par is now a 41 ms player. Keep
+   playing on a phone. If par is still out of reach, slow `METER.SPEED` again or raise
+   `METER.ACC_WINDOW` in
    `src/play/swingMeter.js` (0.08 → 0.10) and re-run `node tools/playGolfBot.js`; the
    three calibration tests in `tests/playGolf.test.js` will need their bounds moved to
    match, with the new table pasted into the bot's header comment.

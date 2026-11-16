@@ -14,18 +14,25 @@
  *   node tools/playGolfBot.js            # the table below
  *   node tools/playGolfBot.js --rounds 2000 --sd 35
  *
- * MEASURED 2026-11-16, 400 plays per hole, strokes against par per hole
- * across the six templates:
+ * MEASURED 2026-11-16 at METER.SPEED 0.00085, 400 plays per hole, strokes
+ * against par per hole across the six templates:
  *
  *   tap error   reads the green   aims at the cup   putts   fairways   greens
  *      0 ms         -2.17             -2.17          0.00     100%      100%
- *     20 ms         -0.80             -0.64          1.19      85%       89%
- *     35 ms         -0.11             -0.06          1.50      61%       64%
- *     60 ms         +0.82             +0.84          1.97      37%       31%
+ *     20 ms         -0.93             -0.76          1.11      90%       93%
+ *     35 ms         -0.37             -0.27          1.38      70%       73%
+ *     41 ms         -0.12             -0.07          1.49      61%       64%
+ *     60 ms         +0.49             +0.53          1.79      43%       40%
  *
- * 35 ms is a person paying attention, and plays to par: that is the
- * target. 0 ms holes every full shot and is not a person; it is in the
- * table to show that the game has no dice, only timing.
+ * 41 ms plays to par: that is the target. 0 ms holes every full shot and
+ * is not a person; it is in the table to show that the game has no dice,
+ * only timing.
+ *
+ * The bar first ran at 0.001, where par was 35 ms (-0.11) and the other
+ * rows read -0.80 at 20 ms and +0.82 at 60 ms. It was slowed 15% after
+ * the first playtest asked for it slightly easier. Slowing the bar is
+ * the same as tapping 15% more accurately, which is why the 41 ms row
+ * now is the 35 ms row then.
  *
  * The first constants tried (strike window 0.10, 10 degrees, putts at 3
  * degrees into a 0.2-yard cup) put 35 ms at -0.74 a hole with 1.12 putts:
@@ -38,7 +45,7 @@ import { makeRng } from '../src/sim/rng.js';
 import {
   startHole, isFinished, defaultTarget, planShot, resolveStroke, applyStroke, parOf,
 } from '../src/sim/playGolf.js';
-import { newSwing, tapSwing, idealTaps } from '../src/play/swingMeter.js';
+import { METER, newSwing, tapSwing, idealTaps } from '../src/play/swingMeter.js';
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -52,7 +59,7 @@ export function botSwing(rng, needed, sd) {
   const powerAt = Math.max(1, ideal.powerAt + rng.normal(0, sd));
   swing = tapSwing(swing, powerAt);
   if (swing.phase === 'done') return swing;
-  const strikeAt = powerAt + swing.power / 0.001 + rng.normal(0, sd);
+  const strikeAt = powerAt + swing.power / METER.SPEED + rng.normal(0, sd);
   swing = tapSwing(swing, Math.max(powerAt + 1, strikeAt));
   return swing;
 }
@@ -95,7 +102,7 @@ export function botHole(rng, hole, { sd, read, spread = 1 }) {
 
 function main() {
   const rounds = arg('rounds', 1000);
-  const sds = process.argv.includes('--sd') ? [arg('sd', 35)] : [0, 20, 35, 60];
+  const sds = process.argv.includes('--sd') ? [arg('sd', 41)] : [0, 20, 35, 41, 60];
   for (const read of [true, false]) {
     console.log(`\n${read ? 'READS THE GREEN' : 'AIMS AT THE CUP'}  (${rounds} plays per hole)`);
     console.log('sd ms | ' + TEMPLATE_NAMES.map((n) => n.padEnd(13)).join(' | ') + ' | all: vs par, putts, fwy%, gir%, pen');
