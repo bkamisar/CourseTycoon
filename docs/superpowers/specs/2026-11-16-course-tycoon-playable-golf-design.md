@@ -1,10 +1,10 @@
 # Course Tycoon — Playable Golf ("Play this hole")
 
 **Date:** 2026-11-16
-**Status:** Designed by Fable with the author away; every decision below was made
-without review and is listed in §11 so it can be overruled. The measured core is
-built and committed (`9f1a3d3`). The screen, drawing and wiring are not, and are
-the subject of `docs/superpowers/plans/2026-11-16-playable-golf.md`.
+**Status:** Designed and built by Fable with the author away. Every decision below
+was made without review and is listed in §11 so it can be overruled. The feature is
+in the game as build `2026-11-16a`; what has and has not been checked is at the end of
+`docs/superpowers/plans/2026-11-16-playable-golf.md` ("What is left").
 
 ---
 
@@ -211,14 +211,15 @@ leave. A saved round scorecard is §12 material.
 | `src/sim/putting.js` | **built** | `greenSlope`, `puttSpeedFor`, `rollPutt`. |
 | `src/render/playCamera.js` | **built** | `shotFrame`, `makePlayCamera`. |
 | `tools/playGolfBot.js` | **built** | The calibration robot and its table. |
-| `src/play/flight.js` | to build | Where the ball is, `t` ms after it was struck. Pure. |
-| `src/ui/playCopy.js` | to build | The result lines. Pure. |
-| `src/render/playView.js` | to build | Draws one frame of the play screen. |
-| `src/ui/playHole.js` | to build | The screen: header, dock, meter, input, phases. |
-| `src/ui/screens.js`, `src/main.js`, `src/ui/editor.js`, `src/render/holeView.js` | to modify | Sixth screen, wiring, Play button, optional flag. |
+| `src/play/flight.js` | **built** | Where the ball is, `t` ms after it was struck. Pure. |
+| `src/ui/playCopy.js` | **built** | The result lines. Pure. |
+| `src/render/playView.js` | **built** | Draws one frame of the play screen. |
+| `src/ui/playHole.js` | **built** | The screen: header, dock, meter, input, phases. |
+| `src/ui/screens.js`, `src/main.js`, `src/ui/editor.js`, `src/render/holeView.js` | **modified** | Sixth screen, wiring, Play button, optional flag and clip. |
 
-Everything built is pure and tested (65 tests) and nothing imports it yet, so the
-game as shipped is unchanged by commit `9f1a3d3`.
+The feature carries 86 tests, nearly all on the pure modules. The screen module
+(`playHole.js`) is unit-tested only for its meter mapping; the rest was verified in
+a running page.
 
 ## 9. Edge cases
 
@@ -238,9 +239,9 @@ game as shipped is unchanged by commit `9f1a3d3`.
 Pure modules are unit-tested and sabotage-checked (reverse the hook/slice sign,
 drop the penalty stroke, let the cup take any speed, remove the slope, widen the
 strike window, drop hazards from the fingerprint — each fails the test written for
-it). The two modules still to build that are pure (`flight.js`, `playCopy.js`) get
-the same treatment in the plan. The screen itself is verified in the browser
-against a written checklist, because a swing meter cannot be judged from Node.
+it). The screen itself was verified by driving the game in a real page and reading
+the page and the canvas back — the flow is proven; how it feels under a thumb is not,
+because a swing meter cannot be judged by a script.
 
 ## 11. Decisions made without you
 
@@ -256,10 +257,14 @@ Each is cheap to reverse; none touches the economy.
 6. **Three-tap meter**, also used for putting, one bar speed everywhere.
 7. **Stroke-and-distance** for water and lost balls, not the guests' forward drop.
 8. **Records retire when the hole is redesigned.**
-9. **I built the pure core myself** rather than only specifying it, because the
-   spec's numbers had to be measured to be worth writing down and the measuring
-   needed the code. The screen, drawing and wiring — the bulk of the typing — are
-   left for the cheaper model as you asked.
+9. **I built it, rather than only specifying it.** You asked for a spec a cheaper
+   model could build from. Two things pushed past that. The numbers had to be
+   measured to be worth writing down, and measuring needed the core. Then the plan
+   needed complete code to be safe to hand over, and the only way to know the code
+   was right was to run it — at which point the feature existed, and deleting it so
+   a second model could retype it would have spent your usage for nothing. What is
+   left for a cheaper model, or for you with a phone, is the list at the end of the
+   plan: mostly looking at it and feeling it.
 
 ## 12. Worth doing next
 
