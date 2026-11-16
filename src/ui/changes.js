@@ -31,13 +31,22 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-11-16a';
+export const BUILD = '2026-11-16b';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-11-16b',
+    notes: [
+      'The course has had a coat of paint. The woods are woods now, with treetops you can see; fairways are mown in soft bands and greens in a fine check with a collar round them; bunkers have a lip and a shadow, and the light moves on the ponds. The nine plots sit in one piece of woodland instead of on nine cards.',
+      'Your golfers are people. Each group walks the course as a small figure in its own shirt, where there used to be a dot.',
+      'You can see the weather. Rain falls on a wet day and harder in a storm, and wind streaks across on a blowy one. It is the same weather the numbers have always used, so if it is raining on the map it is raining on the takings.',
+      'When you play a hole yourself there is a golfer standing over the ball, a tail behind the ball in the air, and a splash, a puff of sand or a divot where it comes down. Nothing about how any hole plays has changed.',
+    ],
+  },
   {
     version: '2026-11-16a',
     notes: [

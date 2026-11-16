@@ -14,7 +14,9 @@
 > cheaper model to build from. To make sure it could be built from, its code was
 > extracted, wired up and run in a real page — and at that point the feature existed,
 > so it was committed rather than thrown away and typed in again. The code blocks below
-> are the code in the repository. The tasks are kept as the record of how it was built.
+> are the code as first committed; a graphics pass later the same day (build
+> `2026-11-16b`) added to `playView.js`, `playHole.js` and `holeView.js`, so where they
+> differ the repository is right. The tasks are kept as the record of how it was built.
 > **What still needs doing is the section "What is left" at the very end** — start there.
 
 ---
