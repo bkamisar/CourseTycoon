@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-10-04a';
+export const BUILD = '2026-11-16a';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-11-16a',
+    notes: [
+      'You can play your own course. Open any hole and press Play: pick a target, then three taps — start the swing, set the power at the mark, and strike on the line. Early goes right, late goes left. On the green the same three taps roll the putt, and the little arrows show which way the green falls.',
+      'It is there for fun and for finding out whether a hole you designed is any good. It costs nothing, earns nothing and passes no time. The game keeps your best score on each hole, and forgets it the moment you redesign the hole, because it is not the same hole any more.',
+      'Since the last notes: guests are no longer marked down for playing the back nine, each building now pleases the crowd it was built for, and the Pricing preview shows exactly the day the game will run.',
+    ],
+  },
   {
     version: '2026-10-04a',
     notes: [
