@@ -903,6 +903,28 @@ function buildFor(state, rungId) {
  * against never bidding" is a claim about the twenty-one days as much as
  * about the day.
  *
+ * RE-MEASURED 2026-11-16 (fourth run, every phase rebuilt with `--force`),
+ * after two fixes to how a guest's round is scored (satisfaction.js: the
+ * score expectation now scales with the holes played; day.js: buildings
+ * please the crowd they are for, championship buildings nobody) and the
+ * investor ceilings that moved with them. Acts I and II played out again
+ * from scratch, so the settled resorts are new. Purses unchanged.
+ *
+ *     all three targets hit  n=13  median +$6,643   quartiles -$33,774 .. +$89,188
+ *                                  range -$235,699 .. +$247,573, losing 6/13
+ *     a week missed          n=19  median -$364,170 quartiles -$632,894 .. -$260,905
+ *                                  range -$1,010,171 .. -$119,527, losing 19/19
+ *     break-even multiplier on today's purses: x0.995
+ *
+ *     first-attempt targets   County 31/40  Regional 25/39  National 24/28
+ *     turf                    County 40/40  Regional 38/39  National 22/28
+ *     pace                    County 35/40  Regional 35/39  National 19/28
+ *
+ * The rule holds -- a ladder played well roughly breaks even, and every
+ * ladder with a miss loses, retries included -- so the purses stay. The
+ * Regional still misses high when it misses (all 14 misses over the band,
+ * +9 to +14), as the third run below found and explained.
+ *
  * RE-MEASURED 2026-10-04 (third run), after trimming the purses to x0.925
  * of the 1.6x ones (County $27k / $148k, Regional $44k / $352k, National
  * $81k / $740k; tournaments.js). Only the hosted phase was asked for,
