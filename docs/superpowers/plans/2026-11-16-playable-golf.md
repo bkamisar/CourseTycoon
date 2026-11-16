@@ -10,6 +10,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-16-course-tycoon-playable-golf-design.md` — read §3, §4 and §6 before starting.
 
+> **STATUS, 2026-11-16: Tasks 1–6 are done and committed.** This plan was written for a
+> cheaper model to build from. To make sure it could be built from, its code was
+> extracted, wired up and run in a real page — and at that point the feature existed,
+> so it was committed rather than thrown away and typed in again. The code blocks below
+> are the code in the repository. The tasks are kept as the record of how it was built.
+> **What still needs doing is the section "What is left" at the very end** — start there.
+
 ---
 
 ## Ground rules (read once, apply to every task)
@@ -421,10 +428,21 @@ export function meterHint(swingPhase) {
 
 **Files:** Modify `src/render/holeView.js`; create `src/render/playView.js`, `tests/playView.test.js`.
 
-- [ ] **Step 1: Let `drawHole` leave the flag out.** At full zoom the flag sprite is scaled up ninefold and hides the top of the green, so the play screen draws its own, unzoomed. In `src/render/holeView.js` change the signature and the last drawing lines of `drawHole`:
+- [ ] **Step 1: Give `drawHole` two options.** At full zoom the flag sprite is scaled up ninefold and hides the top of the green, so the play screen draws its own, unzoomed. And `drawHole` clips to `rect`, which under a zoom cuts the rough's rounded ends off along a straight line and shows woods where `lieAt` says rough — so the play screen clips to its own view instead. In `src/render/holeView.js` change the signature, the clip at the top and the last drawing lines of `drawHole`:
 
 ```js
-export function drawHole(ctx, hole, rect, { flag = true } = {}) {
+export function drawHole(ctx, hole, rect, { flag = true, clip = true } = {}) {
+```
+```js
+  ctx.save();
+  // The play screen draws under a zoom, with its own clip to its own view.
+  // Clipping to `rect` there would cut the rough's rounded ends off along
+  // a straight line and show woods where lieAt says rough.
+  if (clip) {
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.width, rect.height);
+    ctx.clip();
+  }
 ```
 ```js
   drawTeeBox(ctx, t, hole);
@@ -444,7 +462,7 @@ import { makeHole, greenCentre } from '../src/sim/hole.js';
 import { greenRadius } from '../src/sim/terrain.js';
 import { slopeFraction } from '../src/sim/putting.js';
 
-test('a steeper green gets more chevrons per arrow', () => {
+test('a steeper green gets a longer arrow', () => {
   assert.equal(slopeMarks(slopeFraction('large')), 1);
   assert.equal(slopeMarks(slopeFraction('small')), 2);
   assert.equal(slopeMarks(slopeFraction('tiered')), 3);
@@ -493,8 +511,9 @@ import { drawHole } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
 import { greenRadius } from '../sim/terrain.js';
 
-/** Chevrons per slope arrow: 1 gentle, 2 firm, 3 severe. Thresholds sit
- * between the five green presets' slopeFraction values (0.04 … 0.15). */
+/** How steep a green reads: 1 gentle, 2 firm, 3 severe — drawn as the
+ * length of its slope arrows. Thresholds sit between the five green
+ * presets' slopeFraction values (0.04 … 0.15). */
 export function slopeMarks(fraction) {
   if (fraction < 0.07) return 1;
   if (fraction < 0.13) return 2;
@@ -540,17 +559,17 @@ function drawSlopeArrows(ctx, camera, hole, slope, fraction) {
   // Screen y runs the other way from world y.
   const dir = { x: slope.x / length, y: -slope.y / length };
   const perp = { x: -dir.y, y: dir.x };
-  const marks = slopeMarks(fraction);
+  // A steeper green gets a longer arrow: 6, 10 or 14 px of shaft.
+  const shaft = 2 + slopeMarks(fraction) * 4;
   ctx.fillStyle = PALETTE.FAIRWAY_SHADOW;
   for (const anchor of slopeArrowAnchors(hole)) {
-    const base = camera.toScreen(anchor);
-    for (let k = 0; k < marks; k++) {
-      const tip = { x: base.x + dir.x * k * 4, y: base.y + dir.y * k * 4 };
-      dot(ctx, tip);
-      dot(ctx, { x: tip.x - dir.x * 2 + perp.x * 2, y: tip.y - dir.y * 2 + perp.y * 2 });
-      dot(ctx, { x: tip.x - dir.x * 2 - perp.x * 2, y: tip.y - dir.y * 2 - perp.y * 2 });
-      dot(ctx, { x: tip.x - dir.x + perp.x, y: tip.y - dir.y + perp.y });
-      dot(ctx, { x: tip.x - dir.x - perp.x, y: tip.y - dir.y - perp.y });
+    const mid = camera.toScreen(anchor);
+    const tail = { x: mid.x - (dir.x * shaft) / 2, y: mid.y - (dir.y * shaft) / 2 };
+    const tip = { x: mid.x + (dir.x * shaft) / 2, y: mid.y + (dir.y * shaft) / 2 };
+    for (const p of dottedPoints(tail, tip, 1)) dot(ctx, p);
+    for (const back of [1, 2, 3]) {
+      dot(ctx, { x: tip.x - dir.x * back + perp.x * back, y: tip.y - dir.y * back + perp.y * back });
+      dot(ctx, { x: tip.x - dir.x * back - perp.x * back, y: tip.y - dir.y * back - perp.y * back });
     }
   }
 }
@@ -627,7 +646,7 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
   ctx.save();
   ctx.translate(camera.tx, camera.ty);
   ctx.scale(camera.zoom, camera.zoom);
-  drawHole(ctx, hole, viewRect, { flag: false });
+  drawHole(ctx, hole, viewRect, { flag: false, clip: false });
   ctx.restore();
 
   if (scene.slope) drawSlopeArrows(ctx, camera, hole, scene.slope, scene.slopeFraction);
@@ -741,7 +760,10 @@ function injectStyles() {
       font-family: monospace; font-size: 12px; line-height: 1.5; color: ${PALETTE.WHITE};
       pointer-events: none;
     }
-    .play-header-row { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
+    /* Rows wrap rather than clip: 'Hole 12 · Par 5 · 520y' beside a best
+       score and a round tally does not fit one line of a narrow phone. */
+    .play-header-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 8px; }
+    .play-header-row > span { white-space: nowrap; }
     .play-header-row > span:last-child { color: ${PALETTE.ACCENT}; }
     .play-header-row + .play-header-row { color: ${PALETTE.UI_LIGHT}; }
     .play-dock {
@@ -1332,7 +1354,7 @@ createServer(async (req, res) => {
 
 - [ ] **Step 4: Fix what is broken** in the four files this plan created or the wiring in `main.js`/`editor.js`. If the fix would mean changing `playGolf.js`, `putting.js`, `swingMeter.js` or `playCamera.js`, stop and report it instead.
 
-  Known rough edges that are **accepted** and should be reported, not fixed: fairway mowing stripes and tree sprites look chunkier when zoomed in; rough behind the tee is cut by a straight edge at high zoom; the ball can fly out of view on a wild shot (the camera catches up when it lands).
+  Known rough edges that are **accepted** and should be reported, not fixed: fairway mowing stripes and tree sprites look chunkier when zoomed in; the ball can fly out of view on a wild shot (the camera catches up when it lands).
 
 - [ ] **Step 5: Final suite, final commit** if Step 4 changed anything. Then stop the preview server, revert `.claude/launch.json` if you changed it, and confirm `git status` is clean.
 
@@ -1346,3 +1368,47 @@ createServer(async (req, res) => {
 - `grep -rn "#[0-9A-Fa-f]\{6\}" src/ui/playHole.js src/render/playView.js src/ui/playCopy.js src/play/flight.js` → no output (no raw hex).
 - `git diff 9f1a3d3 --stat -- src/sim/playGolf.js src/sim/putting.js src/play/swingMeter.js src/render/playCamera.js` → no output (the core is untouched).
 - `git status` → clean. Nothing pushed.
+
+---
+
+## What is left (start here)
+
+**Checked in a running page**, at phone size (375×812) and at a small desktop size, by
+driving the game with scripted input and reading the page and the canvas back:
+
+- The Play button sits before Done in the editor; pressing it shows the header, the
+  dock and the hole, with the HUD hidden and nothing drawn under either bar.
+- A full stroke: Swing → `Tap at the mark` → power tick → `Tap on the line` → the ball
+  flies → `Perfect strike. On the green, 18 feet.` → the camera closes in on the green
+  → `Putter · 18 ft`.
+- Holing out: `Par — 3 on a par 3. New best.` with Next hole / Replay / Done, and the
+  header reading `Best 3 · Round: E thru 1`.
+- Replay does not add a second line to the round. Next hole carries the tally. The last
+  built hole offers no Next hole.
+- A swing left to run out is a full overswing and a full miss, and lands in the trees;
+  the next shot is clubbed for the shorter reach from there.
+- Done returns to the editor and then the overview with the HUD back; money, day and
+  prestige unchanged.
+- The best score survives a reload, and is gone after adding a bunker to the hole.
+- No console errors at any point.
+
+**Not checked, because it needs a person or a visible browser:**
+
+1. **Nobody has seen the header, the meter or the buttons.** The preview pane was
+   hidden, so screenshots were not possible; the canvas was captured directly (and looks
+   right), but the DOM chrome was only measured, never looked at. First job: open the
+   game, press Play, and look. Fix anything ugly in the CSS in `src/ui/playHole.js`.
+2. **Feel.** The constants assume a person taps to within about 35 ms. Play nine holes
+   on a phone. If par is out of reach, raise `METER.ACC_WINDOW` in
+   `src/play/swingMeter.js` (0.08 → 0.10) and re-run `node tools/playGolfBot.js`; the
+   three calibration tests in `tests/playGolf.test.js` will need their bounds moved to
+   match, with the new table pasted into the bot's header comment.
+3. **Touch.** Tap-to-aim and drag-to-nudge were exercised with synthetic events, not a
+   finger. Check that dragging on the canvas does not scroll the page on iOS.
+4. **Water and bunkers in the page.** Both are unit-tested; neither was hit on purpose
+   in the browser run. Checks 5 and 6 of Task 7 still apply.
+5. **Sound.** `tok`, `splash` and `cheer` are called; nobody has listened.
+6. **Putting readability.** The slope arrows are small. If they are not readable on a
+   phone, lengthen them in `drawSlopeArrows` (`src/render/playView.js`).
+
+Ideas beyond this version are in §12 of the spec.
