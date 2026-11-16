@@ -312,17 +312,25 @@ function drawFlag(ctx, t, greenCentrePoint) {
 /**
  * Draws one hole into `{x, y, width, height}` of `ctx`. Does nothing for
  * an unbuilt plot (no corridor) — callers drawing a resort map handle
- * empty plots themselves, with their own placeholder treatment.
+ * empty plots themselves, with their own placeholder treatment. Pass
+ * `{ flag: false }` to leave the flag out and `{ clip: false }` to draw
+ * past `rect` (the play screen does both: it zooms, clips to its own view
+ * and draws its own flag).
  */
-export function drawHole(ctx, hole, rect) {
+export function drawHole(ctx, hole, rect, { flag = true, clip = true } = {}) {
   if (!hole || !hole.corridor || hole.corridor.length < 2) return;
 
   const t = computeHoleTransform(hole, rect);
 
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(rect.x, rect.y, rect.width, rect.height);
-  ctx.clip();
+  // The play screen draws under a zoom, with its own clip to its own view.
+  // Clipping to `rect` there would cut the rough's rounded ends off along
+  // a straight line and show woods where lieAt says rough.
+  if (clip) {
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.width, rect.height);
+    ctx.clip();
+  }
 
   // Everything beyond the rough band is exactly what lieAt's catch-all
   // returns: trees / out-of-bounds woods.
@@ -349,7 +357,9 @@ export function drawHole(ctx, hole, rect) {
   }
 
   drawTeeBox(ctx, t, hole);
-  drawFlag(ctx, t, gc);
+  // The play screen draws the hole under a zoom and wants the flag at its
+  // ordinary size on top, so it asks for the hole without one.
+  if (flag) drawFlag(ctx, t, gc);
 
   ctx.restore();
 }
