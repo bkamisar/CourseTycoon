@@ -1602,3 +1602,85 @@ test('a planned evening\'s card takes the ordinary event\'s slot and leaves the 
   }
   assert.equal(rolled, 3, 'sanity: found evenings whose ordinary roll came up');
 });
+
+// --- Found in a full review, 2026-11-15 --------------------------------
+
+test('a closed hole does not send an Act III resort back to Act II', () => {
+  // `gate.passed` used to set `act = 2` every single evening, relying on
+  // the Act III check straight after to promote it back. That check counted
+  // the PLAYABLE holes, so a drain being dug out on two of them left an
+  // Act III resort in Act II for as long as the closure lasted -- with the
+  // Championship button gone from the toolbar and a booked week behind it.
+  const state = openFullCourse(actThreeResort(101));
+  state.act = 3;
+  state.actThreeArrived = true;
+  state.prestige = 80;
+  state.investors = { confidence: 100, principal: 180000, bought: true, buyoutAnnounced: true };
+  state.satisfactionHistory = new Array(10).fill(85);
+  state.conditions = [{ id: 'drain', label: 'Two holes shut', days: 3, daysLeft: 3, holesClosed: 2 }];
+
+  const { state: after, report } = runDay(state, 9100);
+  assert.equal(report.gate.passed, true, 'sanity: the Act I gate reads as passed, which is what used to reset the act');
+  assert.equal(after.act, 3, 'an act is never left once it has been reached');
+  assert.equal(report.actThreeArrived ?? false, false, 'and the invitation is not sent again');
+});
+
+test('a closure does not delay the invitation: Act III opens on eighteen built holes', () => {
+  const state = openFullCourse(actThreeResort(102));
+  state.act = 2;
+  state.actThreeArrived = false;
+  state.investors = { confidence: 100, principal: 180000, bought: true, buyoutAnnounced: true };
+  state.conditions = [{ id: 'drain', label: 'Two holes shut', days: 3, daysLeft: 3, holesClosed: 2 }];
+  const { state: after } = runDay(state, 9110);
+  assert.equal(after.act, 3, 'the course has eighteen holes; two of them being shut this week does not un-build them');
+});
+
+test('the verdict evening reports the prestige the resort actually ends the day on', () => {
+  // The report was filled in before the contract was scored, so on the
+  // one evening prestige moved by up to eighteen points the report showed
+  // the figure from before the swing while the HUD showed the one after.
+  const state = atMinimum(nationalReady(104), 'countyOpen');
+  state.resort.setup = 52;
+  state.resort.setupTarget = 52;
+  state.tournament = newWeek('countyOpen', state.day);
+  const { state: after, report } = playWeek(state, 9200);
+  assert.notEqual(report.tournament.prestige, 0, 'sanity: the verdict moved prestige');
+  assert.equal(report.prestige, after.prestige);
+});
+
+test('a closed championship day is not scored as a day of unhappy guests', () => {
+  // Nobody public plays on a round day, and an empty day used to read as
+  // satisfaction 50. One day of that was a blip; a four-round National was
+  // four days of it: prestige fell about four points a day for no reason
+  // the player could see or act on, and the three days after the week
+  // opened to a word-of-mouth slump from guests who had never existed.
+  let state = atMinimum(nationalReady(103), 'national');
+  state.resort.setup = 86;
+  state.resort.setupTarget = 86;
+  const eve = runDay(state, 9300);          // an ordinary day, for a real reading
+  state = eve.state;
+  assert.ok(eve.report.groupsPlayed > 0, 'sanity: the eve was a real public day');
+  state.tournament = newWeek('national', state.day);
+
+  const before = state.prestige;
+  const first = runDay(state, 9301);
+  assert.equal(first.report.tournamentDay, true);
+  assert.equal(first.report.averageSatisfaction, eve.report.averageSatisfaction,
+    'the last public reading stands until there is a new one');
+  assert.equal(first.state.satisfactionHistory.at(-1), eve.report.averageSatisfaction);
+  assert.ok(Math.abs(first.state.prestige - before) < 1.5,
+    `prestige moved ${(first.state.prestige - before).toFixed(1)} on a day no guest set foot on the course`);
+
+  // And the course is rated against the last crowd that actually played
+  // it, not against an empty one: an empty crowd falls back to the average
+  // golfer, which re-rated a serious course as a misfit for a day.
+  //
+  // Turf is the one thing in the rating that does move between two closed
+  // days (the field wears it), at a fifth of a point per point of turf, so
+  // that much is expected and anything beyond it is the crowd changing.
+  const second = runDay(first.state, 9302);
+  const turfMoved = (first.state.turfQuality - state.turfQuality) * 0.2;
+  const ratingMoved = second.report.courseRating - first.report.courseRating;
+  assert.ok(Math.abs(ratingMoved - turfMoved) < 0.01,
+    `rating moved ${ratingMoved.toFixed(2)} between two closed days where turf accounts for ${turfMoved.toFixed(2)}`);
+});

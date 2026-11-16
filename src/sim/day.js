@@ -275,7 +275,13 @@ export function runDay(state, seed) {
   // Rated against yesterday's crowd: rating feeds demand and demand decides
   // today's crowd, so today's is not knowable yet. The lag is the point -
   // change the course and the rating dips until the clientele catches up.
-  const yesterdayCrowd = next.history.at(-1)?.crowd ?? null;
+  //
+  // "Yesterday's" is the last crowd that actually played. A day nobody
+  // played -- a championship round, above all -- leaves an empty crowd in
+  // the history, and an empty crowd falls back to the average golfer: the
+  // rating of a course built for serious golfers swung four or five points
+  // between two closed days, rated against people who were not there.
+  const yesterdayCrowd = lastCrowdThatPlayed(next.history);
   const rating = holes.length ? courseRating(holes, next.turfQuality, yesterdayCrowd) : 0;
 
   // The mean difficulty across every open hole is what the segments react
@@ -499,9 +505,31 @@ export function runDay(state, seed) {
     });
   });
 
+  /*
+   * A day with no guests has no reading, and what stands in for one
+   * matters more than it looks: this number moves prestige tonight, fills
+   * the satisfaction history that word of mouth and the investors read,
+   * and is what the HUD calls "Happy".
+   *
+   * An ordinary day nobody came to reads 50, as it always has: a resort
+   * that draws no one is not a happy one, and Acts I and II are tuned
+   * against that.
+   *
+   * A championship round is not that. The public are shut out on purpose,
+   * so the last reading they gave stands until they are back to give
+   * another. It used to read 50 as well, which was survivable when a
+   * championship was one day and became a real cost once it was four:
+   * measured on a National at prestige 90, each round day pulled prestige
+   * down about four points (89 -> 85 -> 82 -> 79 before the verdict), and
+   * the three days after the week opened to word of mouth at
+   * (50/55)^2.5 = 0.79 from guests who had never existed -- a penalty for
+   * hosting that no screen mentioned and no decision could avoid.
+   */
+  const lastReading = next.history.at(-1)?.averageSatisfaction;
+  const emptyDayReading = championshipToday && Number.isFinite(lastReading) ? lastReading : 50;
   const averageSatisfaction = satisfactions.length
     ? satisfactions.reduce((s, v) => s + v, 0) / satisfactions.length
-    : 50;
+    : emptyDayReading;
 
   // Who came, and what each of them made of it — the report's answer to
   // "which crowd am I running", per segment rather than as one blended
@@ -859,6 +887,11 @@ export function runDay(state, seed) {
       });
       next.money += result.paid;
       next.prestige = clamp(next.prestige + result.prestige, 0, 100);
+      // The report was filled in before the contract was scored. Without
+      // this the one evening prestige moves by up to eighteen points was
+      // the evening the report printed the figure from before it moved,
+      // while the HUD beside it showed the one after.
+      report.prestige = next.prestige;
       // Only a week that met the target was hosted. A missed rung is given
       // to somebody else for BAR_DAYS and can be bid for again afterwards
       // -- which is what the result card promises. Recording a miss as
@@ -1248,7 +1281,10 @@ export function runDay(state, seed) {
   next.satisfactionHistory.push(averageSatisfaction);
   next.day += 1;
   if (gate.passed) {
-    next.act = 2;
+    // Never backwards. This ran as a bare `next.act = 2` every evening the
+    // gate read as passed -- which is every evening of Acts II and III --
+    // and relied on the Act III check below to put a later act back.
+    if ((next.act ?? 1) < 2) next.act = 2;
     // The investors arrive the moment the gate opens, with their first
     // target already named. Not optional and not declinable: a mechanic
     // you can refuse is one half the players never meet, and this
@@ -1281,10 +1317,14 @@ export function runDay(state, seed) {
    * has fewer rooms, which makes the act harder, but the governing body
    * does not read balance sheets.
    *
-   * `holes` is this day's open holes, computed earlier in this function.
+   * Counted on the holes that are BUILT, not the ones playable today. A
+   * decision event can shut a couple for a few days, and a drain being dug
+   * out does not make an eighteen a sixteen: counting playable holes
+   * delayed the invitation and, with the reset above, sent a resort
+   * already in Act III back to Act II for as long as the closure lasted.
    */
   const settled = Boolean(next.investors?.bought || next.investors?.liquidated);
-  if (next.act === 2 && settled && holes.length >= CHAMPIONSHIP_HOLES) {
+  if (next.act === 2 && settled && openHoles(next).length >= CHAMPIONSHIP_HOLES) {
     next.act = 3;
     if (!next.actThreeArrived) {
       next.actThreeArrived = true;
@@ -1337,6 +1377,19 @@ export function pendingEventFor(event, state) {
       return { label, cost, stance };
     }),
   };
+}
+
+/**
+ * The most recent crowd with anybody in it, or null if there has not been
+ * one. See the note where `runDay` rates the course.
+ */
+function lastCrowdThatPlayed(history = []) {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const crowd = history[i]?.crowd;
+    if (!crowd) continue;
+    if (SEGMENT_KEYS.some((key) => (crowd[key]?.count ?? 0) > 0)) return crowd;
+  }
+  return null;
 }
 
 /**
