@@ -12,16 +12,21 @@ export const PALETTE = Object.freeze({
   // Playing corridor
   FAIRWAY: '#5AC54F', // mown fairway, the base playing surface
   FAIRWAY_SHADOW: '#2E8B3D', // fairway mowing stripes / shaded edge
-  ROUGH: '#8A9A3B', // longer grass bordering the corridor — must read as
+  FAIRWAY_MOWN: '#4DB848', // the alternate mowing band: the same grass, cut the other way
+  ROUGH: '#7C9E3E', // longer grass bordering the corridor — must read as
   // clearly distinct from FAIRWAY at a glance, even on a small screen
-  ROUGH_SHADOW: '#5E6B28', // shaded / deeper rough
+  ROUGH_SHADOW: '#587A2C', // shaded / deeper rough
   TREE: '#1B4D2E', // tree clumps and out-of-bounds woods
   TREE_SHADOW: '#133620', // shaded canopy texture inside a tree clump
+  TREE_LIGHT: '#3A8A4C', // the sunlit side of a canopy
   SAND: '#E8C170', // bunkers
   SAND_SHADOW: '#A2874E', // the shaded, recessed part of a bunker's bowl
+  SAND_LIGHT: '#F6E2A8', // the raked, sunlit floor of a bunker
   WATER: '#3A8FD4', // ponds and hazards, surface
   WATER_DEEP: '#1B4F91', // ponds and hazards, deep water
+  WATER_LIGHT: '#9AD4F5', // shoreline foam, glints on a pond, falling rain
   GREEN_SURFACE: '#A8E68C', // the putting green itself
+  GREEN_MOWN: '#98DC7A', // the green's alternate mowing check
 
   // Built surfaces
   PATH: '#8B5A2B', // cart paths and walkways

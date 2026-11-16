@@ -22,7 +22,7 @@ import { drawPixelText, pixelTextWidth, GLYPH_HEIGHT } from './sprites.js';
  * than re-deriving hit boxes from scratch.
  */
 import { PALETTE } from './palette.js';
-import { drawHole } from './holeView.js';
+import { drawHole, fillWoods } from './holeView.js';
 import { holeStats } from '../sim/hole.js';
 
 const GRID_COLS = 3;
@@ -80,8 +80,16 @@ function drawHoleLabel(ctx, hole, rect) {
 }
 
 function drawEmptyPlot(ctx, rect) {
+  // Unbuilt land is woods like the rest of the map — the dashed outline
+  // and the plus are what say "build here", on a dark plate so they read
+  // against the canopy.
+  const plate = Math.max(9, Math.round(Math.min(rect.width, rect.height) * 0.5));
   ctx.fillStyle = PALETTE.UI_DARK;
-  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.fillRect(
+    Math.round(rect.x + rect.width / 2 - plate / 2),
+    Math.round(rect.y + rect.height / 2 - plate / 2),
+    plate, plate
+  );
 
   ctx.save();
   ctx.strokeStyle = PALETTE.UI_LIGHT;
@@ -137,8 +145,12 @@ export function drawResort(ctx, state, { x = 0, y = 0, width, height, nine = 0 }
   const holes = all.slice(offset, offset + HOLES_PER_NINE);
   const regions = [];
 
-  ctx.fillStyle = PALETTE.UI_DARK;
-  ctx.fillRect(x, y, width, height);
+  // The whole map is one piece of woodland with holes cut through it.
+  // Each plot used to be a card on a dark table; painting the same woods
+  // under the gaps as `drawHole` paints inside the plots (the tile is
+  // anchored to the canvas, so the canopies line up across every edge)
+  // turns nine cards into one course.
+  fillWoods(ctx, { x, y, width, height });
 
   const gridY0 = y + GRID_PAD;
   const gridW = width - GRID_PAD * 2;
