@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/sim/state.js';
 import { runDay, marshalPaceFactor, applyEventChoice, halfwayRestoreTo, cartRestoreTo, snackRestoreTo } from '../src/sim/day.js';
+import * as dayModule from '../src/sim/day.js';
+import { HOTEL_AMENITIES } from '../src/sim/hotelAmenities.js';
 import { SEGMENT_KEYS } from '../src/sim/segments.js';
 import { emptyGoodwill, applyGoodwill } from '../src/sim/goodwill.js';
 import { EVENTS, STANCES } from '../src/sim/events.js';
@@ -808,4 +810,53 @@ test('demand caps out, so rooms are not an infinite ratchet', () => {
   const enormous = sold({ standard: 320, suite: 160 });
   assert.equal(big, enormous,
     'past the crowd, another room sells nothing — it only costs');
+});
+
+// --- What the buildings are worth to a round ---------------------------
+
+test('a course amenity is worth the same to every crowd, as it always was', () => {
+  const { amenityBonusBySegment } = dayModule;
+  const bonus = amenityBonusBySegment([{ type: 'clubhouse' }, { type: 'proShop' }, { type: 'cartBarn' }]);
+  for (const key of SEGMENT_KEYS) assert.equal(bonus[key], 4.5, `${key}: three course amenities at 1.5 each`);
+});
+
+test('a hotel amenity is worth what its own bars say it is worth to each crowd', () => {
+  // The Hotel sheet draws three bars per building -- who it is for -- and
+  // nothing in the simulation used to read them: a function room and a
+  // spa were the same building to every guest.
+  const { amenityBonusBySegment } = dayModule;
+  const room = amenityBonusBySegment([{ type: 'functionRoom' }]);
+  const spa = amenityBonusBySegment([{ type: 'spa' }]);
+  assert.equal(room.locals, HOTEL_AMENITIES.functionRoom.appeal.locals * 1.5);
+  assert.equal(spa.destination, HOTEL_AMENITIES.spa.appeal.destination * 1.5);
+  assert.ok(room.locals > room.destination, 'a function room is for the town');
+  assert.ok(spa.destination > spa.locals, 'a spa is for the people staying');
+});
+
+test('a grandstand does nothing for a Tuesday fourball', () => {
+  // championshipBuildings.js says these "serve neither and please nobody",
+  // and each one used to add 1.5 to every guest's round regardless.
+  const { amenityBonusBySegment } = dayModule;
+  const bonus = amenityBonusBySegment([
+    { type: 'grandstands' }, { type: 'overflowParking' }, { type: 'mediaCentre' }, { type: 'hospitalityPavilion' },
+  ]);
+  for (const key of SEGMENT_KEYS) assert.equal(bonus[key], 0);
+
+  // And end to end: the same day with and without the four of them leaves
+  // every guest exactly as happy.
+  const plain = newGame(31);
+  const built = newGame(31);
+  for (const type of ['grandstands', 'overflowParking', 'mediaCentre', 'hospitalityPavilion']) {
+    built.resort.amenities.push({ id: type, type, menu: [] });
+  }
+  // Same number of buildings either way, so demand and the day's dice are
+  // identical and only the bonus can differ.
+  for (const type of ['gym', 'clubStorage', 'dawnTeeTimes', 'kidsClub']) {
+    plain.resort.amenities.push({ id: type, type, menu: [] });
+  }
+  const a = runDay(plain, 77).report;
+  const b = runDay(built, 77).report;
+  assert.equal(a.groupsPlayed, b.groupsPlayed, 'sanity: the same crowd turned up');
+  assert.ok(b.averageSatisfaction < a.averageSatisfaction,
+    'four hotel amenities are worth something to a round; four grandstands are not');
 });

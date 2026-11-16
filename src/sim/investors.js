@@ -185,8 +185,31 @@ const CEILING = Object.freeze({
   // just above 90, so a ceiling of 90 was missed 11% of the time and 95
   // was missed 76% -- the same "impossible measure" fault, recreated in a
   // different place while fixing it in the first.
-  prestige: 92,
-  satisfaction: 93,
+  //
+  // Moved from 92 and 93 on 2026-11-15, because what a resort delivers
+  // moved. Two faults in how a guest's round was scored were fixed that
+  // day (satisfaction.js: a nine-hole score expectation applied to
+  // eighteen holes; day.js: every building, grandstands included, pleasing
+  // every guest equally), and the first had been doing this file's job by
+  // accident -- the satisfaction target was being missed BECAUSE the
+  // player built the back nine. With it gone, at the old ceilings,
+  // satisfaction was missed in 18% of reviews at a $300 room rate where it
+  // had been 45%, and a $900 hotel was bought out six times in eight.
+  //
+  // Measured over eight seeds a rate, against the figures before either fix:
+  //
+  //     room rate     150     300     575     700     900
+  //     bought out    8/8     8/8     8/8     2/8     2/8   (was 22/24, 4/16)
+  //     liquidated    0       0       0       6/8     6/8   (was 0/24,  8/16)
+  //     satisfaction missed 42-47% at the viable rates (was 45%)
+  //     prestige     missed 24-45%                     (was 48%)
+  //     neglecting the greens at $300: liquidated 8/8, as before
+  //
+  // One step either way is a different game: 92/95 misses prestige half as
+  // often as it should, and 93/96 misses satisfaction in three reviews of
+  // four and starts liquidating sensible hotels.
+  prestige: 93,
+  satisfaction: 95,
 });
 
 /**

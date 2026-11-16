@@ -205,3 +205,30 @@ test('a short course is never told about a hole it does not have', () => {
     assert.ok(!joined.includes(ordinal(n)), `named a nonexistent hole: ${joined}`);
   }
 });
+
+// --- The score a golfer expects, by how much golf there was -------------
+
+test('the same golf is the same round on nine holes and on eighteen', () => {
+  // `handicap / 2` was a nine-hole expectation applied to any course, so a
+  // golfer shooting exactly to form over eighteen read as eleven points
+  // unhappier than the same golfer over nine: a penalty for the player
+  // having finished the course.
+  const nine = guestSatisfaction({ ...baseline, handicap: 16, strokesOverPar: 8, holesPlayed: 9 });
+  const eighteen = guestSatisfaction({ ...baseline, handicap: 16, strokesOverPar: 16, holesPlayed: 18 });
+  assert.equal(eighteen, nine, 'twice the holes at the same rate over par is the same day out');
+
+  const old = guestSatisfaction({ ...baseline, handicap: 16, strokesOverPar: 16 });
+  assert.ok(eighteen > old + 10,
+    `eighteen holes judged as nine read ${old}; judged as eighteen it reads ${eighteen}`);
+});
+
+test('a nine, and anything shorter, is judged exactly as it always was', () => {
+  // Act I is tuned on these and ends on a nine. Below nine the expectation
+  // deliberately stays at the nine-hole figure -- see the note in
+  // satisfaction.js for why that cushion was left alone.
+  const args = { ...baseline, handicap: 20, strokesOverPar: 6 };
+  const implied = guestSatisfaction(args);
+  assert.equal(guestSatisfaction({ ...args, holesPlayed: 9 }), implied);
+  assert.equal(guestSatisfaction({ ...args, holesPlayed: 3 }), implied);
+  assert.equal(guestSatisfaction({ ...args, holesPlayed: 6 }), implied);
+});

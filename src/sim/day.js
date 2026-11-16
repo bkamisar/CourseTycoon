@@ -3,7 +3,10 @@ import { holeStats, clamp, courseDifficultyOf } from './hole.js';
 import { makeGroup, resetGuestIds } from './golfer.js';
 import { playHole } from './round.js';
 import { scheduleRounds, playbackEndMinute, TARGET_MINUTES_PER_HOLE } from './schedule.js';
-import { demandGroups, dailyRevenue, dailyCosts, perceivedValue, menuRevenue } from './economy.js';
+import {
+  demandGroups, dailyRevenue, dailyCosts, perceivedValue, menuRevenue,
+  AMENITIES as COURSE_AMENITIES,
+} from './economy.js';
 import { guestSatisfaction, buildComplaints } from './satisfaction.js';
 import { courseRating, nextPrestige } from './ratings.js';
 import { actOneGate } from './acts.js';
@@ -455,7 +458,7 @@ export function runDay(state, seed) {
     courseRating: rating, prestige: next.prestige, amenities: next.resort.amenities,
     holesOpen: holes.length,
   });
-  const amenityBonus = amenityTypes.length * 1.5;
+  const amenityBonus = amenityBonusBySegment(next.resort.amenities);
 
   // The kitchen, once per day: how much prep every board on the resort
   // demands, against what the staff can actually turn around. Computed
@@ -493,11 +496,14 @@ export function runDay(state, seed) {
         perceivedValue: value,
         scenery: averageScenery,
         turfQuality: next.turfQuality,
-        amenityBonus,
+        amenityBonus: amenityBonus[guest.segment],
         segment: guest.segment,
         courseDifficulty,
         kitchenServiceFactor: kitchen.serviceFactor,
         shopServiceFactor: shop.serviceFactor,
+        // What they are judging their score against: see the note on
+        // `expectedOverPar` for what happened when this was assumed.
+        holesPlayed: holes.length,
       });
       satisfactions.push(guestSat);
       crowdCount[guest.segment] += 1;
@@ -1377,6 +1383,53 @@ export function pendingEventFor(event, state) {
       return { label, cost, stance };
     }),
   };
+}
+
+/** What one course amenity is worth to a round, before a crowd weighs it. */
+const AMENITY_BONUS_EACH = 1.5;
+
+/**
+ * What the resort's buildings add to a guest's round, by crowd.
+ *
+ * This was `amenities.length * 1.5` -- every entry in the list, at the
+ * same flat rate, to everybody. The list has three kinds of thing in it
+ * and that is right for one of them:
+ *
+ * - **Course amenities** (`AMENITIES`: the clubhouse, the shop, the
+ *   range, the cart barn...) count in full, as they always have. Act I is
+ *   tuned against exactly this and has nothing else in the list.
+ *
+ * - **Hotel amenities** count by how much each is FOR this crowd. Every
+ *   one of them declares an appeal per crowd, and the Hotel sheet draws it
+ *   as three bars so the player can see who a building is for -- and
+ *   nothing in the simulation read it. A function room (locals 0.85,
+ *   destination 0.20) and a spa (0.40, 0.80) were the same building to a
+ *   guest. The interface was describing a decision the game did not
+ *   contain, which is the fault this project has made more often than any
+ *   other. An amenity at full appeal is worth what it was; one a crowd has
+ *   no use for is worth that much less to them.
+ *
+ * - **Championship buildings** count for nothing. `championshipBuildings.js`
+ *   says so in its first paragraph -- they "serve neither and please
+ *   nobody" -- and yet a grandstand that stands empty fifty-one weeks a
+ *   year was making every Tuesday fourball 3.6 points happier, times
+ *   their crowd's weight.
+ *
+ * Measured on four resorts at the end of Act II (15-20 buildings each),
+ * satisfaction sat at 93-95 with destination guests clamped at exactly
+ * 100: the dial every act is judged on had no travel left in it.
+ */
+export function amenityBonusBySegment(amenities = []) {
+  const bonus = {};
+  for (const key of SEGMENT_KEYS) {
+    let worth = 0;
+    for (const a of amenities) {
+      if (COURSE_AMENITIES[a.type]) worth += 1;
+      else worth += HOTEL_AMENITIES[a.type]?.appeal[key] ?? 0;
+    }
+    bonus[key] = worth * AMENITY_BONUS_EACH;
+  }
+  return bonus;
 }
 
 /**

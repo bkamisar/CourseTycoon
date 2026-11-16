@@ -1,6 +1,9 @@
 import { clamp } from './hole.js';
 import { SEGMENTS, difficultyFit } from './segments.js';
 
+/** The round the score expectation below was written for. */
+const NINE = 9;
+
 /**
  * Ordinal for a hole number. Computed rather than looked up in a table of
  * nine, so complaints still read correctly if a course ever runs past the
@@ -47,11 +50,38 @@ export function guestSatisfaction({
   courseDifficulty,
   kitchenServiceFactor = 1,
   shopServiceFactor = 1,
+  holesPlayed = NINE,
 }) {
   const seg = SEGMENTS[segment] ?? SEGMENTS.locals;
 
-  // Over nine holes a golfer expects roughly half their handicap.
-  const expectedOverPar = handicap / 2;
+  /*
+   * Over nine holes a golfer expects roughly half their handicap -- and
+   * over eighteen, all of it.
+   *
+   * This was `handicap / 2` flat, a nine-hole figure applied to whatever
+   * was played, so the same golfer having the same round was a different
+   * guest depending on how much course there was. Measured on the
+   * template rotation, 800 golfers a row, mean handicap 15-16, scoring
+   * 0.8 over par a hole throughout:
+   *
+   *     holes   over par   score term
+   *       3       2.4        +8.5
+   *       9       7.6        +0.6     <- what the constant was written for
+   *      12       9.6        -3.2
+   *      18      14.7       -10.9
+   *
+   * Building the back nine cost every guest about eleven points for
+   * playing exactly as well as before. That is a penalty for finishing
+   * the course, charged in the one currency every act is judged in.
+   *
+   * Scaled from nine upward only. Below nine the old figure stands, flatter
+   * than it should be: the opening three holes read about eight points
+   * kinder than a golfer's score earns, and the whole of Act I is tuned
+   * with that in it -- the gate is held on a finished nine, where the two
+   * agree. Removing a penalty nobody chose is a fix; removing a cushion the
+   * first week was balanced on is a rebalance, and not this one.
+   */
+  const expectedOverPar = (handicap / 2) * Math.max(1, holesPlayed / NINE);
   const scoreDelta = clamp((expectedOverPar - strokesOverPar) * 1.6, -22, 14);
 
   const waitPenalty = waitMinutes * 0.55 * seg.waitWeight;
