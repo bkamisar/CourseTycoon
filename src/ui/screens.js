@@ -12,7 +12,14 @@
  * in the browser (see the Task 5 report).
  */
 
-export const SCREEN_NAMES = Object.freeze(['start', 'overview', 'editor', 'playback', 'report']);
+/**
+ * Six screens. It was five until the course became playable: every
+ * feature before that fitted in a sheet over one of the five, and `play`
+ * could not — it needs the canvas, the frame loop and the whole of the
+ * player's attention. Adding a screen is still meant to be rare. A new
+ * feature should have to argue its way past a sheet first.
+ */
+export const SCREEN_NAMES = Object.freeze(['start', 'overview', 'editor', 'play', 'playback', 'report']);
 
 function assertScreen(name) {
   if (!SCREEN_NAMES.includes(name)) {

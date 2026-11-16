@@ -702,8 +702,12 @@ export function openRebuildPicker(sheetHost, { state, hole, holeId, onRebuilt })
  * the one it was handed — cannot reflect in place, so `onRebuild(next)`
  * hands the new state back to the caller instead, the same way `onDone`
  * already does for a plain exit.
+ *
+ * `onPlay`, when given, adds a Play button that hands the hole to the play
+ * screen; the caller tears this editor down and mounts a fresh one when
+ * the player comes back.
  */
-export function mountHoleEditor({ canvas, surface, container, state, hole, carts = false, sheetHost, onDone, onRebuild }) {
+export function mountHoleEditor({ canvas, surface, container, state, hole, carts = false, sheetHost, onDone, onRebuild, onPlay }) {
   injectStyles();
 
   const dockEl = document.createElement('div');
@@ -1035,6 +1039,8 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
       sub: sheetHost ? costSub(rebuildPrice) : undefined,
     });
 
+    const playButton = onPlay ? [makeButton('Play', () => onPlay())] : [];
+
     toolbarEl.replaceChildren(
       ...hazardButtons,
       shrinkButton,
@@ -1043,6 +1049,7 @@ export function mountHoleEditor({ canvas, surface, container, state, hole, carts
       makeButton('Width +', () => adjustCorridorWidth(CORRIDOR_WIDTH_STEP)),
       greenButton,
       rebuildButton,
+      ...playButton,
       Object.assign(makeButton('Done', () => onDone?.()), { className: 'editor-btn editor-btn--done' })
     );
     remeasureChrome();

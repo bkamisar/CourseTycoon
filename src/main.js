@@ -21,6 +21,10 @@ import { mountAmenityBar } from './ui/amenityBar.js';
 import { mountSheetHost } from './ui/sheet.js';
 import { createScreenRouter } from './ui/screens.js';
 import { mountHoleEditor, openTemplatePicker } from './ui/editor.js';
+import { mountPlayHole } from './ui/playHole.js';
+import { roundLine } from './ui/playCopy.js';
+import { bestOn, recordPlay, parOf } from './sim/playGolf.js';
+import { weatherOn, effectsOf } from './sim/weather.js';
 import { openBuildSheet, openStaffSheet, openPricingSheet } from './ui/panels.js';
 import { openGlossarySheet } from './ui/glossary.js';
 import { mountReport } from './ui/report.js';
@@ -146,6 +150,11 @@ let regions = [];
 // of them read.
 let shownNine = 0;
 let activeEditor = null;
+let activePlay = null;
+// The holes played since the player last walked onto the course from the
+// editor: [{ holeId, strokes, par }]. In memory only — it is a tally for
+// the header, not a saved scorecard.
+let playRound = [];
 let dayResult = null; // { state, report, timeline } | null
 let clock = null;
 let lastFrameTime = null;
@@ -188,6 +197,63 @@ function drawOverview() {
 function stopEditorLoop() {
   activeEditor?.destroy();
   activeEditor = null;
+}
+
+function stopPlay() {
+  activePlay?.destroy();
+  activePlay = null;
+}
+
+function nextOpenHoleAfter(holeId) {
+  const ids = openHoles(state).map((h) => h.id).sort((a, b) => a - b);
+  return ids.find((id) => id > holeId) ?? null;
+}
+
+/**
+ * Puts the player on the tee of one of their own holes.
+ *
+ * Playing changes exactly one thing in the save — the best score on the
+ * hole — and only when a better one is made, so `commitState` is called
+ * for a new record and for nothing else.
+ */
+function openPlayFor(holeId, { fresh = false } = {}) {
+  stopEditorLoop();
+  stopPlay();
+  if (fresh) playRound = [];
+  const hole = state.resort.courses[0].holes.find((h) => h.id === holeId);
+  const par = parOf(hole);
+  const today = effectsOf(weatherOn(state.weatherSeed, state.day));
+  const nextId = nextOpenHoleAfter(holeId);
+  router.go('play');
+  activePlay = mountPlayHole({
+    canvas,
+    surface,
+    container: uiRoot,
+    hole,
+    par,
+    lengthYards: holeStats(hole).length,
+    best: bestOn(state, hole),
+    weather: { short: today.short, spread: today.spread },
+    round: roundLine(playRound),
+    hasNext: nextId !== null,
+    topInsetPx: embedded ? EMBEDDED_TOP_INSET : 0,
+    sfx: chiptune.sfx,
+    onFinish(play) {
+      const next = recordPlay(state, hole, play);
+      const isNewBest = next !== state;
+      if (isNewBest) commitState(next);
+      // Replaying a hole replaces its line on the card rather than adding one.
+      playRound = playRound.filter((r) => r.holeId !== holeId);
+      playRound.push({ holeId, strokes: play.strokes, par });
+      return { isNewBest, best: bestOn(state, hole), round: roundLine(playRound) };
+    },
+    onNext: () => openPlayFor(nextId),
+    onReplay: () => openPlayFor(holeId),
+    onExit: () => {
+      stopPlay();
+      openEditorFor(holeId);
+    },
+  });
 }
 
 
@@ -317,6 +383,8 @@ function openEditorFor(holeId) {
       stopEditorLoop();
       router.go('overview');
     },
+    // A fresh round every time the player walks out from the editor.
+    onPlay: () => openPlayFor(holeId, { fresh: true }),
   });
 }
 
@@ -545,18 +613,19 @@ function syncScreenChrome() {
   playbackToolbar.hidden = router.current !== 'playback';
   reportRoot.hidden = router.current !== 'report';
   // Rides along with the report screen rather than getting its own router
-  // state (a sixth screen would break the "exactly five screens" contract
-  // screens.js documents) -- it is content ON the report screen's moment,
-  // not a screen of its own.
+  // state (a screen of its own is reserved for things that need the whole
+  // canvas -- see screens.js) -- it is content ON the report screen's
+  // moment, not a screen of its own.
   narrationRoot.hidden = router.current !== 'report';
   // Same reasoning as the narration root: content on the report screen's
   // moment, not a screen of its own.
   eventRoot.hidden = router.current !== 'report';
   startRoot.hidden = !onStart;
   // The HUD bar and amenity strip have nothing real to show before a game
-  // state exists at all -- hide them rather than let them sit empty behind
-  // the start screen.
-  topChrome.style.display = onStart ? 'none' : '';
+  // state exists, and nothing that changes while a hole is being played —
+  // and the play screen needs the room — so they are hidden for both.
+  const onPlay = router.current === 'play';
+  topChrome.style.display = onStart || onPlay ? 'none' : '';
   overviewMute.update();
   playbackMute.update();
   nineToggle.update();
@@ -863,6 +932,9 @@ function frame(now) {
       hud.update(state);
       amenityBar.update(state);
       activeEditor?.render(surface.ctx, { x: 0, y: 0, width: surface.width, height: surface.height });
+      break;
+    case 'play':
+      activePlay?.render(surface.ctx, { x: 0, y: 0, width: surface.width, height: surface.height }, now);
       break;
     case 'playback': {
       const before = clock.minute;
