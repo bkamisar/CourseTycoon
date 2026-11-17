@@ -944,6 +944,7 @@ function frame(now) {
   // water, rain, walking golfers. Set here, once, so a frame is drawn at
   // one instant and nothing in src/render reads the time for itself.
   setAnimationTime(now);
+  surface.beginFrame();
   // Plain daylight unless the screen being drawn knows better (the map
   // and the day playback set their own from the weather and the clock).
   setLight(DAYLIGHT);
