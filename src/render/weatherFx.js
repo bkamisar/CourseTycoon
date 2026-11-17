@@ -18,7 +18,7 @@
  * the picture never depends on a random number or on how many frames
  * happened to be drawn before this one.
  */
-import { PALETTE } from './palette.js';
+import { withAlpha } from './palette.js';
 
 /** drops on screen, pixels fallen per ms, sideways drift per pixel fallen, streak length */
 const RAIN = {
@@ -90,21 +90,25 @@ export function drawWeather(ctx, rect, key, ms) {
   ctx.rect(rect.x, rect.y, rect.width, rect.height);
   ctx.clip();
 
-  ctx.fillStyle = PALETTE.WHITE;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 0.5;
+  ctx.strokeStyle = withAlpha('WHITE', 0.55);
+  ctx.beginPath();
   for (const s of windStreaks(key, rect, ms)) {
-    // Dashed, brightest at the leading end: two pixels, a gap, then singles.
-    for (let k = 0; k < s.length; k++) {
-      if (k === 2 || k === 5) continue;
-      ctx.fillRect(Math.round(s.x - k), Math.round(s.y), 1, 1);
-    }
+    // A long faint line and a short bright head.
+    ctx.moveTo(s.x - s.length * 1.6, s.y + 0.4);
+    ctx.lineTo(s.x, s.y);
   }
+  ctx.stroke();
 
-  ctx.fillStyle = PALETTE.WATER_LIGHT;
+  ctx.lineWidth = 0.45;
+  ctx.strokeStyle = withAlpha('WATER_LIGHT', 0.75);
+  ctx.beginPath();
   for (const d of rainDrops(key, rect, ms)) {
-    for (let k = 0; k < d.length; k++) {
-      ctx.fillRect(Math.round(d.x + k * d.slant), Math.round(d.y - k), 1, 1);
-    }
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(d.x + d.length * d.slant * 1.4, d.y - d.length * 1.4);
   }
+  ctx.stroke();
 
   ctx.restore();
 }

@@ -8,13 +8,13 @@
  *
  * Everything else (cup, flag, slope arrows, reach ring, aim line, target,
  * ball) is drawn AFTER the zoom is undone, at `camera.toScreen(point)`,
- * so a ball is two crisp pixels at any zoom.
+ * so a ball and a golfer are the same size at any zoom.
  */
-import { PALETTE } from './palette.js';
-import { SPRITES, drawSprite, drawSpriteOutlined } from './sprites.js';
+import { PALETTE, withAlpha } from './palette.js';
+import { drawFigure, shirtColour } from './figures.js';
 import { drawWeather } from './weatherFx.js';
 import { setLight, lightAt, applyLight, drawCastShadow } from './light.js';
-import { drawHole, fillWoods } from './holeView.js';
+import { drawHole, fillWoods, paintFlag } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
 import { greenRadius } from '../sim/terrain.js';
 
@@ -49,17 +49,15 @@ export function dottedPoints(a, b, step) {
   return points;
 }
 
-function dot(ctx, p, size = 1) {
-  ctx.fillRect(Math.round(p.x), Math.round(p.y), size, size);
+function dot(ctx, p, r = 0.6) {
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawCupAndFlag(ctx, camera, hole) {
   const s = camera.toScreen(greenCentre(hole));
-  const sprite = SPRITES.flag;
-  drawCastShadow(ctx, Math.round(s.x) - 1, Math.round(s.y) - 1, sprite.length + 2, 2);
-  drawSprite(ctx, sprite, s.x - sprite[0].length / 2, s.y - sprite.length);
-  ctx.fillStyle = PALETTE.OUTLINE;
-  ctx.fillRect(Math.round(s.x) - 1, Math.round(s.y) - 1, 2, 2);
+  paintFlag(ctx, s.x, s.y, 1.5);
 }
 
 function drawSlopeArrows(ctx, camera, hole, slope, fraction) {
@@ -69,48 +67,72 @@ function drawSlopeArrows(ctx, camera, hole, slope, fraction) {
   const perp = { x: -dir.y, y: dir.x };
   // A steeper green gets a longer arrow: 6, 10 or 14 px of shaft.
   const shaft = 2 + slopeMarks(fraction) * 4;
-  ctx.fillStyle = PALETTE.FAIRWAY_SHADOW;
-  for (const anchor of slopeArrowAnchors(hole)) {
-    const mid = camera.toScreen(anchor);
-    const tail = { x: mid.x - (dir.x * shaft) / 2, y: mid.y - (dir.y * shaft) / 2 };
-    const tip = { x: mid.x + (dir.x * shaft) / 2, y: mid.y + (dir.y * shaft) / 2 };
-    for (const p of dottedPoints(tail, tip, 1)) dot(ctx, p);
-    for (const back of [1, 2, 3]) {
-      dot(ctx, { x: tip.x - dir.x * back + perp.x * back, y: tip.y - dir.y * back + perp.y * back });
-      dot(ctx, { x: tip.x - dir.x * back - perp.x * back, y: tip.y - dir.y * back - perp.y * back });
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const [width, colour] of [[2, withAlpha('WHITE', 0.35)], [1, PALETTE.FAIRWAY_SHADOW]]) {
+    ctx.lineWidth = width;
+    ctx.strokeStyle = colour;
+    ctx.beginPath();
+    for (const anchor of slopeArrowAnchors(hole)) {
+      const mid = camera.toScreen(anchor);
+      const tail = { x: mid.x - (dir.x * shaft) / 2, y: mid.y - (dir.y * shaft) / 2 };
+      const tip = { x: mid.x + (dir.x * shaft) / 2, y: mid.y + (dir.y * shaft) / 2 };
+      ctx.moveTo(tail.x, tail.y);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.moveTo(tip.x - dir.x * 3 + perp.x * 2.6, tip.y - dir.y * 3 + perp.y * 2.6);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.lineTo(tip.x - dir.x * 3 - perp.x * 2.6, tip.y - dir.y * 3 - perp.y * 2.6);
     }
+    ctx.stroke();
   }
+  ctx.restore();
 }
 
 function drawReachRing(ctx, camera, ball, reachYards) {
   const centre = camera.toScreen(ball);
   const radius = reachYards * camera.scale;
-  const steps = Math.max(24, Math.round((2 * Math.PI * radius) / 5));
-  ctx.fillStyle = PALETTE.UI_LIGHT;
-  ctx.globalAlpha = 0.6;
-  for (let i = 0; i < steps; i++) {
-    const a = (i / steps) * Math.PI * 2;
-    dot(ctx, { x: centre.x + Math.cos(a) * radius, y: centre.y + Math.sin(a) * radius });
-  }
-  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(centre.x, centre.y, radius, 0, Math.PI * 2);
+  ctx.setLineDash([2, 3]);
+  ctx.lineWidth = 0.7;
+  ctx.strokeStyle = withAlpha('UI_LIGHT', 0.6);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawAim(ctx, camera, ball, target) {
   const from = camera.toScreen(ball);
   const to = camera.toScreen(target);
-  ctx.fillStyle = PALETTE.WHITE;
-  ctx.globalAlpha = 0.75;
-  for (const p of dottedPoints(from, to, 4)) dot(ctx, p);
-  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.setLineDash([1.6, 2.4]);
+  ctx.lineWidth = 0.8;
+  ctx.strokeStyle = withAlpha('WHITE', 0.85);
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
 
-  const x = Math.round(to.x);
-  const y = Math.round(to.y);
-  ctx.fillStyle = PALETTE.OUTLINE;
-  ctx.fillRect(x - 4, y - 1, 9, 3);
-  ctx.fillRect(x - 1, y - 4, 3, 9);
-  ctx.fillStyle = PALETTE.ACCENT;
-  ctx.fillRect(x - 3, y, 7, 1);
-  ctx.fillRect(x, y - 3, 1, 7);
+  // The target: a ring and a cross, dark under bright so it reads on anything.
+  for (const [width, colour] of [[2, withAlpha('OUTLINE', 0.75)], [0.9, PALETTE.ACCENT]]) {
+    ctx.lineWidth = width;
+    ctx.strokeStyle = colour;
+    ctx.beginPath();
+    ctx.arc(to.x, to.y, 3.2, 0, Math.PI * 2);
+    ctx.moveTo(to.x - 5, to.y);
+    ctx.lineTo(to.x - 1.6, to.y);
+    ctx.moveTo(to.x + 1.6, to.y);
+    ctx.lineTo(to.x + 5, to.y);
+    ctx.moveTo(to.x, to.y - 5);
+    ctx.lineTo(to.x, to.y - 1.6);
+    ctx.moveTo(to.x, to.y + 1.6);
+    ctx.lineTo(to.x, to.y + 5);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** How long the burst where a ball came down stays on screen. */
@@ -148,40 +170,64 @@ function drawImpact(ctx, camera, impact) {
   const style = IMPACT_STYLE[impact.kind];
   if (!style) return;
   const s = camera.toScreen(impact);
-  ctx.fillStyle = PALETTE[style.colour];
-  for (const p of impactParticles(impact.kind, impact.age)) dot(ctx, { x: s.x + p.dx, y: s.y + p.dy });
+  const fade = 1 - impact.age / IMPACT_MS;
+  ctx.save();
+  // A ripple, or a scuff, on the ground where it landed.
+  ctx.beginPath();
+  ctx.ellipse(s.x, s.y, 2 + style.spread * (1 - fade), (2 + style.spread * (1 - fade)) * 0.55, 0, 0, Math.PI * 2);
+  ctx.lineWidth = 0.6;
+  ctx.strokeStyle = withAlpha(style.colour, 0.6 * fade);
+  ctx.stroke();
+  ctx.fillStyle = withAlpha(style.colour, 0.4 + 0.6 * fade);
+  for (const p of impactParticles(impact.kind, impact.age)) dot(ctx, { x: s.x + p.dx, y: s.y + p.dy }, 0.7);
+  ctx.restore();
 }
 
-const GOLFER_POSE = { address: 'golferAddress', backswing: 'golferBackswing', finish: 'golferFinish' };
+const FIGURE_SCALE = 1.6;
 
 /** The player's golfer, standing to the left of where the ball is (or
- * was) struck from, feet level with it. Fixed size at any zoom, like the
- * flag and the tee — he is a marker for "you are here", not scenery. */
+ * was) struck from, so the club at address meets the ball. Fixed size at
+ * any zoom, like the flag — a marker for "you are here", not scenery. */
 function drawGolfer(ctx, camera, golfer) {
-  const sprite = SPRITES[GOLFER_POSE[golfer.pose] ?? GOLFER_POSE.address];
   const s = camera.toScreen(golfer.at);
-  drawCastShadow(ctx, Math.round(s.x) - sprite[0].length + 1, Math.round(s.y) + 1, sprite.length, 4);
-  drawSpriteOutlined(ctx, sprite, s.x - sprite[0].length - 1, s.y - (sprite.length - 2));
+  const fx = s.x - 3.3 * FIGURE_SCALE;
+  const fy = s.y + 0.2;
+  drawCastShadow(ctx, fx - 1.2 * FIGURE_SCALE, fy, 7 * FIGURE_SCALE, 2.4 * FIGURE_SCALE);
+  drawFigure(ctx, fx, fy, { shirt: shirtColour(0), scale: FIGURE_SCALE, pose: golfer.pose ?? 'address' });
 }
 
 /** The last few places the ball was, oldest first and faintest: the tail
  * that makes a white dot crossing green stripes readable as a shot. */
 function drawTrail(ctx, camera, trail) {
+  ctx.save();
   trail.forEach((p, i) => {
     const s = camera.toScreen(p);
-    ctx.fillStyle = i < trail.length / 2 ? PALETTE.UI_LIGHT : PALETTE.WHITE;
-    ctx.fillRect(Math.round(s.x), Math.round(s.y) - Math.round(p.lift ?? 0), 1, 1);
+    const k = (i + 1) / trail.length;
+    ctx.fillStyle = withAlpha('WHITE', 0.15 + 0.6 * k);
+    dot(ctx, { x: s.x, y: s.y - (p.lift ?? 0) }, 0.4 + 0.5 * k);
   });
+  ctx.restore();
 }
 
 function drawBall(ctx, camera, ball, lift) {
   const s = camera.toScreen(ball);
-  const x = Math.round(s.x);
-  const y = Math.round(s.y);
-  ctx.fillStyle = PALETTE.OUTLINE;
-  ctx.fillRect(x, y, 2, 1);                       // shadow, on the ground
-  ctx.fillStyle = PALETTE.WHITE;
-  ctx.fillRect(x - 1, y - 1 - Math.round(lift), 2, 2);
+  // The shadow stays on the ground and shrinks and fades as the ball climbs.
+  const high = Math.min(1, lift / 25);
+  ctx.beginPath();
+  ctx.ellipse(s.x + 0.4 + lift * 0.15, s.y + 0.3, 1.3 - 0.5 * high, 0.7 - 0.25 * high, 0, 0, Math.PI * 2);
+  ctx.fillStyle = withAlpha('OUTLINE', 0.45 - 0.25 * high);
+  ctx.fill();
+  const y = s.y - lift;
+  ctx.beginPath();
+  ctx.arc(s.x, y - 0.6, 1.1, 0, Math.PI * 2);
+  const g = ctx.createRadialGradient(s.x - 0.4, y - 1, 0, s.x, y - 0.6, 1.1);
+  g.addColorStop(0, PALETTE.WHITE);
+  g.addColorStop(1, PALETTE.UI_LIGHT);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.lineWidth = 0.3;
+  ctx.strokeStyle = withAlpha('OUTLINE', 0.6);
+  ctx.stroke();
 }
 
 /**
