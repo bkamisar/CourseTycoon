@@ -26,7 +26,7 @@
  *
  * It decides nothing. No number in the simulation reads the light.
  */
-import { PALETTE } from './palette.js';
+import { PALETTE, withAlpha } from './palette.js';
 
 /** How dark a cast shadow is: OUTLINE laid over the ground at this opacity. */
 export const SHADOW_ALPHA = 0.36;
@@ -125,30 +125,53 @@ export function castShadowPixels(baseX, baseY, height, width, light) {
   return pixels;
 }
 
-/** Draws the shadow of a sprite-sized thing under the current light.
- * Call it before drawing the thing itself. */
+/**
+ * Draws the shadow of a thing `height` tall and `width` wide at its foot,
+ * the left end of its foot at (`baseX`, `baseY`), under the current light:
+ * a soft-ended band from its foot to where its top lands. Call it before
+ * drawing the thing itself. (`castShadowPixels` above is the same shadow
+ * as a set of whole pixels, from when the course was pixel art; the tests
+ * still hold the light to it.)
+ */
 export function drawCastShadow(ctx, baseX, baseY, height, width = 1) {
-  const pixels = castShadowPixels(baseX, baseY, height, width, current);
-  if (pixels.length === 0) return;
+  if (current.dx === 0 && current.dy === 0) return;
+  const fx = baseX + width / 2;
   ctx.save();
   ctx.globalAlpha = SHADOW_ALPHA;
-  ctx.fillStyle = PALETTE.OUTLINE;
-  for (const p of pixels) ctx.fillRect(p.x, p.y, 1, 1);
+  ctx.strokeStyle = PALETTE.OUTLINE;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(fx, baseY);
+  ctx.lineTo(fx + current.dx * height, baseY + current.dy * height);
+  ctx.stroke();
   ctx.restore();
 }
 
 /**
- * Lays the colour of the light over `rect`. Multiplied rather than
- * painted on: a wash of orange turns everything milky, while multiplying
- * leaves the darks dark and warms what was already bright, which is what
- * low sun does.
+ * Lays the light over `rect`: its colour, multiplied rather than painted
+ * on (a wash of orange turns everything milky, while multiplying leaves
+ * the darks dark and warms what was already bright, which is what low sun
+ * does), and a soft darkening toward the corners, which is what makes a
+ * flat picture read as something seen through a lens.
  */
 export function applyLight(ctx, rect, light = current) {
-  if (!light.tint || light.strength <= 0) return;
   ctx.save();
-  ctx.globalCompositeOperation = 'multiply';
-  ctx.globalAlpha = Math.min(1, light.strength);
-  ctx.fillStyle = PALETTE[light.tint];
+  if (light.tint && light.strength > 0) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = Math.min(1, light.strength);
+    ctx.fillStyle = PALETTE[light.tint];
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const far = Math.hypot(rect.width, rect.height) / 2;
+  const g = ctx.createRadialGradient(cx, cy, far * 0.5, cx, cy, far);
+  g.addColorStop(0, withAlpha('OUTLINE', 0));
+  g.addColorStop(1, withAlpha('OUTLINE', 0.28));
+  ctx.fillStyle = g;
   ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
   ctx.restore();
 }

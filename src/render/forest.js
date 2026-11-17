@@ -26,8 +26,9 @@
  * `drawForest` paints what it returns, once, into two off-screen layers —
  * shadows and trees — and blits those every frame after.
  */
-import { PALETTE } from './palette.js';
-import { SPRITES, drawSprite } from './sprites.js';
+import { PALETTE, mix, withAlpha } from './palette.js';
+import { SPRITES } from './sprites.js';
+import { resolution } from './paint.js';
 import { SHADOW_ALPHA, currentLight } from './light.js';
 import { lieAt, LIE, greenRadius } from '../sim/terrain.js';
 import { greenCentre } from '../sim/hole.js';
@@ -251,62 +252,175 @@ export function exposedTrunks(trees, area) {
   });
 }
 
-const spriteCanvases = new Map();
+// --- Painting -----------------------------------------------------------
+//
+// The trees are painted, not blitted from the pixel sprites: a round crown
+// of overlapping lobes under one gradient, lit from the top left, or a
+// conifer's stacked tiers. Each picture stays inside its sprite's box, so
+// everything `fits` checked about the sprite is true of the painting (the
+// checked footprint is the sprite plus a pixel of margin all round).
 
-/** A sprite, painted once onto a canvas of its own, so that planting two
- * thousand trees is two thousand blits and not sixty thousand pixels.
- * Two of each: with its trunk showing, and with its trunk in shade. */
-function spriteCanvas(name, trunkShows) {
-  const key = `${name}|${trunkShows}`;
-  let canvas = spriteCanvases.get(key);
-  if (canvas) return canvas;
-  const sprite = trunkShows ? SPRITES[name] : SPRITES[name].map((row) => row.replaceAll('E', 'J'));
-  canvas = document.createElement('canvas');
-  canvas.width = sprite[0].length;
-  canvas.height = sprite.length;
-  drawSprite(canvas.getContext('2d'), sprite, 0, 0);
-  spriteCanvases.set(key, canvas);
-  return canvas;
+/** Device pixels per logical pixel in a tree's bitmap: enough that a tree
+ * on the zoomed-in play screen is still sharp. */
+function treeDetail() {
+  return Math.min(32, Math.max(8, resolution() * 4));
 }
 
-function paintTrees(layer, trees, area) {
-  const tctx = layer.getContext('2d');
-  tctx.clearRect(0, 0, layer.width, layer.height);
-  const shows = exposedTrunks(trees, area);
-  trees.forEach((tree, i) => {
-    tctx.drawImage(spriteCanvas(tree.name, shows[i]), tree.left - area.x, tree.top - area.y);
+/** Three tones of each kind, chosen per tree, so a forest is not one tree
+ * repeated: as planted, a little yellower, a little darker. */
+const TONES = [
+  (c) => PALETTE[c],
+  (c) => mix(c, 'ROUGH', 0.22),
+  (c) => mix(c, 'TREE_SHADOW', 0.28),
+];
+
+function toneOf(tree) {
+  return Math.floor(hash(tree.x, tree.y, 9) * TONES.length);
+}
+
+/** Path of a crown: a main disc and lobes round it, in a `w`×`h` box. */
+function crownPath(c, cx, cy, r) {
+  c.beginPath();
+  c.moveTo(cx + r * 0.8, cy);
+  c.arc(cx, cy, r * 0.8, 0, Math.PI * 2);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.3;
+    const lx = cx + Math.cos(a) * r * 0.45;
+    const ly = cy + Math.sin(a) * r * 0.45;
+    c.moveTo(lx + r * 0.5, ly);
+    c.arc(lx, ly, r * 0.5, 0, Math.PI * 2);
+  }
+}
+
+function paintTrunk(c, w, h, top, shows) {
+  const tw = Math.max(0.5, w * 0.13);
+  c.fillStyle = shows ? PALETTE.TEE : PALETTE.TREE_SHADOW;
+  c.fillRect(w / 2 - tw / 2, top, tw, h - top);
+}
+
+function paintBroadleaf(c, w, h, tone, shows) {
+  const trunkTop = h * 0.72;
+  const r = Math.min(w / 2, trunkTop / 2 + 0.3) * 0.97;
+  const cx = w / 2;
+  const cy = r + 0.05;
+  paintTrunk(c, w, h, trunkTop, shows);
+  // The crown's own shade on the ground and the trunk, down and right.
+  c.fillStyle = withAlpha('OUTLINE', 0.3);
+  c.beginPath();
+  c.arc(cx + r * 0.1, cy + r * 0.14, r * 0.92, 0, Math.PI * 2);
+  c.fill();
+  const g = c.createRadialGradient(cx - r * 0.45, cy - r * 0.5, 0, cx - r * 0.1, cy - r * 0.1, r * 1.45);
+  g.addColorStop(0, tone('TREE_HIGHLIGHT'));
+  g.addColorStop(0.3, tone('TREE_LIGHT'));
+  g.addColorStop(0.68, tone('TREE'));
+  g.addColorStop(1, tone('TREE_SHADOW'));
+  crownPath(c, cx, cy, r);
+  c.fillStyle = g;
+  c.fill();
+  c.lineWidth = Math.max(0.12, r * 0.06);
+  c.strokeStyle = withAlpha('OUTLINE', 0.4);
+  c.stroke();
+  // Clusters of leaves: catching the light on the sunny side, in shade on the other.
+  for (const [dx, dy, lit] of [[-0.45, -0.2, 1], [-0.15, -0.55, 1], [0.1, -0.15, 1], [0.35, 0.35, 0], [-0.1, 0.45, 0], [0.5, 0, 0]]) {
+    c.fillStyle = lit ? withAlpha('TREE_HIGHLIGHT', 0.45) : withAlpha('TREE_SHADOW', 0.45);
+    c.beginPath();
+    c.arc(cx + dx * r, cy + dy * r, r * 0.17, 0, Math.PI * 2);
+    c.fill();
+  }
+}
+
+function paintConifer(c, w, h, tone, shows) {
+  const trunkTop = h * 0.8;
+  paintTrunk(c, w, h, trunkTop, shows);
+  const tiers = [[0, 0.42, 0.55], [0.22, 0.66, 0.8], [0.42, 0.88, 1]];
+  tiers.forEach(([apex, base, spread], i) => {
+    const ay = apex * h;
+    const by = base * h;
+    const half = (w / 2) * spread;
+    c.beginPath();
+    c.moveTo(w / 2, ay);
+    c.lineTo(w / 2 + half, by);
+    c.quadraticCurveTo(w / 2, by + h * 0.05, w / 2 - half, by);
+    c.closePath();
+    const g = c.createLinearGradient(w / 2 - half, 0, w / 2 + half, 0);
+    g.addColorStop(0, tone(i === 0 ? 'TREE_HIGHLIGHT' : 'TREE_LIGHT'));
+    g.addColorStop(0.45, tone('TREE'));
+    g.addColorStop(1, tone('TREE_SHADOW'));
+    c.fillStyle = g;
+    c.fill();
+    c.lineWidth = Math.max(0.12, w * 0.025);
+    c.strokeStyle = withAlpha('OUTLINE', 0.4);
+    c.stroke();
   });
 }
 
-/** A tree is taller than its picture: the sprite is a few pixels because
+const PAINTERS = {
+  treeRound: paintBroadleaf,
+  treeRoundSmall: paintBroadleaf,
+  treeSapling: paintBroadleaf,
+  treePine: paintConifer,
+  treePineSmall: paintConifer,
+};
+
+const treeBitmaps = new Map();
+
+/** One kind of tree, in one tone, with its trunk showing or not, painted
+ * once into a bitmap the size of its sprite's box. */
+function treeBitmap(name, tone, shows) {
+  const detail = treeDetail();
+  const key = `${name}|${tone}|${shows}|${detail}`;
+  let canvas = treeBitmaps.get(key);
+  if (canvas) return canvas;
+  const sprite = SPRITES[name];
+  const w = sprite[0].length;
+  const h = sprite.length;
+  canvas = document.createElement('canvas');
+  canvas.width = Math.round(w * detail);
+  canvas.height = Math.round(h * detail);
+  const c = canvas.getContext('2d');
+  c.scale(detail, detail);
+  (PAINTERS[name] ?? paintBroadleaf)(c, w, h, TONES[tone], shows);
+  treeBitmaps.set(key, canvas);
+  return canvas;
+}
+
+function drawTree(c, tree, shows) {
+  const sprite = SPRITES[tree.name];
+  c.drawImage(treeBitmap(tree.name, toneOf(tree), shows), tree.left, tree.top, sprite[0].length, sprite.length);
+}
+
+/** A tree is taller than its picture: the picture is a few pixels because
  * the screen is, but what it stands for is the tallest thing on the
  * course, and its shadow should say so. */
 const TREE_SHADOW_HEIGHT = 1.5;
 
 /**
- * Every tree's shadow, as one flat mask: a wedge from the foot of the
- * trunk, widening to the width of the crown where the top of the tree
- * lands. Painted solid, and laid over the course at SHADOW_ALPHA as a
- * single image, so two shadows crossing are no darker than one.
+ * Every tree's shadow as one path: a round-ended band from the foot of
+ * the trunk to where the top of the tree lands, three quarters as wide as
+ * the crown. Stroked once per width, so where two shadows cross they are
+ * no darker than one.
  */
-function paintShadows(layer, trees, area, light) {
-  const sctx = layer.getContext('2d');
-  sctx.clearRect(0, 0, layer.width, layer.height);
-  sctx.fillStyle = PALETTE.OUTLINE;
+function strokeShadows(c, trees, light) {
+  const byWidth = new Map();
   for (const tree of trees) {
     const sprite = SPRITES[tree.name];
-    const ox = Math.round(light.dx * sprite.length * TREE_SHADOW_HEIGHT);
-    const oy = Math.round(light.dy * sprite.length * TREE_SHADOW_HEIGHT);
-    const steps = Math.max(Math.abs(ox), Math.abs(oy));
-    if (steps === 0) continue;
-    const crown = Math.max(1, sprite[0].length - 2);
-    const depth = Math.max(1, Math.round(crown / 2));
-    for (let k = 1; k <= steps; k++) {
-      const width = Math.max(1, Math.round(crown * Math.min(1, 0.4 + (1.2 * k) / steps)));
-      const cx = tree.x - area.x + Math.round((ox * k) / steps);
-      const cy = tree.y - area.y + Math.round((oy * k) / steps);
-      sctx.fillRect(cx - Math.floor(width / 2), cy - Math.floor(depth / 2), width, depth);
+    const width = Math.max(1, sprite[0].length * 0.75);
+    if (!byWidth.has(width)) byWidth.set(width, []);
+    byWidth.get(width).push(tree);
+  }
+  c.lineCap = 'round';
+  c.strokeStyle = PALETTE.OUTLINE;
+  for (const [width, group] of byWidth) {
+    c.lineWidth = width;
+    c.beginPath();
+    for (const tree of group) {
+      const height = SPRITES[tree.name].length * TREE_SHADOW_HEIGHT;
+      const fx = tree.x + 0.5;
+      const fy = tree.y + 0.3;
+      c.moveTo(fx, fy);
+      c.lineTo(fx + light.dx * height, fy + light.dy * height);
     }
+    c.stroke();
   }
 }
 
@@ -320,40 +434,72 @@ function plotKey(plot) {
   ].join('|');
 }
 
-/** Painted forests, newest last. A handful is plenty: the map, the day
- * playback, the editor and the play screen each ask for one. */
-const layers = new Map();
-const MAX_LAYERS = 6;
+/** A key for "these plots, drawn in these rectangles": exported so the
+ * resort map can cache its ground under the same terms as its forest. */
+export function plotsKey(plots) {
+  return plots.map(plotKey).join('#');
+}
 
-function layerFor(area, plots) {
-  const key = `${area.x},${area.y},${area.width},${area.height}|${plots.map(plotKey).join('#')}`;
-  let layer = layers.get(key);
-  if (layer) {
+/** Planted forests (and their painted layers), newest last. A handful is
+ * plenty: the map, the day playback, the editor and the play screen each
+ * ask for one. */
+const stands = new Map();
+const MAX_STANDS = 6;
+
+function standFor(area, plots) {
+  const key = `${area.x},${area.y},${area.width},${area.height}|${plotsKey(plots)}`;
+  let stand = stands.get(key);
+  if (stand) {
     // Touched: move it to the back of the queue for eviction.
-    layers.delete(key);
-    layers.set(key, layer);
-    return layer;
+    stands.delete(key);
+    stands.set(key, stand);
+    return stand;
   }
   const trees = plantForest({ area, plots });
-  const make = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, area.width);
-    canvas.height = Math.max(1, area.height);
-    return canvas;
-  };
-  layer = { trees, treeLayer: make(), shadowLayer: make(), shadowKey: null };
-  paintTrees(layer.treeLayer, trees, area);
-  layers.set(key, layer);
-  if (layers.size > MAX_LAYERS) layers.delete(layers.keys().next().value);
-  return layer;
+  stand = { trees, shows: exposedTrunks(trees, area), layers: null };
+  stands.set(key, stand);
+  if (stands.size > MAX_STANDS) stands.delete(stands.keys().next().value);
+  return stand;
+}
+
+/** An off-screen canvas covering `area` at device resolution, with a
+ * context that draws in the same logical units as the screen. */
+function layerCanvas(area) {
+  const res = resolution();
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(area.width * res));
+  canvas.height = Math.max(1, Math.round(area.height * res));
+  const c = canvas.getContext('2d');
+  c.setTransform(res, 0, 0, res, -area.x * res, -area.y * res);
+  return { canvas, c };
+}
+
+function layersFor(stand, area) {
+  const res = resolution();
+  if (stand.layers?.res === res) return stand.layers;
+  const trees = layerCanvas(area);
+  stand.trees.forEach((tree, i) => drawTree(trees.c, tree, stand.shows[i]));
+  stand.layers = { res, trees, shadows: layerCanvas(area), shadowKey: null };
+  return stand.layers;
+}
+
+function overlaps(tree, r) {
+  const sprite = SPRITES[tree.name];
+  return tree.left < r.x + r.width && tree.left + sprite[0].length > r.x
+    && tree.top < r.y + r.height + 14 && tree.top + sprite.length > r.y - 14;
 }
 
 /**
  * Draws the forest over `area`: shadows first, then the trees. Everything
  * the trees must keep off — the holes in `plots` — has to be on the
  * canvas already.
+ *
+ * Painted once into two layers at device resolution and blitted after —
+ * except when `visible` is given, the part of `area` actually on screen
+ * under a zoom (the play screen), where a layer would be either enormous
+ * or blurred: then the trees in view are drawn straight onto the canvas.
  */
-export function drawForest(ctx, { area, plots = [] }) {
+export function drawForest(ctx, { area, plots = [], visible = null }) {
   const whole = {
     x: Math.floor(area.x),
     y: Math.floor(area.y),
@@ -361,21 +507,40 @@ export function drawForest(ctx, { area, plots = [] }) {
     height: Math.ceil(area.y + area.height) - Math.floor(area.y),
   };
   const built = plots.filter((p) => p.hole?.corridor?.length > 1);
-  const layer = layerFor(whole, built);
-
+  const stand = standFor(whole, built);
   const light = currentLight();
-  // Shadows only move a whole pixel at a time, so they are repainted only
-  // when the light has moved far enough to move one.
-  const shadowKey = `${Math.round(light.dx * 8)},${Math.round(light.dy * 8)}`;
-  if (shadowKey !== '0,0') {
-    if (layer.shadowKey !== shadowKey) {
-      paintShadows(layer.shadowLayer, layer.trees, whole, light);
-      layer.shadowKey = shadowKey;
+  const sunny = light.dx !== 0 || light.dy !== 0;
+
+  if (visible) {
+    const inView = [];
+    stand.trees.forEach((tree, i) => { if (overlaps(tree, visible)) inView.push(i); });
+    if (sunny) {
+      ctx.save();
+      ctx.globalAlpha = SHADOW_ALPHA;
+      strokeShadows(ctx, inView.map((i) => stand.trees[i]), light);
+      ctx.restore();
+    }
+    for (const i of inView) drawTree(ctx, stand.trees[i], stand.shows[i]);
+    return;
+  }
+
+  const layers = layersFor(stand, whole);
+  if (sunny) {
+    // Repainted only when the sun has moved far enough to show.
+    const shadowKey = `${Math.round(light.dx * 40)},${Math.round(light.dy * 40)}`;
+    if (layers.shadowKey !== shadowKey) {
+      const { canvas, c } = layers.shadows;
+      c.save();
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.clearRect(0, 0, canvas.width, canvas.height);
+      c.restore();
+      strokeShadows(c, stand.trees, light);
+      layers.shadowKey = shadowKey;
     }
     ctx.save();
     ctx.globalAlpha = SHADOW_ALPHA;
-    ctx.drawImage(layer.shadowLayer, whole.x, whole.y);
+    ctx.drawImage(layers.shadows.canvas, whole.x, whole.y, whole.width, whole.height);
     ctx.restore();
   }
-  ctx.drawImage(layer.treeLayer, whole.x, whole.y);
+  ctx.drawImage(layers.trees.canvas, whole.x, whole.y, whole.width, whole.height);
 }

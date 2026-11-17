@@ -228,15 +228,17 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
   // painted under the same zoom as the hole, so the forest floor outside
   // the hole's own rectangle is the same size as the floor inside it. The
   // rectangle filled is the view, mapped back through the zoom.
-  fillWoods(ctx, {
+  const inView = {
     x: (viewRect.x - camera.tx) / camera.zoom,
     y: (viewRect.y - camera.ty) / camera.zoom,
     width: viewRect.width / camera.zoom,
     height: viewRect.height / camera.zoom,
-  });
+  };
+  fillWoods(ctx, inView);
   drawHole(ctx, hole, viewRect, {
     flag: false,
     clip: false,
+    visible: inView,
     cover: {
       x: viewRect.x - FOREST_BEYOND,
       y: viewRect.y - FOREST_BEYOND,
