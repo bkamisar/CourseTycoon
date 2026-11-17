@@ -1,4 +1,3 @@
-import { drawPixelText, pixelTextWidth, GLYPH_HEIGHT } from './sprites.js';
 /**
  * Draws the resort overview: the nine-plot map the player spends most of
  * their time on. A built hole is drawn as a small version of its actual
@@ -10,20 +9,24 @@ import { drawPixelText, pixelTextWidth, GLYPH_HEIGHT } from './sprites.js';
  * even at a glance.
  *
  * Amenities used to be drawn here too, as a cluster of unlabelled 8x8
- * sprites — playtesting found that unreadable at this scale ("the top
- * left bar with sprites... I can't tell what they are at all"). They now
- * live in `src/ui/amenityBar.js`, a DOM strip mounted alongside the HUD,
- * which can afford to spend real pixels on text. This file no longer
- * knows about `state.resort.amenities` at all.
+ * sprites — playtesting found that unreadable at this scale. They live in
+ * `src/ui/amenityBar.js`, a DOM strip mounted alongside the HUD. This file
+ * does not know about `state.resort.amenities` at all.
  *
  * Also returns the tappable regions for every hole plot drawn, in the
  * same coordinate space `ctx` was drawn in. This is deliberately the only
  * place that layout maths happens — input-handling reads this list rather
  * than re-deriving hit boxes from scratch.
+ *
+ * Since the canvas is drawn at the device's real resolution, nine holes of
+ * textured ground every frame would be the slowest thing in the game. The
+ * ground does not move, so it is painted once into a layer (`groundFor`)
+ * and only what moves — light on the ponds, the flags — is drawn per frame.
  */
-import { PALETTE } from './palette.js';
-import { drawHole, fillWoods, drawTeeAndFlag, computeHoleTransform } from './holeView.js';
-import { drawForest } from './forest.js';
+import { PALETTE, withAlpha } from './palette.js';
+import { drawHole, fillWoods, drawTeeAndFlag, drawPondGlints, computeHoleTransform, roundRect } from './holeView.js';
+import { drawForest, plotsKey } from './forest.js';
+import { resolution } from './paint.js';
 import { holeStats } from '../sim/hole.js';
 
 const GRID_COLS = 3;
@@ -31,86 +34,71 @@ const GRID_ROWS = 3;
 const GRID_PAD = 4;
 const CELL_GAP = 4;
 
-/** Terse "P4 · D52" label, sized to still read at the plot's actual
- * on-screen size (these cells render well under 100px even on a real
- * phone) rather than at whatever size a zoomed-in screenshot suggests. */
-const LABEL_FONT = '7px monospace';
-const LABEL_PAD_X = 2;
-const LABEL_HEIGHT = 9;
-const LABEL_MARGIN = 1;
+const LABEL_FONT = '700 5.5px system-ui, -apple-system, "Segoe UI", sans-serif';
+const LABEL_PAD_X = 2.2;
+const LABEL_HEIGHT = 8;
+const LABEL_MARGIN = 1.5;
 
 /**
- * A small top-left corner badge, deliberately NOT centred over the plot.
- * Both the flag (drawn at the green, top-centre) and the tee sprite
- * (drawn at the corridor start, bottom-centre) sit on that centreline —
- * an earlier version of this label sat centred at the bottom and drew
- * its chip directly on top of the tee sprite, dimming it into an
- * unreadable smudge sitting in the middle of the text. The corner is
- * always rough/trees background on every template (the corridor never
- * reaches the plot's edges), so a badge there never collides with
- * anything the hole itself draws.
+ * A small top-left corner badge, deliberately NOT centred over the plot:
+ * the flag (top-centre) and the tee (bottom-centre) sit on that
+ * centreline, and an earlier label there sat on top of the tee. The
+ * corner is always woods or rough on every template, so a badge there
+ * never collides with anything the hole itself draws.
  */
 function drawHoleLabel(ctx, hole, rect) {
   const stats = holeStats(hole);
   const text = `P${stats.par} · D${Math.round(stats.difficulty)}`;
-
   ctx.save();
-  // Drawn as bitmap glyphs rather than fillText: canvas text anti-aliases,
-  // and this canvas is magnified by a whole number afterwards, so the grey
-  // fringe around each letter is magnified too and reads as blur.
-  const textWidth = pixelTextWidth(text);
-  const labelWidth = Math.min(rect.width - LABEL_MARGIN * 2, textWidth + LABEL_PAD_X * 2);
-  const labelX = Math.round(rect.x + LABEL_MARGIN);
-  const labelY = Math.round(rect.y + LABEL_MARGIN);
-
-  // A solid (not translucent) chip behind the text — the hole art
-  // underneath ranges from dark tree green to pale sand, and white text
-  // alone would vanish against the lighter parts of it; a translucent
-  // chip would too, over the darkest parts.
-  ctx.fillStyle = PALETTE.OUTLINE;
-  ctx.fillRect(labelX, labelY, Math.round(labelWidth), LABEL_HEIGHT);
-
-  drawPixelText(
-    ctx,
-    text,
-    labelX + LABEL_PAD_X,
-    labelY + Math.round((LABEL_HEIGHT - GLYPH_HEIGHT) / 2),
-    PALETTE.WHITE
-  );
+  ctx.font = LABEL_FONT;
+  ctx.textBaseline = 'middle';
+  const width = Math.min(rect.width - LABEL_MARGIN * 2, ctx.measureText(text).width + LABEL_PAD_X * 2);
+  const x = rect.x + LABEL_MARGIN;
+  const y = rect.y + LABEL_MARGIN;
+  // Solid enough to read over pale sand and dark woods alike.
+  ctx.beginPath();
+  roundRect(ctx, x, y, width, LABEL_HEIGHT, 2);
+  ctx.fillStyle = withAlpha('OUTLINE', 0.78);
+  ctx.fill();
+  ctx.fillStyle = PALETTE.WHITE;
+  ctx.fillText(text, x + LABEL_PAD_X, y + LABEL_HEIGHT / 2 + 0.3);
   ctx.restore();
 }
 
 function drawEmptyPlot(ctx, rect) {
   // Unbuilt land is woods like the rest of the map — the dashed outline
   // and the plus are what say "build here", on a dark plate so they read
-  // against the canopy.
-  const plate = Math.max(9, Math.round(Math.min(rect.width, rect.height) * 0.5));
-  ctx.fillStyle = PALETTE.UI_DARK;
-  ctx.fillRect(
-    Math.round(rect.x + rect.width / 2 - plate / 2),
-    Math.round(rect.y + rect.height / 2 - plate / 2),
-    plate, plate
-  );
-
+  // against the trees.
+  const plate = Math.max(9, Math.min(rect.width, rect.height) * 0.5);
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
   ctx.save();
-  ctx.strokeStyle = PALETTE.UI_LIGHT;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 2]);
-  ctx.strokeRect(rect.x + 1.5, rect.y + 1.5, rect.width - 3, rect.height - 3);
-  ctx.restore();
+  ctx.beginPath();
+  roundRect(ctx, cx - plate / 2, cy - plate / 2, plate, plate, 3);
+  ctx.fillStyle = withAlpha('UI_DARK', 0.85);
+  ctx.fill();
 
-  const cx = Math.round(rect.x + rect.width / 2);
-  const cy = Math.round(rect.y + rect.height / 2);
-  const arm = Math.max(3, Math.round(Math.min(rect.width, rect.height) * 0.18));
-  ctx.fillStyle = PALETTE.ACCENT;
-  ctx.fillRect(cx - arm, cy - 1, arm * 2, 2);
-  ctx.fillRect(cx - 1, cy - arm, 2, arm * 2);
+  ctx.beginPath();
+  roundRect(ctx, rect.x + 1.5, rect.y + 1.5, rect.width - 3, rect.height - 3, 3);
+  ctx.strokeStyle = withAlpha('UI_LIGHT', 0.8);
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([3, 2]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const arm = Math.max(3, Math.min(rect.width, rect.height) * 0.16);
+  ctx.strokeStyle = PALETTE.ACCENT;
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - arm, cy);
+  ctx.lineTo(cx + arm, cy);
+  ctx.moveTo(cx, cy - arm);
+  ctx.lineTo(cx, cy + arm);
+  ctx.stroke();
+  ctx.restore();
 }
 
-/**
- * Draws the resort into `{x, y, width, height}` of `ctx` (defaults to the
- * full canvas) and returns the tappable regions for what it drew.
- */
 /** Holes per screen. The grid is 3x3 and a golf course comes in nines, so
  * these are the same number for the same reason. */
 export const HOLES_PER_NINE = GRID_COLS * GRID_ROWS;
@@ -132,8 +120,37 @@ export function hasBackNine(state) {
     .some((h) => h.corridor?.length > 1);
 }
 
+/** Painted ground layers, newest last: the front and back nines. */
+const grounds = new Map();
+const MAX_GROUNDS = 3;
+
 /**
- * Draws one nine.
+ * The still ground of the whole map — forest floor and every built hole's
+ * terrain, without the light on the ponds, the tees or the flags — painted
+ * once at the device's resolution and kept until a hole changes.
+ */
+function groundFor(area, plots) {
+  const res = resolution();
+  const key = `${res}|${area.x},${area.y},${area.width},${area.height}|${plotsKey(plots)}`;
+  let ground = grounds.get(key);
+  if (ground) return ground;
+  ground = document.createElement('canvas');
+  ground.width = Math.max(1, Math.round(area.width * res));
+  ground.height = Math.max(1, Math.round(area.height * res));
+  const c = ground.getContext('2d');
+  c.setTransform(res, 0, 0, res, -area.x * res, -area.y * res);
+  fillWoods(c, area);
+  for (const { hole, rect } of plots) {
+    drawHole(c, hole, rect, { forest: false, tee: false, flag: false, glints: false });
+  }
+  grounds.set(key, ground);
+  if (grounds.size > MAX_GROUNDS) grounds.delete(grounds.keys().next().value);
+  return ground;
+}
+
+/**
+ * Draws one nine into `{x, y, width, height}` of `ctx` and returns the
+ * tappable regions for what it drew.
  *
  * Eighteen holes will not fit this grid: at 180x320 an 18-cell layout
  * halves the height of every hole and none of them read. A course comes
@@ -145,13 +162,7 @@ export function drawResort(ctx, state, { x = 0, y = 0, width, height, nine = 0 }
   const offset = nine * HOLES_PER_NINE;
   const holes = all.slice(offset, offset + HOLES_PER_NINE);
   const regions = [];
-
-  // The whole map is one piece of woodland with holes cut through it.
-  // Each plot used to be a card on a dark table; painting the same forest
-  // floor under the gaps as `drawHole` paints inside the plots (the tile
-  // is anchored to the canvas, so it lines up across every edge) turns
-  // nine cards into one course.
-  fillWoods(ctx, { x, y, width, height });
+  const area = { x, y, width, height };
 
   const gridY0 = y + GRID_PAD;
   const gridW = width - GRID_PAD * 2;
@@ -159,9 +170,6 @@ export function drawResort(ctx, state, { x = 0, y = 0, width, height, nine = 0 }
   const cellW = Math.floor((gridW - (GRID_COLS - 1) * CELL_GAP) / GRID_COLS);
   const cellH = Math.floor((gridH - (GRID_ROWS - 1) * CELL_GAP) / GRID_ROWS);
 
-  // Three passes, because the trees are one forest and not nine.
-  //
-  // 1. The ground of every built hole.
   const plots = [];
   holes.forEach((hole, i) => {
     const col = i % GRID_COLS;
@@ -173,20 +181,28 @@ export function drawResort(ctx, state, { x = 0, y = 0, width, height, nine = 0 }
       height: cellH,
     };
     regions.push({ kind: 'hole', id: hole.id, ...rect });
-    if (hole.open) {
-      drawHole(ctx, hole, rect, { forest: false, tee: false, flag: false });
-      plots.push({ hole, rect, t: computeHoleTransform(hole, rect) });
-    }
+    if (hole.open && hole.corridor?.length > 1) plots.push({ hole, rect, t: computeHoleTransform(hole, rect) });
   });
+
+  // 1. The ground: one woodland floor with every built hole cut into it.
+  ctx.drawImage(groundFor(area, plots), x, y, width, height);
 
   // 2. One forest over the whole map: across the gaps, over the unbuilt
   // plots, and up to the edge of every hole's rough — never over it,
   // because a tree is only planted where that hole's own `lieAt` says
   // trees. A tree standing half in a plot and half in the gap beside it
   // is one tree, not two halves that happen to meet.
-  drawForest(ctx, { area: { x, y, width, height }, plots });
+  drawForest(ctx, { area, plots });
 
-  // 3. Everything that sits on top of the trees.
+  // 3. What moves, and what sits on top of the trees.
+  for (const { hole, rect, t } of plots) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.width, rect.height);
+    ctx.clip();
+    drawPondGlints(ctx, hole, rect, t);
+    ctx.restore();
+  }
   holes.forEach((hole, i) => {
     const rect = regions[i];
     if (hole.open) {
