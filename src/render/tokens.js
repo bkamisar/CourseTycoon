@@ -18,7 +18,7 @@
 import { PALETTE } from './palette.js';
 import { SPRITES, drawSprite } from './sprites.js';
 import { animationTime } from './animClock.js';
-import { drawFigure, shirtColour } from './figures.js';
+import { drawFigure, shirtColour, drawBeverageCart, drawHalfwayHouse } from './figures.js';
 import { drawCastShadow } from './light.js';
 import { computeHoleTransform } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
@@ -163,10 +163,12 @@ export function drawEffects(ctx, effects, window = EFFECT_WINDOW_MINUTES) {
       // rather than as somebody driving away.
       const fade = Math.max(0.25, 1 - Math.max(0, fx.age - SERVICE_WINDOW_MINUTES * 0.6)
         / (SERVICE_WINDOW_MINUTES * 0.4));
-      drawCastShadow(ctx, x - 4, y - 2, 5, 8);
+      drawCastShadow(ctx, fx.x - 4, fx.y - 1, 6, 8);
       ctx.save();
       ctx.globalAlpha = fade;
-      drawSprite(ctx, SPRITES[spriteName], x - 4, y - 9);
+      if (fx.type === 'cartStop') drawBeverageCart(ctx, fx.x, fx.y - 1);
+      else if (fx.type === 'refuel') drawHalfwayHouse(ctx, fx.x, fx.y - 1);
+      else drawSprite(ctx, SPRITES[spriteName], x - 4, y - 9);
       ctx.restore();
       continue;
     }
@@ -176,7 +178,9 @@ export function drawEffects(ctx, effects, window = EFFECT_WINDOW_MINUTES) {
     ctx.save();
     ctx.globalAlpha = fade;
     ctx.fillStyle = color;
-    ctx.fillRect(x - 1, y - 1, 2, 2);
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, 1.2, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 }

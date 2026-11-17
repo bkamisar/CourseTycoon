@@ -29,6 +29,8 @@
 import { PALETTE, mix, withAlpha } from './palette.js';
 import { SPRITES } from './sprites.js';
 import { resolution } from './paint.js';
+import { animationTime } from './animClock.js';
+import { ambientWeather, treeSway } from './ambient.js';
 import { SHADOW_ALPHA, currentLight } from './light.js';
 import { lieAt, LIE, greenRadius } from '../sim/terrain.js';
 import { greenCentre } from '../sim/hole.js';
@@ -384,9 +386,21 @@ function treeBitmap(name, tone, shows) {
   return canvas;
 }
 
-function drawTree(c, tree, shows) {
+function drawTree(c, tree, shows, sway = 0) {
   const sprite = SPRITES[tree.name];
-  c.drawImage(treeBitmap(tree.name, toneOf(tree), shows), tree.left, tree.top, sprite[0].length, sprite.length);
+  const bitmap = treeBitmap(tree.name, toneOf(tree), shows);
+  if (!sway) {
+    c.drawImage(bitmap, tree.left, tree.top, sprite[0].length, sprite.length);
+    return;
+  }
+  // Leaning from the foot of the trunk: the base stays put, the crown moves.
+  const fx = tree.x + 0.5;
+  const fy = tree.y + 1;
+  c.save();
+  c.translate(fx, fy);
+  c.transform(1, 0, sway, 1, 0, 0);
+  c.drawImage(bitmap, tree.left - fx, tree.top - fy, sprite[0].length, sprite.length);
+  c.restore();
 }
 
 /** A tree is taller than its picture: the picture is a few pixels because
@@ -520,7 +534,14 @@ export function drawForest(ctx, { area, plots = [], visible = null }) {
       strokeShadows(ctx, inView.map((i) => stand.trees[i]), light);
       ctx.restore();
     }
-    for (const i of inView) drawTree(ctx, stand.trees[i], stand.shows[i]);
+    // Close up, the trees move in the wind. (On the map they are one
+    // painted layer and hold still: at that size a sway would not show.)
+    const key = ambientWeather();
+    const ms = animationTime();
+    for (const i of inView) {
+      const tree = stand.trees[i];
+      drawTree(ctx, tree, stand.shows[i], treeSway(key, tree.x, tree.y, ms));
+    }
     return;
   }
 

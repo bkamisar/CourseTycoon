@@ -37,6 +37,7 @@ import { animationTime } from './animClock.js';
 import { resolution } from './paint.js';
 import { drawForest } from './forest.js';
 import { drawCastShadow } from './light.js';
+import { drawRipples } from './ambient.js';
 import { greenCentre } from '../sim/hole.js';
 import { greenRadius } from '../sim/terrain.js';
 
@@ -366,12 +367,14 @@ const GLINTS = [[-0.4, -0.3, 0.32, 0], [0.18, -0.5, 0.24, 2.1], [0.28, 0.12, 0.2
 /** Light on every pond of `hole` drawn into `rect`: short bright strokes
  * that drift and fade on the shared animation clock. */
 export function drawPondGlints(ctx, hole, rect, t = computeHoleTransform(hole, rect)) {
-  const now = animationTime() / 1000;
-  for (const f of hole.features) {
-    if (f.type !== 'pond') continue;
+  const ms = animationTime();
+  const now = ms / 1000;
+  hole.features.forEach((f, index) => {
+    if (f.type !== 'pond') return;
     const { p, r } = circleOf(t, f, f.size);
-    if (r < 2) continue;
+    if (r < 2) return;
     insideCircle(ctx, p, r, () => {
+      drawRipples(ctx, p, r, ms, index);
       ctx.lineCap = 'round';
       ctx.lineWidth = Math.max(0.4, Math.min(0.9, r * 0.06));
       for (const [gx, gy, len, phase] of GLINTS) {
@@ -386,7 +389,7 @@ export function drawPondGlints(ctx, hole, rect, t = computeHoleTransform(hole, r
         ctx.stroke();
       }
     });
-  }
+  });
 }
 
 /**

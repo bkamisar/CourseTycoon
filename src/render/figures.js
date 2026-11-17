@@ -99,3 +99,85 @@ export function drawFigure(ctx, x, y, { shirt = PALETTE.ACCENT, scale = 1, strid
 
   ctx.restore();
 }
+
+function roundedBox(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+}
+
+/**
+ * The beverage cart, its back wheels at (`x`, `y`): a white buggy under a
+ * striped canopy, with a crate of drinks on the back. About eight logical
+ * px long, the size the pixel sprite was.
+ */
+export function drawBeverageCart(ctx, x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineJoin = 'round';
+  ctx.fillStyle = PALETTE.OUTLINE;
+  for (const wx of [-2.6, 2.6]) {
+    ctx.beginPath();
+    ctx.ellipse(wx, 0, 1.1, 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  roundedBox(ctx, -4, -3.4, 8, 3.2, 1);
+  ctx.fillStyle = PALETTE.WHITE;
+  ctx.fill();
+  ctx.lineWidth = 0.4;
+  ctx.strokeStyle = PALETTE.OUTLINE;
+  ctx.stroke();
+  roundedBox(ctx, 0.6, -4.6, 3, 1.6, 0.4);
+  ctx.fillStyle = PALETTE.SAND;
+  ctx.fill();
+  ctx.stroke();
+  ctx.lineWidth = 0.35;
+  ctx.beginPath();
+  ctx.moveTo(-3.2, -3.4);
+  ctx.lineTo(-3.2, -7.2);
+  ctx.moveTo(0.2, -3.4);
+  ctx.lineTo(0.2, -7.2);
+  ctx.stroke();
+  roundedBox(ctx, -4.4, -8.6, 6, 1.8, 0.8);
+  ctx.save();
+  ctx.clip();
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = i % 2 ? PALETTE.WHITE : PALETTE.ACCENT;
+    ctx.fillRect(-4.4 + i * 1.5, -8.6, 1.5, 1.8);
+  }
+  ctx.restore();
+  roundedBox(ctx, -4.4, -8.6, 6, 1.8, 0.8);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** The halfway house, its front at (`x`, `y`): a small timber hut with a
+ * pitched roof, a lit window and a hatch. */
+export function drawHalfwayHouse(ctx, x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 0.4;
+  ctx.strokeStyle = PALETTE.OUTLINE;
+  roundedBox(ctx, -4, -5, 8, 5, 0.5);
+  ctx.fillStyle = PALETTE.PATH;
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-5, -4.6);
+  ctx.lineTo(0, -8.4);
+  ctx.lineTo(5, -4.6);
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.FLAG;
+  ctx.fill();
+  ctx.stroke();
+  roundedBox(ctx, -2.8, -3.8, 2.6, 1.8, 0.3);
+  ctx.fillStyle = PALETTE.ACCENT;
+  ctx.fill();
+  ctx.stroke();
+  roundedBox(ctx, 0.8, -3.2, 2, 3.2, 0.3);
+  ctx.fillStyle = PALETTE.TEE;
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}

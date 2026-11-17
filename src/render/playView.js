@@ -14,6 +14,7 @@ import { PALETTE, withAlpha } from './palette.js';
 import { drawFigure, shirtColour } from './figures.js';
 import { drawWeather } from './weatherFx.js';
 import { setLight, lightAt, applyLight, drawCastShadow } from './light.js';
+import { setAmbientWeather, drawCloudShadows, drawBirds } from './ambient.js';
 import { drawHole, fillWoods, paintFlag } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
 import { greenRadius } from '../sim/terrain.js';
@@ -256,6 +257,13 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
   // No clock on this screen, so a dry day is plain daylight; a wet one is
   // overcast, shadowless and grey, the same as it is on the map.
   setLight(lightAt({ weatherKey: scene.weatherKey }));
+  setAmbientWeather(scene.weatherKey);
+  const cover = {
+    x: viewRect.x - FOREST_BEYOND,
+    y: viewRect.y - FOREST_BEYOND,
+    width: viewRect.width + FOREST_BEYOND * 2,
+    height: viewRect.height + FOREST_BEYOND * 2,
+  };
 
   // The strip outside viewRect sits behind opaque chrome, but is cleared
   // anyway so a previous screen's last frame cannot show through a gap.
@@ -285,13 +293,11 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
     flag: false,
     clip: false,
     visible: inView,
-    cover: {
-      x: viewRect.x - FOREST_BEYOND,
-      y: viewRect.y - FOREST_BEYOND,
-      width: viewRect.width + FOREST_BEYOND * 2,
-      height: viewRect.height + FOREST_BEYOND * 2,
-    },
+    cover,
   });
+  // Cloud shadows belong to the ground, so they are drawn under the zoom
+  // and slide past with it when the camera moves.
+  drawCloudShadows(ctx, cover, scene.timeMs ?? 0);
   ctx.restore();
 
   if (scene.slope) drawSlopeArrows(ctx, camera, hole, scene.slope, scene.slopeFraction);
@@ -306,6 +312,7 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
   drawBall(ctx, camera, scene.ball, scene.lift ?? 0);
   // The colour of the light goes over everything on the ground and under
   // the rain, which is in the air in front of it.
+  drawBirds(ctx, viewRect, scene.timeMs ?? 0);
   applyLight(ctx, viewRect);
   if (scene.weatherKey) drawWeather(ctx, viewRect, scene.weatherKey, scene.timeMs ?? 0);
 
