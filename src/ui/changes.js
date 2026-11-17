@@ -31,13 +31,22 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-11-16d';
+export const BUILD = '2026-11-16e';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-11-16e',
+    notes: [
+      'The course is drawn at your screen's full resolution now, and it is not pixel art any more. Fairways are striped, greens shine toward the light, bunkers and ponds have depth, and the light moves on the water.',
+      'The trees are painted, a whole forest of them, in three shades. They stand exactly where they stood before, so a ball that looks clear of the trees is still clear of them.',
+      'Golfers walk with a stride, in their own shirts, and swing a club when you play. Shadows are soft, and the map has real lettering.',
+      'Nothing about how the game plays has changed.',
+    ],
+  },
   {
     version: '2026-11-16d',
     notes: [
