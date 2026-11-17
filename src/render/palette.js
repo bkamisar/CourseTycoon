@@ -47,6 +47,9 @@ export const PALETTE = Object.freeze({
   UI_DARK: '#2A2A32', // sheet backgrounds, HUD bar, letterbox-adjacent chrome
   UI_LIGHT: '#C8C8D0', // borders, secondary UI text, dividers
 
+  // The flag on every green.
+  FLAG: '#E2493B',
+
   // Highlight
   ACCENT: '#FFC93C', // money, highlights, calls to action
 
@@ -62,3 +65,30 @@ export const PALETTE = Object.freeze({
   FOOD_DRINK: '#E8A020',     // beer and anything amber in a glass
   FOOD_BERRY: '#8E44AD',     // the Transfusion's grape
 });
+
+/** `#RRGGBB` for a palette colour (a role name or a hex value from this file). */
+function rgb(colour) {
+  const hex = PALETTE[colour] ?? colour;
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/**
+ * The colour `t` of the way from `a` to `b` (0 is `a`, 1 is `b`), as
+ * `#RRGGBB`. How a gradient gets the in-between colours it needs without
+ * anybody writing a hex value outside this file: every one of them is
+ * derived from two roles that are here.
+ */
+export function mix(a, b, t) {
+  const ca = rgb(a);
+  const cb = rgb(b);
+  const k = Math.min(1, Math.max(0, t));
+  const hex = ca.map((v, i) => Math.round(v + (cb[i] - v) * k).toString(16).padStart(2, '0'));
+  return `#${hex.join('')}`.toUpperCase();
+}
+
+/** A palette colour at opacity `alpha`, as `rgba(...)`. */
+export function withAlpha(colour, alpha) {
+  const [r, g, b] = rgb(colour);
+  return `rgba(${r},${g},${b},${Math.min(1, Math.max(0, alpha))})`;
+}
