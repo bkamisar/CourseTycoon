@@ -18,6 +18,7 @@
 import { PALETTE } from './palette.js';
 import { SPRITES, drawSprite, shirted, drawSpriteOutlined } from './sprites.js';
 import { animationFrame } from './animClock.js';
+import { drawCastShadow } from './light.js';
 import { computeHoleTransform } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
 import { pathLength, pointAtDistance } from '../sim/geometry.js';
@@ -144,6 +145,7 @@ export function drawTokens(ctx, tokens) {
     const frame = animationFrame(WALK_FRAME_MS, 2, tok.groupIndex);
     const base = frame === 0 ? SPRITES.miniGolferWalk1 : SPRITES.miniGolferWalk2;
     const sprite = shirted(base, tok.groupIndex);
+    drawCastShadow(ctx, Math.round(tok.x) - 1, Math.round(tok.y), sprite.length - 1, 3);
     drawSpriteOutlined(ctx, sprite, tok.x - 2, tok.y - (sprite.length - 1));
   }
 }
@@ -161,6 +163,7 @@ export function drawEffects(ctx, effects, window = EFFECT_WINDOW_MINUTES) {
       // rather than as somebody driving away.
       const fade = Math.max(0.25, 1 - Math.max(0, fx.age - SERVICE_WINDOW_MINUTES * 0.6)
         / (SERVICE_WINDOW_MINUTES * 0.4));
+      drawCastShadow(ctx, x - 4, y - 2, 5, 8);
       ctx.save();
       ctx.globalAlpha = fade;
       drawSprite(ctx, SPRITES[spriteName], x - 4, y - 9);

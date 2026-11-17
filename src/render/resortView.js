@@ -22,7 +22,8 @@ import { drawPixelText, pixelTextWidth, GLYPH_HEIGHT } from './sprites.js';
  * than re-deriving hit boxes from scratch.
  */
 import { PALETTE } from './palette.js';
-import { drawHole, fillWoods } from './holeView.js';
+import { drawHole, fillWoods, drawTeeAndFlag, computeHoleTransform } from './holeView.js';
+import { drawForest } from './forest.js';
 import { holeStats } from '../sim/hole.js';
 
 const GRID_COLS = 3;
@@ -146,10 +147,10 @@ export function drawResort(ctx, state, { x = 0, y = 0, width, height, nine = 0 }
   const regions = [];
 
   // The whole map is one piece of woodland with holes cut through it.
-  // Each plot used to be a card on a dark table; painting the same woods
-  // under the gaps as `drawHole` paints inside the plots (the tile is
-  // anchored to the canvas, so the canopies line up across every edge)
-  // turns nine cards into one course.
+  // Each plot used to be a card on a dark table; painting the same forest
+  // floor under the gaps as `drawHole` paints inside the plots (the tile
+  // is anchored to the canvas, so it lines up across every edge) turns
+  // nine cards into one course.
   fillWoods(ctx, { x, y, width, height });
 
   const gridY0 = y + GRID_PAD;
@@ -158,6 +159,10 @@ export function drawResort(ctx, state, { x = 0, y = 0, width, height, nine = 0 }
   const cellW = Math.floor((gridW - (GRID_COLS - 1) * CELL_GAP) / GRID_COLS);
   const cellH = Math.floor((gridH - (GRID_ROWS - 1) * CELL_GAP) / GRID_ROWS);
 
+  // Three passes, because the trees are one forest and not nine.
+  //
+  // 1. The ground of every built hole.
+  const plots = [];
   holes.forEach((hole, i) => {
     const col = i % GRID_COLS;
     const row = Math.floor(i / GRID_COLS);
@@ -167,15 +172,29 @@ export function drawResort(ctx, state, { x = 0, y = 0, width, height, nine = 0 }
       width: cellW,
       height: cellH,
     };
-
+    regions.push({ kind: 'hole', id: hole.id, ...rect });
     if (hole.open) {
-      drawHole(ctx, hole, rect);
+      drawHole(ctx, hole, rect, { forest: false, tee: false, flag: false });
+      plots.push({ hole, rect, t: computeHoleTransform(hole, rect) });
+    }
+  });
+
+  // 2. One forest over the whole map: across the gaps, over the unbuilt
+  // plots, and up to the edge of every hole's rough — never over it,
+  // because a tree is only planted where that hole's own `lieAt` says
+  // trees. A tree standing half in a plot and half in the gap beside it
+  // is one tree, not two halves that happen to meet.
+  drawForest(ctx, { area: { x, y, width, height }, plots });
+
+  // 3. Everything that sits on top of the trees.
+  holes.forEach((hole, i) => {
+    const rect = regions[i];
+    if (hole.open) {
+      drawTeeAndFlag(ctx, hole, rect);
       drawHoleLabel(ctx, hole, rect);
     } else {
       drawEmptyPlot(ctx, rect);
     }
-
-    regions.push({ kind: 'hole', id: hole.id, ...rect });
   });
 
   return regions;

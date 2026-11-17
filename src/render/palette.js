@@ -19,6 +19,7 @@ export const PALETTE = Object.freeze({
   TREE: '#1B4D2E', // tree clumps and out-of-bounds woods
   TREE_SHADOW: '#133620', // shaded canopy texture inside a tree clump
   TREE_LIGHT: '#3A8A4C', // the sunlit side of a canopy
+  TREE_HIGHLIGHT: '#62B45A', // the one or two leaves on a standing tree that catch the sun full on
   SAND: '#E8C170', // bunkers
   SAND_SHADOW: '#A2874E', // the shaded, recessed part of a bunker's bowl
   SAND_LIGHT: '#F6E2A8', // the raked, sunlit floor of a bunker
@@ -27,6 +28,12 @@ export const PALETTE = Object.freeze({
   WATER_LIGHT: '#9AD4F5', // shoreline foam, glints on a pond, falling rain
   GREEN_SURFACE: '#A8E68C', // the putting green itself
   GREEN_MOWN: '#98DC7A', // the green's alternate mowing check
+
+  // Light. Never painted as a colour in its own right: the whole course is
+  // multiplied by one of these (render/light.js), which is why they are pale.
+  LIGHT_DAWN: '#BFD3FF', // first thing: cool, a little blue
+  LIGHT_DUSK: '#FFB273', // the last hours: low gold sun
+  LIGHT_OVERCAST: '#9FB0C4', // under rain cloud: flat and grey
 
   // Built surfaces
   PATH: '#8B5A2B', // cart paths and walkways

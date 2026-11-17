@@ -13,6 +13,7 @@
 import { PALETTE } from './palette.js';
 import { SPRITES, drawSprite, drawSpriteOutlined } from './sprites.js';
 import { drawWeather } from './weatherFx.js';
+import { setLight, lightAt, applyLight, drawCastShadow } from './light.js';
 import { drawHole, fillWoods } from './holeView.js';
 import { greenCentre } from '../sim/hole.js';
 import { greenRadius } from '../sim/terrain.js';
@@ -55,6 +56,7 @@ function dot(ctx, p, size = 1) {
 function drawCupAndFlag(ctx, camera, hole) {
   const s = camera.toScreen(greenCentre(hole));
   const sprite = SPRITES.flag;
+  drawCastShadow(ctx, Math.round(s.x) - 1, Math.round(s.y) - 1, sprite.length + 2, 2);
   drawSprite(ctx, sprite, s.x - sprite[0].length / 2, s.y - sprite.length);
   ctx.fillStyle = PALETTE.OUTLINE;
   ctx.fillRect(Math.round(s.x) - 1, Math.round(s.y) - 1, 2, 2);
@@ -158,6 +160,7 @@ const GOLFER_POSE = { address: 'golferAddress', backswing: 'golferBackswing', fi
 function drawGolfer(ctx, camera, golfer) {
   const sprite = SPRITES[GOLFER_POSE[golfer.pose] ?? GOLFER_POSE.address];
   const s = camera.toScreen(golfer.at);
+  drawCastShadow(ctx, Math.round(s.x) - sprite[0].length + 1, Math.round(s.y) + 1, sprite.length, 4);
   drawSpriteOutlined(ctx, sprite, s.x - sprite[0].length - 1, s.y - (sprite.length - 2));
 }
 
@@ -196,8 +199,17 @@ function drawBall(ctx, camera, ball, lift) {
  * }
  * `canvasWidth`/`canvasHeight` are the surface's, for the clear.
  */
+/** How far past the hole's own rectangle the forest is planted, in
+ * un-zoomed pixels: the camera follows a ball into the woods, and the
+ * woods it finds there should have trees in them. */
+const FOREST_BEYOND = 48;
+
 export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
   const { hole, viewRect, camera } = scene;
+
+  // No clock on this screen, so a dry day is plain daylight; a wet one is
+  // overcast, shadowless and grey, the same as it is on the map.
+  setLight(lightAt({ weatherKey: scene.weatherKey }));
 
   // The strip outside viewRect sits behind opaque chrome, but is cleared
   // anyway so a previous screen's last frame cannot show through a gap.
@@ -213,8 +225,8 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
   ctx.translate(camera.tx, camera.ty);
   ctx.scale(camera.zoom, camera.zoom);
   // Beyond the hole is woods — exactly what lieAt returns out there —
-  // painted under the same zoom as the hole, so the canopies outside the
-  // hole's own rectangle are the same size as the ones inside it. The
+  // painted under the same zoom as the hole, so the forest floor outside
+  // the hole's own rectangle is the same size as the floor inside it. The
   // rectangle filled is the view, mapped back through the zoom.
   fillWoods(ctx, {
     x: (viewRect.x - camera.tx) / camera.zoom,
@@ -222,7 +234,16 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
     width: viewRect.width / camera.zoom,
     height: viewRect.height / camera.zoom,
   });
-  drawHole(ctx, hole, viewRect, { flag: false, clip: false });
+  drawHole(ctx, hole, viewRect, {
+    flag: false,
+    clip: false,
+    cover: {
+      x: viewRect.x - FOREST_BEYOND,
+      y: viewRect.y - FOREST_BEYOND,
+      width: viewRect.width + FOREST_BEYOND * 2,
+      height: viewRect.height + FOREST_BEYOND * 2,
+    },
+  });
   ctx.restore();
 
   if (scene.slope) drawSlopeArrows(ctx, camera, hole, scene.slope, scene.slopeFraction);
@@ -235,6 +256,9 @@ export function drawPlayScene(ctx, canvasWidth, canvasHeight, scene) {
   if (scene.golfer) drawGolfer(ctx, camera, scene.golfer);
   if (scene.trail?.length) drawTrail(ctx, camera, scene.trail);
   drawBall(ctx, camera, scene.ball, scene.lift ?? 0);
+  // The colour of the light goes over everything on the ground and under
+  // the rain, which is in the air in front of it.
+  applyLight(ctx, viewRect);
   if (scene.weatherKey) drawWeather(ctx, viewRect, scene.weatherKey, scene.timeMs ?? 0);
 
   ctx.restore();

@@ -12,6 +12,7 @@ import { PALETTE } from './render/palette.js';
 import { drawResort, hasBackNine } from './render/resortView.js';
 import { setAnimationTime, animationTime } from './render/animClock.js';
 import { drawWeather } from './render/weatherFx.js';
+import { setLight, lightAt, applyLight, DAYLIGHT } from './render/light.js';
 import { computeTokens, computeEffects, drawTokens, drawEffects } from './render/tokens.js';
 import { openHoles } from './sim/state.js';
 import { runDay, applyEventChoice } from './sim/day.js';
@@ -192,10 +193,14 @@ function drawOverview() {
   ctx.fillStyle = PALETTE.OUTLINE;
   ctx.fillRect(0, 0, width, height);
   const mapRect = insetRectForChrome(overviewToolbar);
-  regions = drawResort(ctx, state, { ...mapRect, nine: shownNine });
   // Today's weather, falling on the course the forecast says it will fall
-  // on: the same `weatherOn` call the day itself is about to make.
-  drawWeather(ctx, mapRect, weatherOn(state.weatherSeed, state.day), animationTime());
+  // on: the same `weatherOn` call the day itself is about to make. It
+  // sets the light too — no shadows and a grey cast under rain cloud.
+  const weatherKey = weatherOn(state.weatherSeed, state.day);
+  setLight(lightAt({ weatherKey }));
+  regions = drawResort(ctx, state, { ...mapRect, nine: shownNine });
+  applyLight(ctx, mapRect);
+  drawWeather(ctx, mapRect, weatherKey, animationTime());
   hud.update(state);
   amenityBar.update(state);
 }
@@ -771,14 +776,19 @@ function drawPlayback() {
   ctx.fillStyle = PALETTE.OUTLINE;
   ctx.fillRect(0, 0, width, height);
   const mapRect = insetRectForChrome(playbackToolbar);
-  regions = drawResort(ctx, dayResult.state, { ...mapRect, nine: shownNine });
-  const holes = openHoles(dayResult.state);
   const minute = clock.minute;
-  drawTokens(ctx, computeTokens(dayResult.timeline, holes, regions, minute));
-  drawEffects(ctx, computeEffects(dayResult.timeline, holes, regions, minute));
   // `state` is still the morning's until the report is dismissed, so its
   // day is the day being watched.
-  drawWeather(ctx, mapRect, weatherOn(state.weatherSeed, state.day), animationTime());
+  const weatherKey = weatherOn(state.weatherSeed, state.day);
+  // The sun crosses the sky as the day is watched: long cool shadows off
+  // the first tee, short ones at lunch, long gold ones for the last group.
+  setLight(lightAt({ minute, dayEnd: dayResult.endMinute, weatherKey }));
+  regions = drawResort(ctx, dayResult.state, { ...mapRect, nine: shownNine });
+  const holes = openHoles(dayResult.state);
+  drawTokens(ctx, computeTokens(dayResult.timeline, holes, regions, minute));
+  drawEffects(ctx, computeEffects(dayResult.timeline, holes, regions, minute));
+  applyLight(ctx, mapRect);
+  drawWeather(ctx, mapRect, weatherKey, animationTime());
   hud.update(state); // yesterday's figures -- today's are still a secret until the report
   amenityBar.update(state);
 }
@@ -934,6 +944,9 @@ function frame(now) {
   // water, rain, walking golfers. Set here, once, so a frame is drawn at
   // one instant and nothing in src/render reads the time for itself.
   setAnimationTime(now);
+  // Plain daylight unless the screen being drawn knows better (the map
+  // and the day playback set their own from the weather and the clock).
+  setLight(DAYLIGHT);
 
   switch (router.current) {
     case 'start':

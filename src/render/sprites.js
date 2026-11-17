@@ -34,6 +34,9 @@ export const SPRITE_CHARS = {
   Y: 'FOOD_BERRY',
   C: 'WATER_LIGHT',
   N: 'FOOD_MEAT_PALE',
+  I: 'TREE_LIGHT',
+  J: 'TREE_SHADOW',
+  U: 'TREE_HIGHLIGHT',
 };
 
 // --- Actors -----------------------------------------------------------
@@ -322,7 +325,78 @@ const beverageCart = [
   '.OO..OO.',
 ];
 
+// --- Standing trees ------------------------------------------------------
+//
+// Planted by render/forest.js, hundreds at a time, in rows that overlap.
+// All lit from the top left like everything else: highlight, light, body,
+// and a shaded side that melts into the forest floor behind it, which is
+// what makes the next tree forward stand out against this one. The trunk
+// is the bottom row, and is where the tree "is": forest.js stands the
+// middle of the bottom row on its site. One row only, so that the row of
+// trees in front hides it and trunks show just where they should: along
+// the front edge of the woods and at the back of a clearing.
+
+/** A broadleaf, full size. The light sits on it as a cap, not down one
+ * side: a row of these overlapping the row behind reads as a line of
+ * round crowns, where a lit edge reads as diagonal stripes. 7 wide x 8 tall. */
+const treeRound = [
+  '..UII..',
+  '.UIIIT.',
+  'IIIITTT',
+  'ITTTTTT',
+  'TTTTTTJ',
+  '.TTTJJ.',
+  '..JJJ..',
+  '...E...',
+];
+
+/** A conifer, full size. 7 wide x 8 tall. */
+const treePine = [
+  '...U...',
+  '..IIT..',
+  '..ITT..',
+  '.IITTT.',
+  '.ITTTJ.',
+  'IITTTJJ',
+  '.TTTJJ.',
+  '...E...',
+];
+
+/** A young broadleaf: what is planted where a full tree would overhang
+ * the rough. 5 wide x 6 tall. */
+const treeRoundSmall = [
+  '.UII.',
+  'IIITT',
+  'ITTTT',
+  'TTTTJ',
+  '.TJJ.',
+  '..E..',
+];
+
+/** A young conifer. 5 wide x 6 tall. */
+const treePineSmall = [
+  '..U..',
+  '.IIT.',
+  '.ITJ.',
+  'IITTJ',
+  '.TTJ.',
+  '..E..',
+];
+
+/** The smallest thing that still reads as a tree: for the thin strips at
+ * the edge of the woods where nothing bigger fits. 3 wide x 3 tall. */
+const treeSapling = [
+  '.U.',
+  'ITJ',
+  '.E.',
+];
+
 export const SPRITES = {
+  treeRound,
+  treePine,
+  treeRoundSmall,
+  treePineSmall,
+  treeSapling,
   beverageCart,
   golferWalk1,
   golferWalk2,

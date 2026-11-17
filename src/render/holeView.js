@@ -28,6 +28,8 @@
 import { PALETTE } from './palette.js';
 import { SPRITES, drawSprite } from './sprites.js';
 import { animationFrame } from './animClock.js';
+import { drawForest } from './forest.js';
+import { drawCastShadow } from './light.js';
 import { greenCentre } from '../sim/hole.js';
 import { greenRadius } from '../sim/terrain.js';
 
@@ -195,9 +197,15 @@ function greenFill(ctx) {
 const CANOPIES = [[3, 3, 3], [11, 2, 2], [8, 9, 3], [14, 12, 3], [2, 11, 2], [6, 15, 2], [13, 6, 2]];
 
 /**
- * Woods: dark ground showing between round canopies, each lit from the
- * top left. Used for BOTH the out-of-bounds woods and every tree clump,
- * because `lieAt` calls both of them trees — one lie, one texture.
+ * The forest floor: dark ground with the dim crowns of the undergrowth
+ * showing on it. Used for BOTH the out-of-bounds woods and every tree
+ * clump, because `lieAt` calls both of them trees — one lie, one texture.
+ *
+ * These crowns used to carry a sunlit shoulder and were the whole of the
+ * woods. Now the trees that catch the light are the ones forest.js
+ * stands on top of this, and this is what shows behind and between them
+ * — and at the very edge of the woods, where a standing tree would
+ * overhang the rough and so is not planted.
  */
 function woodsFill(ctx) {
   return pattern(ctx, 'woods', () => makeTile(16, PALETTE.TREE_SHADOW, (put) => {
@@ -205,9 +213,7 @@ function woodsFill(ctx) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (dx * dx + dy * dy > r * r + 1) continue;
-          // The sunlit shoulder: the top-left third of the crown.
-          const lit = dx + dy <= -r && dx * dx + dy * dy < r * r;
-          put(cx + dx, cy + dy, lit ? PALETTE.TREE_LIGHT : PALETTE.TREE);
+          put(cx + dx, cy + dy, PALETTE.TREE);
         }
       }
     }
@@ -215,10 +221,11 @@ function woodsFill(ctx) {
 }
 
 /**
- * Paints woods over `rect`. Exported for callers that draw ground the
- * hole itself does not cover — the resort map between its plots, the play
- * screen beyond the hole's own rectangle — so the woods there are the
- * same woods, tile for tile, as the ones `drawHole` paints.
+ * Paints the forest floor over `rect`. Exported for callers that draw
+ * ground the hole itself does not cover — the resort map between its
+ * plots, the play screen beyond the hole's own rectangle — so the floor
+ * there is the same floor, tile for tile, as the one `drawHole` paints.
+ * The trees that stand on it are `drawForest`'s.
  */
 export function fillWoods(ctx, rect) {
   ctx.fillStyle = woodsFill(ctx);
@@ -399,18 +406,38 @@ function drawFlag(ctx, t, greenCentrePoint) {
   const h = sprite.length;
   // Base of the pole sits at the green's centre; sprite drawn upward and
   // centred from there.
+  drawCastShadow(ctx, Math.round(p.x) - 1, Math.round(p.y) - 1, h - 1, 2);
   drawSprite(ctx, sprite, p.x - w / 2, p.y - h);
+}
+
+/**
+ * The tee and the flag of a hole drawn into `rect`, for a caller that
+ * asked `drawHole` for neither. The resort map does: it plants one forest
+ * across all nine plots after the holes are down, and the tee and flag
+ * have to go on after the trees, as they do inside `drawHole`.
+ */
+export function drawTeeAndFlag(ctx, hole, rect) {
+  if (!hole || !hole.corridor || hole.corridor.length < 2) return;
+  const t = computeHoleTransform(hole, rect);
+  drawTeeBox(ctx, t, hole);
+  drawFlag(ctx, t, greenCentre(hole));
 }
 
 /**
  * Draws one hole into `{x, y, width, height}` of `ctx`. Does nothing for
  * an unbuilt plot (no corridor) — callers drawing a resort map handle
- * empty plots themselves, with their own placeholder treatment. Pass
- * `{ flag: false }` to leave the flag out and `{ clip: false }` to draw
- * past `rect` (the play screen does both: it zooms, clips to its own view
- * and draws its own flag).
+ * empty plots themselves, with their own placeholder treatment.
+ *
+ * Options: `flag: false` and `tee: false` leave those out; `clip: false`
+ * draws past `rect` (the play screen zooms, clips to its own view and
+ * draws its own flag); `forest: false` leaves the standing trees out, for
+ * a caller planting one forest over several holes; `cover` is the
+ * rectangle to plant when it is more than `rect` (the play screen again,
+ * which can see past the hole's own rectangle).
  */
-export function drawHole(ctx, hole, rect, { flag = true, clip = true } = {}) {
+export function drawHole(ctx, hole, rect, {
+  flag = true, tee = true, clip = true, forest = true, cover = null,
+} = {}) {
   if (!hole || !hole.corridor || hole.corridor.length < 2) return;
 
   const t = computeHoleTransform(hole, rect);
@@ -448,7 +475,15 @@ export function drawHole(ctx, hole, rect, { flag = true, clip = true } = {}) {
     if (f.type === 'trees') drawTreeClump(ctx, t, f);
   }
 
-  drawTeeBox(ctx, t, hole);
+  // Trees last of the terrain: they stand on top of the ground, and their
+  // shadows fall across whatever the ground next to them is. `unbounded`
+  // because this hole is the only thing here — every pixel of every tree
+  // is checked against it, not only the ones inside `rect`.
+  if (forest) {
+    drawForest(ctx, { area: cover ?? rect, plots: [{ hole, rect, t, unbounded: true }] });
+  }
+
+  if (tee) drawTeeBox(ctx, t, hole);
   // The play screen draws the hole under a zoom and wants the flag at its
   // ordinary size on top, so it asks for the hole without one.
   if (flag) drawFlag(ctx, t, gc);
