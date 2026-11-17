@@ -31,13 +31,22 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-11-16f';
+export const BUILD = '2026-11-16g';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-11-16g',
+    notes: [
+      "The buttons, bars and swing meter have been refinished to match the course: the phone's own lettering, glass bars, buttons that press in, and a meter that glows.",
+      'When you play, the camera follows the ball through the air and settles where it lands. Shots hang at the top before they drop, and a ball that is going in drops in slow motion.',
+      'The course is alive: cloud shadows drift across it with the wind, trees sway close up (harder on a blowy day), a few birds come over now and then, and rain rings the ponds.',
+      'The beverage cart and the halfway house are drawn properly at last.',
+    ],
+  },
   {
     version: '2026-11-16f',
     notes: [
