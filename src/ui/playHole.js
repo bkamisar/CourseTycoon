@@ -19,9 +19,9 @@
 import { PALETTE } from '../render/palette.js';
 import { topChromeOverlapPx, bottomChromeOverlapPx } from '../render/pixel.js';
 import { drawPlayScene } from '../render/playView.js';
-import { shotFrame, makePlayCamera } from '../render/playCamera.js';
+import { shotFrame, makePlayCamera, blendFrame, followFrame, frameAround } from '../render/playCamera.js';
 import { METER, newSwing, tapSwing, tickSwing, cursorAt } from '../play/swingMeter.js';
-import { flightAt } from '../play/flight.js';
+import { flightAt, flightClock } from '../play/flight.js';
 import {
   startHole, isFinished, defaultTarget, clampTarget, planShot, resolveStroke, applyStroke, reachFrom,
 } from '../sim/playGolf.js';
@@ -188,18 +188,36 @@ export function mountPlayHole({
     };
   }
 
-  // The camera is framed once per resting ball — not per frame, and not
-  // while the target is dragged, or the ground would slide under the
-  // finger that is aiming at it.
-  function ensureCamera() {
-    // ...and it holds still from the strike until the next shot is set up:
-    // the player watches the ball land where it was hit to, reads what
-    // happened, and only then does the view move on.
-    if (camera && phase !== 'aim' && phase !== 'swing') return;
-    const key = `${viewRect.y}|${viewRect.height}|${play.strokes}|${play.ball.x}|${play.ball.y}|${play.lie}`;
-    if (key === cameraKey && camera) return;
-    cameraKey = key;
-    camera = makePlayCamera(hole, viewRect, shotFrame(hole, play, defaultTarget(hole, play)));
+  // The camera glides. Each phase says what it wants to hold — the shot
+  // being set up, the ball in the air and where it will come down, the
+  // place it came to rest — and the view eases toward that every frame.
+  // The shot frame is worked out once per resting ball (not per frame),
+  // and nothing moves while the target is being dragged, or the ground
+  // would slide under the finger that is aiming at it.
+  let aimFrame = null;
+  let shownFrame = null;
+  let lastFrameAt = null;
+  const CAMERA_EASE_MS = 240;
+
+  function wantedFrame(ball) {
+    const key = `${play.strokes}|${play.ball.x}|${play.ball.y}|${play.lie}`;
+    if (key !== cameraKey || !aimFrame) {
+      cameraKey = key;
+      aimFrame = shotFrame(hole, play, defaultTarget(hole, play));
+    }
+    if (phase === 'aim' || phase === 'swing' || !outcome) return aimFrame;
+    if (outcome.kind === 'putt') return shotFrame(hole, { ball: outcome.from, lie: LIE.GREEN }, outcome.to);
+    if (phase === 'flight') return followFrame(ball, outcome.to);
+    return frameAround([outcome.to]);
+  }
+
+  function ensureCamera(ball, now) {
+    const goal = wantedFrame(ball);
+    const dt = lastFrameAt === null ? Infinity : Math.max(0, now - lastFrameAt);
+    lastFrameAt = now;
+    if (!shownFrame) shownFrame = goal;
+    else if (!drag) shownFrame = blendFrame(shownFrame, goal, 1 - Math.exp(-dt / CAMERA_EASE_MS));
+    camera = makePlayCamera(hole, viewRect, shownFrame);
   }
 
   function button(label, onClick, primary = false) {
@@ -381,7 +399,7 @@ export function mountPlayHole({
     let lift = 0;
     let trail = [];
     if (phase === 'flight') {
-      const elapsed = now - struckAt;
+      const elapsed = flightClock(outcome, now - struckAt);
       const f = flightAt(outcome, elapsed);
       if (f.done) {
         land(now);
@@ -400,7 +418,7 @@ export function mountPlayHole({
     if (impact && now - impact.at >= IMPACT_MS) impact = null;
     if (phase === 'message' && now >= messageUntil) nextShot();
 
-    ensureCamera();
+    ensureCamera(ball, now);
     updateMeter(now);
 
     const putting = play.lie === LIE.GREEN && (phase === 'aim' || phase === 'swing');

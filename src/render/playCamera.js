@@ -52,6 +52,28 @@ export function frameAround(points, { pad = FRAME_PAD, minSpan = FRAME_MIN_SPAN 
 }
 
 /**
+ * A frame `k` of the way from `a` to `b` (0 is `a`, 1 is `b`). Sizes move
+ * by ratio rather than by difference, so a zoom in and a zoom out of the
+ * same amount take the same time and neither lurches at its end.
+ */
+export function blendFrame(a, b, k) {
+  const t = Math.min(1, Math.max(0, k));
+  return {
+    cx: a.cx + (b.cx - a.cx) * t,
+    cy: a.cy + (b.cy - a.cy) * t,
+    width: a.width * Math.pow(b.width / a.width, t),
+    height: a.height * Math.pow(b.height / a.height, t),
+  };
+}
+
+/** What the camera holds while a full shot is in the air: the ball and
+ * where it is going to come down, so it closes in on the landing as the
+ * ball drops toward it. */
+export function followFrame(ball, landing) {
+  return frameAround([ball, landing]);
+}
+
+/**
  * What the camera should hold for the shot about to be played: the whole
  * green when putting; otherwise the ball, where the caddie is pointing,
  * and the cup too if it is near enough to be worth seeing.
