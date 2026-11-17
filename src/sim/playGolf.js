@@ -61,6 +61,12 @@ export const OVERSWING_WILD = 5;
  * top of a perfect strike: possible, and rare enough to be a story. */
 export const HOLE_OUT_RADIUS = 0.35;
 
+/** A ball that comes to rest on the green this close to the cup is
+ * conceded: it counts one more stroke and the hole is over. Three feet,
+ * the gimme of a friendly round — the putt every player holes and nobody
+ * enjoys tapping in on a phone. */
+export const GIMME_YARDS = 1;
+
 /** A ball this many yards beyond the rough is lost: stroke and distance. */
 export const LOST_BALL_MARGIN = 40;
 const ROUGH_MARGIN = 22; // mirrors terrain.js#lieAt
@@ -181,8 +187,9 @@ function isLost(hole, point, lie) {
  * because wind does not blow a ball off a green in this game.
  *
  * Returns the outcome without touching `play`:
- *   { kind, club, from, to, lie, yards, angle, holed, penalty, path?, seconds? }
- * `penalty` is null, 'water' or 'lost'. `to` is where the ball went (so
+ *   { kind, club, from, to, lie, yards, angle, holed, gimme, penalty, path?, seconds? }
+ * `penalty` is null, 'water' or 'lost'. `gimme` is true when the ball
+ * stopped on the green within GIMME_YARDS of the cup without dropping. `to` is where the ball went (so
  * the renderer can show the splash); `applyStroke` is what sends a
  * penalised ball back.
  */
@@ -200,6 +207,7 @@ export function resolveStroke(hole, play, target, swing, weatherSpread = 1) {
     return {
       kind: 'putt', club: plan.club, from, to: roll.end, lie,
       yards: distance(from, roll.end), angle, holed: roll.holed,
+      gimme: isGimme(lie, roll.holed, roll.end, cup),
       penalty: lie === LIE.WATER ? 'water' : null,
       path: roll.path, seconds: roll.seconds,
     };
@@ -219,12 +227,19 @@ export function resolveStroke(hole, play, target, swing, weatherSpread = 1) {
   if (lie === LIE.WATER) penalty = 'water';
   else if (isLost(hole, to, lie)) penalty = 'lost';
 
-  return { kind: 'swing', club: plan.club, from, to, lie, yards: carry, angle, holed, penalty };
+  const gimme = penalty === null && isGimme(lie, holed, to, cup);
+  return { kind: 'swing', club: plan.club, from, to, lie, yards: carry, angle, holed, gimme, penalty };
+}
+
+function isGimme(lie, holed, at, cup) {
+  return !holed && lie === LIE.GREEN && distance(at, cup) <= GIMME_YARDS;
 }
 
 /**
  * The hole after a stroke. A penalised ball costs a second stroke and is
- * replayed from where it was struck, in the lie it was struck from.
+ * replayed from where it was struck, in the lie it was struck from. A
+ * gimme costs the one stroke it would have taken to tap in, and ends the
+ * hole with the ball where it stopped (`conceded` says so).
  */
 export function applyStroke(play, outcome) {
   const penalised = outcome.penalty !== null;
@@ -236,6 +251,11 @@ export function applyStroke(play, outcome) {
     lie: outcome.holed || !penalised ? outcome.lie : play.lie,
     holed: outcome.holed,
   };
+  if (outcome.gimme && !next.holed) {
+    next.strokes = Math.min(MAX_STROKES, next.strokes + 1);
+    next.holed = true;
+    next.conceded = true;
+  }
   if (!next.holed && next.strokes >= MAX_STROKES) {
     next.strokes = MAX_STROKES;
     next.pickedUp = true;

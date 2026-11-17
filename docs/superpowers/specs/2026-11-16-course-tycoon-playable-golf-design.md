@@ -103,9 +103,12 @@ What the course does to that shot is exactly what it does to a guest:
 
 - **Bag:** Chip 40 · Pitch 70 · Wedge 105 · 9 iron 135 · 7 iron 165 · 5 iron 195 ·
   3 wood 225 · Driver 250 yards at 100% from a clean lie.
-- **Strike:** ±94 ms either side of the line is the full range of error; at the
-  limit the ball starts 12° off line (52 yards wide on a full drive). Within ±14 ms
-  it is called perfect and flies dead straight. Overswing to 110% multiplies the
+- **Strike:** ±118 ms either side of the line is the full range of error; at the
+  limit the ball starts 12° off line (52 yards wide on a full drive). Within ±18 ms
+  it is called perfect and flies dead straight. (±94 / ±14 ms until the second
+  playtest asked for more forgiving accuracy.)
+- **Gimme:** a ball that stops on the green within three feet of the cup is
+  conceded — one more stroke, hole over. Overswing to 110% multiplies the
   error by up to 1.5.
 - **Penalties:** water, or a ball more than 40 yards beyond the rough, costs one
   stroke and is replayed from where it was hit. (Guests get a forward drop; a
@@ -132,10 +135,11 @@ table):
 | Tap error | Strokes vs par, per hole | Putts | Fairways | Greens in reg. |
 |---|---|---|---|---|
 | 0 ms (not a person) | −2.17 | 0.00 | 100% | 100% |
-| 20 ms (sharp) | −0.93 | 1.11 | 90% | 93% |
-| 35 ms | −0.37 | 1.38 | 70% | 73% |
-| **41 ms (paying attention)** | **−0.12** | **1.49** | **61%** | **64%** |
-| 60 ms (sloppy) | +0.49 | 1.79 | 43% | 40% |
+| 20 ms (sharp) | −1.04 | 1.06 | 96% | 82% |
+| 35 ms | −0.56 | 1.31 | 78% | 74% |
+| 41 ms | −0.38 | 1.39 | 71% | 69% |
+| **50 ms (paying attention)** | **−0.10** | **1.50** | **62%** | **59%** |
+| 60 ms (sloppy) | +0.19 | 1.63 | 53% | 48% |
 
 **Slowed after the first playtest.** The meter first ran at one second from empty
 to full, where par was a 35 ms player (−0.11; 20 ms scored −0.80 and 60 ms +0.82).
@@ -144,6 +148,11 @@ slowed 15% (`METER.SPEED` 0.001 → 0.00085). A slower bar is the same as a stea
 hand, so par is now a 41 ms player and everyone gains between a tenth and a third
 of a stroke a hole. Speed was chosen over the strike window because it eases both
 taps — distance and direction — and it is the one the player can see.
+
+**Made more forgiving after the second playtest.** The strike window was widened
+from `ACC_WINDOW` 0.08 to 0.10 (and the perfect band with it) and a three-foot
+gimme was added. Par is now a player good to about 50 ms; the table above is
+measured with both changes, and a gimme counts as a putt in it.
 
 The target was "ordinary timing plays to par", and it does. The first constants
 tried (a ±100 ms strike window, 10°, a 3° putter into a 0.2-yard cup) scored −0.74

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CLUBS, PUTT_RANGES, MAX_SWING_ANGLE, MAX_STROKES, HOLE_OUT_RADIUS,
+  CLUBS, PUTT_RANGES, MAX_SWING_ANGLE, MAX_STROKES, HOLE_OUT_RADIUS, GIMME_YARDS,
   startHole, isFinished, reachFrom, clampTarget, defaultTarget, planShot,
   resolveStroke, applyStroke, scoreName, holeFingerprint, bestOn, recordPlay, parOf,
 } from '../src/sim/playGolf.js';
@@ -220,7 +220,51 @@ test('a putt rolls rather than flies, and carries its path for the renderer', ()
   assert.deepEqual(out.path[0], play.ball);
   assert.ok(out.seconds > 0);
   const next = applyStroke(play, out);
-  assert.equal(next.strokes, 2);
+  // Struck at exactly the needed pace it dies at the lip: a gimme, so the
+  // tap-in is counted too.
+  assert.equal(next.strokes, out.gimme ? 3 : 2);
+});
+
+test('a ball that stops on the green within three feet is a gimme: one more stroke, hole over', () => {
+  const hole = straight();
+  const cup = greenCentre(hole);
+  const play = at(hole, { x: cup.x - 4, y: cup.y - 3 });
+  const close = { kind: 'putt', from: play.ball, to: { x: cup.x + GIMME_YARDS * 0.9, y: cup.y }, lie: LIE.GREEN, holed: false, gimme: true, penalty: null };
+  const next = applyStroke(play, close);
+  assert.equal(next.strokes, 3);
+  assert.equal(next.holed, true);
+  assert.equal(next.conceded, true);
+  assert.ok(isFinished(next));
+  assert.deepEqual(next.ball, close.to, 'the ball stays where it stopped');
+});
+
+test('resolveStroke calls a gimme only on the green, inside three feet, and not when it dropped', () => {
+  const hole = straight();
+  const cup = greenCentre(hole);
+  // Putts from all round the cup at a range of paces: every outcome agrees with the rule.
+  let gimmes = 0;
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    const play = at(hole, { x: cup.x + Math.cos(a) * 3, y: cup.y + Math.sin(a) * 3 });
+    const needed = planShot(hole, play, cup).needed;
+    for (const pace of [0.5, 0.75, 0.9, 1, 1.3]) {
+      const out = resolveStroke(hole, play, cup, { power: needed * pace, accuracy: 0 });
+      const close = Math.hypot(out.to.x - cup.x, out.to.y - cup.y) <= GIMME_YARDS;
+      assert.equal(out.gimme, !out.holed && out.lie === LIE.GREEN && close);
+      if (out.gimme) gimmes += 1;
+    }
+  }
+  assert.ok(gimmes > 0, 'some of them stopped close');
+});
+
+test('a gimme on the last stroke allowed still finishes at the cap, holed', () => {
+  const hole = straight();
+  const cup = greenCentre(hole);
+  const play = { ...at(hole, { x: cup.x - 4, y: cup.y - 3 }), strokes: MAX_STROKES - 1 };
+  const next = applyStroke(play, { kind: 'putt', from: play.ball, to: { x: cup.x + 0.5, y: cup.y }, lie: LIE.GREEN, holed: false, gimme: true, penalty: null });
+  assert.equal(next.strokes, MAX_STROKES);
+  assert.equal(next.holed, true);
+  assert.ok(!next.pickedUp);
 });
 
 test('weather does not blow a putt about', () => {
@@ -331,9 +375,10 @@ test('the bag is ordered shortest first, which planShot relies on', () => {
 //
 // tools/playGolfBot.js is the measurement; these pin its conclusions on a
 // fresh set of seeds so a retune that breaks the feel fails loudly. The
-// floors are loose on purpose (the table has -0.12 / -0.93 / +0.49).
-// Par moved from 35 ms to 41 ms when the meter was slowed 15% after the
-// first playtest; the sloppy player's floor came down with it.
+// floors are loose on purpose (the table has -0.04 at 50 ms, -1.04 at
+// 20 ms, +0.19 at 60 ms). Par moved from 35 ms to 41 ms when the meter
+// was slowed 15% after the first playtest, and to about 50 ms when the
+// second asked for a three-foot gimme and a wider strike window.
 
 function averageOverPar(sd, plays = 120) {
   let over = 0;
@@ -349,16 +394,16 @@ function averageOverPar(sd, plays = 120) {
   return over / n;
 }
 
-test('ordinary timing (41 ms) plays to about par', () => {
-  const over = averageOverPar(41);
-  assert.ok(over > -0.5 && over < 0.4, `41 ms averaged ${over.toFixed(2)} a hole`);
+test('ordinary timing (50 ms) plays to about par', () => {
+  const over = averageOverPar(50);
+  assert.ok(over > -0.45 && over < 0.35, `50 ms averaged ${over.toFixed(2)} a hole`);
 });
 
 test('sharper timing scores lower and sloppier timing scores higher', () => {
   const sharp = averageOverPar(20);
   const sloppy = averageOverPar(60);
-  assert.ok(sharp < -0.5, `20 ms averaged ${sharp.toFixed(2)}`);
-  assert.ok(sloppy > 0.15 && sloppy < 1.2, `60 ms averaged ${sloppy.toFixed(2)}`);
+  assert.ok(sharp < -0.6, `20 ms averaged ${sharp.toFixed(2)}`);
+  assert.ok(sloppy > 0 && sloppy < 0.9, `60 ms averaged ${sloppy.toFixed(2)}`);
 });
 
 test('every template can be finished by a sloppy player without picking up often', () => {

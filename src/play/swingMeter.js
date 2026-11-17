@@ -20,10 +20,10 @@
  * moving cursor is good to about 35 ms, and ran the bar at 0.001 a
  * millisecond so that such a player scored par. The first person to play
  * it asked for it slightly easier, which is the only measurement of a
- * person this game has, so the bar now runs 15% slower. Par is a player
- * good to about 41 ms: 3.5% of the bar, nine yards on a drive, and —
- * through ACC_WINDOW — a little under half of the worst possible miss.
- * The old 35 ms player now beats par by a third of a stroke a hole.
+ * person this game has, so the bar now runs 15% slower. The second
+ * asked for more forgiving accuracy, so ACC_WINDOW went from 0.08 to 0.10
+ * and short putts became gimmes (playGolf.js GIMME_YARDS). Par is now a
+ * player good to about 50 ms.
  * tools/playGolfBot.js is the measurement; see its table before changing
  * anything here.
  */
@@ -36,10 +36,13 @@ export const METER = Object.freeze({
   MIN_POWER: 0.05,
   /** How far below the strike line the cursor runs before the swing is a miss. */
   LATE_LIMIT: -0.1,
-  /** Cursor distance from the strike line that counts as the worst miss (±1). */
-  ACC_WINDOW: 0.08,
-  /** Inside this distance of the line the strike is called perfect (accuracy 0). */
-  PERFECT: 0.012,
+  /** Cursor distance from the strike line that counts as the worst miss (±1).
+   * Widened from 0.08 after the second playtest asked for more forgiving
+   * accuracy: the same mistiming now sends the ball a fifth less wide. */
+  ACC_WINDOW: 0.1,
+  /** Inside this distance of the line the strike is called perfect
+   * (accuracy 0). Widened with ACC_WINDOW, from 0.012. */
+  PERFECT: 0.015,
 });
 
 export function newSwing() {

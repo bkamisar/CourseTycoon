@@ -75,7 +75,8 @@ function praise(swing, outcome) {
 /** The line shown when the hole is over. */
 export function finishLine(play, par, isNewBest) {
   if (play.pickedUp) return `Picked up after ${MAX_STROKES}. It happens.`;
-  return `${scoreName(play.strokes, par)} — ${play.strokes} on a par ${par}.${isNewBest ? ' New best.' : ''}`;
+  const gimme = play.conceded ? 'Gimme. ' : '';
+  return `${gimme}${scoreName(play.strokes, par)} — ${play.strokes} on a par ${par}.${isNewBest ? ' New best.' : ''}`;
 }
 
 /** "Round: +1 thru 3" for the holes played this visit; '' before the first. */

@@ -14,17 +14,22 @@
  *   node tools/playGolfBot.js            # the table below
  *   node tools/playGolfBot.js --rounds 2000 --sd 35
  *
- * MEASURED 2026-11-16 at METER.SPEED 0.00085, 400 plays per hole, strokes
- * against par per hole across the six templates:
+ * MEASURED 2026-11-16 at METER.SPEED 0.00085, ACC_WINDOW 0.10 and a
+ * three-foot gimme, 400 plays per hole, strokes against par per hole
+ * across the six templates (a gimme counts as a putt):
  *
  *   tap error   reads the green   aims at the cup   putts   fairways   greens
  *      0 ms         -2.17             -2.17          0.00     100%      100%
- *     20 ms         -0.93             -0.76          1.11      90%       93%
- *     35 ms         -0.37             -0.27          1.38      70%       73%
- *     41 ms         -0.12             -0.07          1.49      61%       64%
- *     60 ms         +0.49             +0.53          1.79      43%       40%
+ *     20 ms         -1.04             -0.84          1.06      96%       82%
+ *     35 ms         -0.56             -0.43          1.31      78%       74%
+ *     41 ms         -0.38             -0.28          1.39      71%       69%
+ *     50 ms         -0.10             -0.04          1.50      62%       59%
+ *     60 ms         +0.19             +0.24          1.63      53%       48%
  *
- * 41 ms plays to par: that is the target. 0 ms holes every full shot and
+ * About 50 ms plays to par: the second playtest asked for more forgiving
+ * golf, and a player who is not concentrating hard now gets there. Before
+ * the gimme and the wider window (ACC_WINDOW 0.08), par was 41 ms
+ * (-0.12), 20 ms scored -0.93 and 60 ms +0.49. 0 ms holes every full shot and
  * is not a person; it is in the table to show that the game has no dice,
  * only timing.
  *
@@ -92,6 +97,7 @@ export function botHole(rng, hole, { sd, read, spread = 1 }) {
     const swing = botSwing(rng, needed, sd);
     const out = resolveStroke(hole, play, target, swing, spread);
     if (onGreen) tally.putts += 1;
+    if (out.gimme) tally.putts += 1; // the tap-in it was conceded for
     if (play.strokes === 0 && par > 3) tally.fairway = out.lie === LIE.FAIRWAY;
     if (out.penalty) tally.penalties += 1;
     play = applyStroke(play, out);
@@ -102,7 +108,7 @@ export function botHole(rng, hole, { sd, read, spread = 1 }) {
 
 function main() {
   const rounds = arg('rounds', 1000);
-  const sds = process.argv.includes('--sd') ? [arg('sd', 41)] : [0, 20, 35, 41, 60];
+  const sds = process.argv.includes('--sd') ? [arg('sd', 50)] : [0, 20, 35, 41, 50, 60];
   for (const read of [true, false]) {
     console.log(`\n${read ? 'READS THE GREEN' : 'AIMS AT THE CUP'}  (${rounds} plays per hole)`);
     console.log('sd ms | ' + TEMPLATE_NAMES.map((n) => n.padEnd(13)).join(' | ') + ' | all: vs par, putts, fwy%, gir%, pen');

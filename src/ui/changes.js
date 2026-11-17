@@ -31,13 +31,20 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-11-16e';
+export const BUILD = '2026-11-16f';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-11-16f',
+    notes: [
+      'Gimmes. When you play a hole yourself, a ball that stops on the green within three feet of the cup is given: it counts the one stroke to tap it in, and the hole is done.',
+      'The strike is more forgiving. The same mistiming sends the ball about a fifth less wide, and the window for a perfect strike is a little wider too.',
+    ],
+  },
   {
     version: '2026-11-16e',
     notes: [
