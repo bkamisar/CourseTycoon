@@ -31,13 +31,21 @@ import { PALETTE } from '../render/palette.js';
  * site root; the check below exists precisely because it sometimes will
  * not.
  */
-export const BUILD = '2026-11-16c';
+export const BUILD = '2026-11-16d';
 
 /**
  * Newest first. Written for somebody who was mid-game, so each entry says
  * what will look different rather than what was implemented.
  */
 export const CHANGES = [
+  {
+    version: '2026-11-16d',
+    notes: [
+      'The woods are trees now. Each one is planted on its own, in rows that overlap front to back, with younger ones along the edge of the rough. None of them overhangs anything you can play from: if a ball looks clear of the trees, it is.',
+      'Things cast shadows. Trees, golfers, the flag and the beverage cart all throw one, and they all fall the same way.',
+      'The sun crosses the sky while you watch a day. The first groups go out in cool light with long shadows across the fairways, midday is bright and short-shadowed, and the last groups finish in gold. A wet day has no shadows at all, only grey.',
+    ],
+  },
   {
     version: '2026-11-16c',
     notes: [
