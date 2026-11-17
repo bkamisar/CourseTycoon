@@ -13,6 +13,7 @@ import { drawResort, hasBackNine } from './render/resortView.js';
 import { setAnimationTime, animationTime } from './render/animClock.js';
 import { drawWeather } from './render/weatherFx.js';
 import { setLight, lightAt, applyLight, DAYLIGHT } from './render/light.js';
+import { setAmbientWeather, drawCloudShadows, drawBirds } from './render/ambient.js';
 import { computeTokens, computeEffects, drawTokens, drawEffects } from './render/tokens.js';
 import { openHoles } from './sim/state.js';
 import { runDay, applyEventChoice } from './sim/day.js';
@@ -44,6 +45,7 @@ import { createSaveAdapter } from './save/adapter.js';
 import { createLocalBackend } from './save/local.js';
 import { encode } from './save/code.js';
 import { createChiptune, mountMuteToggle } from './audio/chiptune.js';
+import { injectTheme } from './ui/theme.js';
 
 document.body.style.backgroundColor = PALETTE.OUTLINE;
 
@@ -138,6 +140,7 @@ const changesRoot = document.createElement('div');
 document.body.appendChild(changesRoot);
 
 injectToolbarStyles();
+injectTheme();
 
 // ---------------------------------------------------------------------
 // State that only lives here: which screen is active, what the current
@@ -198,7 +201,10 @@ function drawOverview() {
   // sets the light too — no shadows and a grey cast under rain cloud.
   const weatherKey = weatherOn(state.weatherSeed, state.day);
   setLight(lightAt({ weatherKey }));
+  setAmbientWeather(weatherKey);
   regions = drawResort(ctx, state, { ...mapRect, nine: shownNine });
+  drawCloudShadows(ctx, mapRect, animationTime());
+  drawBirds(ctx, mapRect, animationTime());
   applyLight(ctx, mapRect);
   drawWeather(ctx, mapRect, weatherKey, animationTime());
   hud.update(state);
@@ -783,10 +789,13 @@ function drawPlayback() {
   // The sun crosses the sky as the day is watched: long cool shadows off
   // the first tee, short ones at lunch, long gold ones for the last group.
   setLight(lightAt({ minute, dayEnd: dayResult.endMinute, weatherKey }));
+  setAmbientWeather(weatherKey);
   regions = drawResort(ctx, dayResult.state, { ...mapRect, nine: shownNine });
   const holes = openHoles(dayResult.state);
   drawTokens(ctx, computeTokens(dayResult.timeline, holes, regions, minute));
   drawEffects(ctx, computeEffects(dayResult.timeline, holes, regions, minute));
+  drawCloudShadows(ctx, mapRect, animationTime());
+  drawBirds(ctx, mapRect, animationTime());
   applyLight(ctx, mapRect);
   drawWeather(ctx, mapRect, weatherKey, animationTime());
   hud.update(state); // yesterday's figures -- today's are still a secret until the report
